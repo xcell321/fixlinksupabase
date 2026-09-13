@@ -1,0 +1,9 @@
+node_modules/
+.expo/
+dist/
+mobile/dist/
+.env
+.env.*
+*.log
+*.zip
+*.apk

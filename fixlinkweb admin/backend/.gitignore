@@ -1,0 +1,6 @@
+.env
+.env.*
+*.log
+src/config/serviceAccountKey.json
+src/config/firebase.js
+node_modules/

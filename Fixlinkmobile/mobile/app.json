@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "FixLink Mobile",
+    "slug": "fixlinkmobile",
+    "scheme": "fixlink",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "FixLink needs your location to match you with nearby repair technicians and provide turn-by-turn navigation.",
+        "NSCameraUsageDescription": "FixLink needs access to your camera to attach photos of broken appliances.",
+        "NSPhotoLibraryUsageDescription": "FixLink needs access to your photo library to select appliance photos or credentials."
+      }
+    },
+    "android": {
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "plugins": [
+      "@react-native-community/datetimepicker",
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "FixLink needs your location to match you with nearby repair technicians and provide turn-by-turn navigation."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "FixLink needs access to your photos to upload repair and certification images."
+        }
+      ],
+      "expo-splash-screen"
+    ]
+  }
+}

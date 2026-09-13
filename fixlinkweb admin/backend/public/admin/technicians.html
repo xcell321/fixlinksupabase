@@ -1,0 +1,377 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FixLink Admin - Technician Verification</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%230F766E'/%3E%3Cstop offset='1' stop-color='%23075E59'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='24' height='24' rx='7' fill='url(%23g)'/%3E%3Cpath fill='%23fff' transform='translate(0.5 0.5) scale(0.958)' d='M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 6.7C.4 9.1.9 12.1 2.9 14.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z'/%3E%3C/svg%3E">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+:root {
+    --ink: #102A43;
+    --teal: #0F766E;
+    --teal-dark: #075E59;
+    --teal-light: #E6F6F3;
+    --canvas: #F5F8FA;
+    --white: #FFFFFF;
+    --muted: #5A7A91;
+    --line: #D9E2EC;
+    --danger: #DC2626;
+    --error: #E53935;
+    --gold: #D97706;
+    --green: #059669;
+    --orange: #F59E0B;
+}
+
+body {
+    min-height: 100vh;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--ink);
+    background-color: var(--canvas);
+    background-image: linear-gradient(135deg, rgba(15, 118, 110, 0.05), transparent 42%),
+        linear-gradient(315deg, rgba(7, 94, 89, 0.04), transparent 48%);
+}
+
+.admin-shell {
+    max-width: 1180px;
+}
+
+.admin-title {
+    color: var(--ink);
+    font-size: clamp(1.55rem, 3vw, 2rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+}
+
+.module-badge {
+    color: var(--teal-dark);
+    background-color: var(--teal-light);
+    border: 1px solid #CBE7E1;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+
+.admin-card {
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: 0 12px 32px rgba(16, 42, 67, 0.08) !important;
+}
+
+.admin-card .card-header {
+    color: #fff;
+    background: linear-gradient(135deg, var(--teal), var(--teal-dark)) !important;
+    border-bottom: 0;
+}
+
+.admin-card .card-header h5 {
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}
+
+.admin-card .card-body {
+    background-color: var(--white);
+}
+
+.admin-table {
+    color: var(--ink);
+    font-size: 0.94rem;
+}
+
+.admin-table thead th {
+    color: var(--teal-dark);
+    background-color: var(--teal-light);
+    border-bottom-color: var(--line);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.admin-table tbody td {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+}
+
+.admin-table tbody td:nth-child(2),
+.admin-table tbody td.text-muted {
+    color: var(--muted) !important;
+}
+
+.admin-table tbody tr {
+    border-color: var(--line);
+}
+
+.admin-table tbody tr:hover {
+    --bs-table-hover-bg: #F0FAF7;
+}
+
+.btn-teal {
+    color: #fff;
+    background-color: var(--teal);
+    border-color: var(--teal);
+    font-weight: 600;
+}
+
+.btn-teal:hover,
+.btn-teal:focus-visible {
+    color: #fff;
+    background-color: var(--teal-dark);
+    border-color: var(--teal-dark);
+}
+
+.btn-teal:focus-visible {
+    box-shadow: 0 0 0 0.25rem rgba(15, 118, 110, 0.25);
+}
+
+.pending-badge {
+    color: #D97706 !important;
+    background-color: #FEF3C7 !important;
+}
+
+.admin-layout {
+    display: flex;
+    min-height: 100vh;
+}
+
+.sidebar {
+    display: flex;
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 2;
+    width: 238px;
+    padding: 2rem 1rem 1.25rem;
+    flex-direction: column;
+    color: var(--ink);
+    background: var(--teal-light);
+    border-right: 1px solid var(--line);
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    margin: 0 0 2.7rem 0.55rem;
+    font-size: 1.08rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+}
+
+.brand small {
+    display: block;
+    margin-top: 0.25rem;
+    color: var(--muted);
+    font-size: 0.57rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+}
+
+.brand-mark {
+    display: grid;
+    width: 2.1rem;
+    height: 2.1rem;
+    place-items: center;
+    color: #fff;
+    background: linear-gradient(135deg, var(--teal), var(--teal-dark));
+    border-radius: 10px;
+    box-shadow: 0 4px 10px rgba(7, 94, 89, 0.25);
+}
+
+.brand-mark svg {
+    width: 1.25rem;
+    height: 1.25rem;
+    fill: currentColor;
+}
+
+.sidebar-label, .eyebrow {
+    margin-bottom: 0.45rem;
+    color: var(--teal);
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+}
+
+.nav-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.2rem;
+    padding: 0.7rem 0.75rem;
+    color: var(--muted);
+    border: 0;
+    border-radius: 10px;
+    font-size: 0.88rem;
+    font-weight: 500;
+    text-align: left;
+}
+
+.nav-link span { width: 1.1rem; height: 1.1rem; display: grid; place-items: center; }
+        .nav-link span svg { width: 1.1rem; height: 1.1rem; stroke: var(--teal); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        .nav-link:hover, .nav-link.active { color: #fff; background: var(--teal); }
+        .nav-link:hover span svg, .nav-link.active span svg { stroke: rgba(255, 255, 255, 0.92); }
+.sidebar-footer { margin-top: auto; padding: 1rem 0.55rem 0; color: var(--muted); border-top: 1px solid var(--line); font-size: 0.75rem; line-height: 1.6; }
+.logout-button { width: 100%; margin-top: 0.7rem; padding: 0.55rem 0; color: var(--teal-dark); background: transparent; border: 1px solid var(--line); border-radius: 10px; font: inherit; font-weight: 600; cursor: pointer; }.logout-button:hover { color: #fff; background: var(--teal-dark); border-color: var(--teal-dark); }
+.sidebar-footer span { color: var(--muted); }
+
+.main-content { width: calc(100% - 238px); margin-left: 238px; padding: 2.2rem 4.5vw 4rem; }
+.topbar { display: flex; align-items: center; justify-content: flex-end; max-width: 1220px; margin: 0 auto 1rem; }
+.view-intro .eyebrow { color: var(--teal); }
+.refresh-button { padding: 0.55rem 0.8rem; color: var(--teal-dark); background: transparent; border: 1px solid var(--line); border-radius: 10px; font: inherit; font-weight: 600; display: inline-flex; align-items: center; gap: 0.45rem; }
+        .refresh-button svg { width: 1rem; height: 1rem; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.refresh-button:hover { background: var(--teal-light); border-color: var(--teal); }
+.notice { display: none; max-width: 1220px; margin: -1.4rem auto 1.5rem; padding: 0.75rem 1rem; color: var(--teal-dark); background: var(--teal-light); border: 1px solid #CBE7E1; border-radius: 10px; font-weight: 600; }
+.notice.show { display: block; }.notice.error { color: var(--danger); background: #FEE2E2; border-color: #FECACA; }
+.view { display: none; max-width: 1220px; margin: auto; }.view.active { display: block; }
+.view-intro { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 1.8rem; }.view-intro h2 { margin: 0; color: var(--ink); font-size: clamp(1.45rem, 3vw, 2.2rem); font-weight: 800; letter-spacing: -0.02em; }.view-intro p:not(.eyebrow) { margin: 0.6rem 0 0; color: var(--muted); }
+.live-pill { padding: 0.45rem 0.7rem; color: #065F46; background: #D1FAE5; border-radius: 999px; font-size: 0.75rem; font-weight: 700; }.live-pill i { display: inline-block; width: 7px; height: 7px; margin-right: 0.35rem; background: var(--green); border-radius: 50%; }
+.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }.stat-card { padding: 1.25rem 1.3rem; background: var(--white); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 4px 14px rgba(16, 42, 67, 0.05); }.stat-card.accent { background: linear-gradient(135deg, var(--teal), var(--teal-dark)); color: #fff; border-color: var(--teal-dark); }.stat-label { display: block; color: var(--muted); font-size: 0.78rem; font-weight: 600; }.accent .stat-label, .accent small { color: #CDEAE3; }.stat-card strong { display: block; margin: 0.65rem 0 0.25rem; color: var(--ink); font-size: 2rem; font-weight: 800; }.accent strong { color: #fff; }.stat-card small { color: var(--muted); font-size: 0.75rem; }
+.overview-grid { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 1.5rem; }.panel { overflow: hidden; background: var(--white); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 4px 14px rgba(16, 42, 67, 0.05); }.panel-heading { display: flex; justify-content: space-between; align-items: flex-start; padding: 1.3rem 1.4rem 0.8rem; }.panel-heading h3 { margin: 0; color: var(--ink); font-size: 1.05rem; font-weight: 700; }.text-button { padding: 0; color: var(--teal); background: none; border: 0; font-size: 0.8rem; font-weight: 700; }.text-button:hover { color: var(--teal-dark); text-decoration: underline; }.list-area, .status-list { padding: 0 1.4rem 1rem; }.list-row, .status-row { display: flex; justify-content: space-between; align-items: center; padding: 0.9rem 0; border-bottom: 1px solid var(--line); }.list-row:last-child, .status-row:last-child { border-bottom: 0; }.list-row small, .table-subtext { display: block; margin-top: 0.25rem; color: var(--muted); font-size: 0.76rem; }.status-row span { color: var(--muted); }.status-row strong { color: var(--teal-dark); }
+        .analytics-panel { display: contents; }
+        .analytics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        .metric-row { padding: 0.9rem 0; border-bottom: 1px solid var(--line); }
+        .metric-row:last-child { border-bottom: 0; }
+        .metric-label { display: flex; gap: 0.75rem; justify-content: space-between; align-items: baseline; }
+        .metric-label span { color: var(--ink); font-size: 0.88rem; font-weight: 600; }
+        .metric-label strong { color: var(--teal-dark); font-size: 0.82rem; font-weight: 700; white-space: nowrap; }
+        .metric-bar { height: 7px; margin-top: 0.55rem; overflow: hidden; background: var(--teal-light); border-radius: 999px; }
+        .metric-bar i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--teal), var(--teal-dark)); }
+        @media (max-width: 768px) { .analytics-grid { grid-template-columns: 1fr; } }
+.toolbar { display: flex; gap: 0.65rem; padding: 1.1rem 1.25rem; border-bottom: 1px solid var(--line); }.toolbar input, .toolbar select, .inline-form input, #announcementForm input, #announcementForm textarea { min-height: 2.4rem; padding: 0.55rem 0.7rem; color: var(--ink); background: #FBFDFE; border: 1px solid var(--line); border-radius: 10px; font: inherit; font-size: 0.82rem; }.toolbar input:focus, .toolbar select:focus, .inline-form input:focus, #announcementForm input:focus, #announcementForm textarea:focus { outline: 3px solid rgba(15, 118, 110, 0.18); border-color: var(--teal); }.search-input { flex: 1; }.toolbar select { min-width: 145px; }.table-wrap { overflow-x: auto; }.admin-table { width: 100%; margin: 0; border-collapse: collapse; font-size: 0.86rem; }.admin-table th { padding: 0.85rem 1.25rem; color: var(--teal-dark); background: var(--teal-light); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; text-align: left; text-transform: uppercase; white-space: nowrap; }.admin-table td { padding: 1rem 1.25rem; border-bottom: 1px solid var(--line); vertical-align: middle; white-space: nowrap; }.admin-table tr:last-child td { border-bottom: 0; }.admin-table tr:hover td { background: #F0FAF7; }.status { display: inline-block; padding: 0.3rem 0.55rem; border-radius: 999px; color: #D97706; background: #FEF3C7; font-size: 0.7rem; font-weight: 700; text-transform: capitalize; }.status-pending { color: #D97706; background: #FEF3C7; }.status-accepted { color: #0F766E; background: #E6F6F3; }.status-in-progress { color: #2563EB; background: #DBEAFE; }.status-active, .status-completed { color: #059669; background: #D1FAE5; }.status-cancelled, .status-rejected, .status-banned { color: #E53935; background: #FEE2E2; }.status-suspended, .status-inactive { color: var(--muted); background: #E2E8F0; }.action-group { display: flex; gap: 0.55rem; }.action-link { padding: 0; color: var(--teal); background: none; border: 0; font-size: 0.78rem; font-weight: 700; }.action-link:hover { color: var(--teal-dark); text-decoration: underline; }.action-link.danger { color: var(--danger); }.action-link.danger:hover { color: #991B1B; }.empty-state { padding: 2rem 1.3rem; color: var(--muted); text-align: center; }.inline-form { display: flex; gap: 0.65rem; padding: 1.25rem; border-bottom: 1px solid var(--line); }.inline-form input { flex: 1; }.btn-teal { padding: 0.6rem 0.9rem; border: 0; border-radius: 10px; }.category-list { display: flex; flex-wrap: wrap; gap: 0.65rem; padding: 1.25rem; }.category-chip { padding: 0.6rem 0.8rem; color: var(--teal-dark); background: var(--teal-light); border: 1px solid #CBE7E1; border-radius: 999px; font-size: 0.82rem; font-weight: 600; }.announcement-panel { padding: 1.25rem; }.announcement-panel form { display: grid; gap: 0.7rem; }.announcement-panel .btn-teal { justify-self: start; }.announcement-list { margin-top: 1.5rem; }.announcement { padding: 1rem 0; border-top: 1px solid var(--line); }.announcement strong { color: var(--ink); }.announcement p { margin: 0.4rem 0; color: var(--muted); }.announcement small { color: var(--muted); }.rating { color: var(--gold); letter-spacing: 0.08em; }
+
+@media (max-width: 576px) {
+    .sidebar { position: static; width: 100%; min-height: auto; padding: 1rem; background: var(--teal-light); }.admin-layout { display: block; }.brand { margin-bottom: 1rem; }.sidebar-label, .sidebar-footer { display: none; }.nav { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.2rem; }.nav-link { margin: 0; font-size: 0.75rem; }.main-content { width: 100%; margin: 0; padding: 1.5rem 1rem 3rem; }.topbar { margin-bottom: 1.7rem; }.refresh-button span { display: none; }.stats-grid, .overview-grid { grid-template-columns: 1fr 1fr; gap: 0.7rem; }.stat-card { padding: 1rem; }.stat-card strong { font-size: 1.5rem; }.view-intro { display: block; }.live-pill { display: inline-block; margin-top: 1rem; }.toolbar { flex-wrap: wrap; }.toolbar input, .toolbar select { min-width: 100%; }.action-group { flex-wrap: wrap; }.admin-table th, .admin-table td { padding-right: 0.8rem; padding-left: 0.8rem; }
+    .admin-shell { margin-top: 2rem !important; }
+    .module-badge { max-width: 48%; white-space: normal; text-align: center; }
+}
+.review-modal[hidden] { display: none; }
+.review-modal { position: fixed; inset: 0; z-index: 10; display: grid; padding: 1rem; place-items: center; background: rgba(16, 42, 67, 0.58); }
+.review-dialog { width: min(720px, 100%); max-height: min(760px, 92vh); overflow-y: auto; background: var(--white); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 20px 60px rgba(16, 42, 67, 0.3); }
+.review-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.3rem 1.4rem; color: #fff; background: linear-gradient(135deg, var(--teal), var(--teal-dark)); }
+.review-header h3 { margin: 0; font-size: 1.15rem; font-weight: 800; }
+.review-header p { margin: 0.35rem 0 0; color: #CDEAE3; font-size: 0.8rem; }
+.review-close { padding: 0.15rem 0.45rem; color: #fff; background: transparent; border: 1px solid #9FD3C9; border-radius: 8px; font-size: 1.2rem; line-height: 1; }
+.review-close:hover { background: rgba(255, 255, 255, 0.15); }
+.review-body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.8rem; padding: 1.3rem 1.4rem; }
+.review-field { min-width: 0; padding: 0.75rem; background: #FBFDFE; border: 1px solid var(--line); border-radius: 10px; }
+.review-field.wide { grid-column: 1 / -1; }
+.review-field dt { color: var(--muted); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; }
+.review-field dd { margin: 0.3rem 0 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.review-footer { display: flex; justify-content: flex-end; gap: 0.65rem; padding: 1rem 1.4rem 1.3rem; border-top: 1px solid var(--line); }
+.review-footer button { padding: 0.6rem 0.9rem; border: 0; border-radius: 10px; font: inherit; font-weight: 700; cursor: pointer; }
+.review-approve { color: #fff; background: var(--teal); }
+.review-approve:hover { background: var(--teal-dark); }
+.review-reject { color: var(--danger); background: #FEE2E2; }
+.review-reject:hover { color: #991B1B; background: #FECACA; }
+.review-footer button:disabled { opacity: 0.55; cursor: wait; }
+@media (max-width: 576px) { .review-body { grid-template-columns: 1fr; }.review-field.wide { grid-column: auto; }.review-footer { flex-wrap: wrap; }.review-footer button { flex: 1; } }
+</style>
+</head>
+<body>
+    <div class="admin-layout">
+        <aside class="sidebar">
+            <div class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 6.7C.4 9.1.9 12.1 2.9 14.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/></svg></span><span>FixLink <small>ADMIN</small></span></div>
+            <p class="sidebar-label">Workspace</p>
+            <nav class="nav flex-column" aria-label="Admin sections">
+                <button class="nav-link" data-view="overview"><span aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span> Overview</button>
+                <button class="nav-link" data-view="technicians"><span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg></span> Technician review</button>
+                <button class="nav-link" data-view="accounts"><span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span> Accounts</button>
+                <button class="nav-link" data-view="requests"><span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span> Repair requests</button>
+                <button class="nav-link" data-view="reports"><span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span> Reports & disputes</button>
+                <button class="nav-link" data-view="reviews"><span aria-hidden="true"><svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span> Ratings & feedback</button>
+                <button class="nav-link" data-view="categories"><span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.83z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></span> Skill categories</button>
+                <button class="nav-link" data-view="announcements"><span aria-hidden="true"><svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></span> Announcements</button>
+                <button class="nav-link" data-view="analytics"><span aria-hidden="true"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span> Reports & analytics</button>
+            </nav>
+            <div class="sidebar-footer">Operations console<br><span>Live database data</span><button class="logout-button" id="logoutButton">Sign out</button></div>
+        </aside>
+
+        <main class="main-content">
+            <header class="topbar"><button class="refresh-button" id="refreshButton" title="Refresh data"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> <span>Refresh</span></button></header>
+            <div id="notice" class="notice" role="status"></div>
+
+            <section class="view active" id="overview">
+                <div class="view-intro"><div><p class="eyebrow">Platform pulse</p><h2>Everything in one place.</h2></div><span class="live-pill"><i></i> Live overview</span></div>
+                <div class="stats-grid">
+                    <div class="stat-card"><span class="stat-label">Total users</span><strong id="userCount">—</strong><small>Customers and technicians</small></div>
+                    <div class="stat-card"><span class="stat-label">Customers</span><strong id="customerCount">—</strong><small>Registered accounts</small></div>
+                    <div class="stat-card accent"><span class="stat-label">Technicians</span><strong id="technicianCount">—</strong><small>Across all statuses</small></div>
+                    <div class="stat-card"><span class="stat-label">Repair requests</span><strong id="requestCount">—</strong><small>All-time activity</small></div>
+                    <div class="stat-card accent"><span class="stat-label">Active requests</span><strong id="activeRequestCount">—</strong><small>Pending or in progress</small></div>
+                    <div class="stat-card"><span class="stat-label">Completed jobs</span><strong id="completedRequestCount">—</strong><small>Finished requests</small></div>
+                    <div class="stat-card accent"><span class="stat-label">Pending approvals</span><strong id="pendingTechnicianCount">—</strong><small>Technicians to review</small></div>
+                    <div class="stat-card"><span class="stat-label">Average rating</span><strong id="ratingCount">—</strong><small>From submitted reviews</small></div>
+                </div>
+                <div class="overview-grid"><div class="panel"><div class="panel-heading"><div><p class="eyebrow">Needs attention</p><h3>Technician applications</h3></div><button class="text-button" data-view-target="technicians">View all →</button></div><div id="overviewTechs" class="list-area">Loading...</div></div><div class="panel"><div class="panel-heading"><div><p class="eyebrow">Service flow</p><h3>Request status</h3></div></div><div id="requestSummary" class="status-list">Loading...</div></div></div>
+            </section>
+
+            <section class="view" id="technicians"><div class="view-intro"><div><p class="eyebrow">Verification</p><h2>Technician review</h2><p>Check applications before technicians join the marketplace.</p></div></div><div class="panel"><div class="toolbar"><input class="search-input" id="techSearch" placeholder="Search name or email" aria-label="Search technicians"><select id="techStatus" aria-label="Filter technicians"><option value="all">All statuses</option><option value="pending_verification">Pending</option><option value="active">Verified</option><option value="rejected">Rejected</option></select></div><div class="table-wrap"><table class="admin-table"><thead><tr><th>Technician</th><th>Contact</th><th>Joined</th><th>Status</th><th>Review</th></tr></thead><tbody id="techTableBody"></tbody></table></div></div></section>
+
+            <section class="view" id="accounts"><div class="view-intro"><div><p class="eyebrow">Directory</p><h2>Account management</h2><p>Search and manage every customer and technician account.</p></div></div><div class="panel"><div class="toolbar"><input class="search-input" id="accountSearch" placeholder="Search by name or email" aria-label="Search accounts"><select id="accountRole" aria-label="Filter account role"><option value="all">All roles</option><option value="customer">Customers</option><option value="technician">Technicians</option></select><select id="accountStatus" aria-label="Filter account status"><option value="all">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option><option value="suspended">Suspended</option><option value="banned">Banned</option></select></div><div class="table-wrap"><table class="admin-table"><thead><tr><th>Account</th><th>Role</th><th>Joined</th><th>Status</th><th>Actions</th></tr></thead><tbody id="accountTableBody"></tbody></table></div></div></section>
+
+            <section class="view data-view" id="requests"><div class="view-intro"><div><p class="eyebrow">Marketplace activity</p><h2>Repair requests</h2><p>Monitor service work across the platform.</p></div></div><div class="panel"><div class="toolbar"><select id="requestFilter"><option value="all">All statuses</option><option>Pending</option><option>Accepted</option><option>In Progress</option><option>Completed</option><option>Cancelled</option></select><input type="date" id="requestDate" aria-label="Filter by date"></div><div class="table-wrap"><table class="admin-table"><thead><tr><th>Request</th><th>Customer</th><th>Appliance</th><th>Location</th><th>Status</th><th>Assigned technician</th></tr></thead><tbody id="requestTableBody"></tbody></table></div></div></section>
+            <section class="view data-view" id="reports"><div class="view-intro"><div><p class="eyebrow">Trust & safety</p><h2>Reports & disputes</h2><p>Review complaints and take action on harmful behavior.</p></div></div><div class="panel"><div class="table-wrap"><table class="admin-table"><thead><tr><th>Report</th><th>Reported user</th><th>Reason</th><th>Status</th><th>Action</th></tr></thead><tbody id="reportsTableBody"></tbody></table></div></div></section>
+            <section class="view data-view" id="reviews"><div class="view-intro"><div><p class="eyebrow">Quality control</p><h2>Ratings & feedback</h2><p>Keep the marketplace constructive and trustworthy.</p></div></div><div class="panel"><div class="table-wrap"><table class="admin-table"><thead><tr><th>Rating</th><th>Review</th><th>Technician</th><th>Customer</th><th>Date</th><th>Action</th></tr></thead><tbody id="reviewTableBody"></tbody></table></div></div></section>
+            <section class="view" id="categories"><div class="view-intro"><div><p class="eyebrow">Marketplace structure</p><h2>Skill categories</h2><p>Keep technician specializations aligned with customer needs.</p></div></div><div class="panel"><form class="inline-form" id="categoryForm"><input id="categoryName" required placeholder="New category name" aria-label="New category name"><button class="btn-teal" type="submit">Add category</button></form><div id="categoryList" class="category-list"></div></div></section>
+            <section class="view" id="announcements"><div class="view-intro"><div><p class="eyebrow">Communication</p><h2>Announcements</h2><p>Send important updates to the FixLink community.</p></div></div><div class="panel announcement-panel"><form id="announcementForm"><input id="announcementTitle" required placeholder="Announcement title"><textarea id="announcementMessage" required rows="4" placeholder="Write an update for the platform..."></textarea><button class="btn-teal" type="submit">Publish announcement</button></form><div id="announcementList" class="announcement-list"></div></div></section>
+            <section class="view data-view" id="analytics"><div class="view-intro"><div><p class="eyebrow">Performance</p><h2>Reports & analytics</h2><p>Track demand, completed work, and technician performance.</p></div></div><div class="analytics-panel" id="analyticsPanel">Loading analytics...</div></section>
+        </main>
+    </div>
+
+    <div class="review-modal" id="reviewModal" hidden>
+        <section class="review-dialog" role="dialog" aria-modal="true" aria-labelledby="reviewTitle">
+            <header class="review-header"><div><h3 id="reviewTitle">Technician application</h3><p id="reviewSubtitle">Review identity and profile information before deciding.</p></div><button class="review-close" id="closeReview" type="button" aria-label="Close review">Ã—</button></header>
+            <dl class="review-body" id="reviewDetails"><div class="empty-state">Loading profile...</div></dl>
+            <footer class="review-footer"><button class="review-reject" id="reviewReject" type="button">Reject</button><button class="review-approve" id="reviewApprove" type="button">Approve technician</button></footer>
+        </section>
+    </div>
+
+    <script>
+        const state = { users: [], technicians: [] };
+        const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
+        const dateText = value => value ? new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+        const statusBadge = status => `<span class="status status-${String(status || 'pending').toLowerCase().replace(/[^a-z]+/g, '-')}">${escapeHtml(String(status || 'Pending').replace('_', ' '))}</span>`;
+        async function api(url, options) { const response = await fetch(url, options); const body = await response.text(); let data = null; try { data = body ? JSON.parse(body) : null; } catch (error) { throw new Error(`Server returned an invalid response (${response.status}) for ${url}`); } if (response.status === 401) { window.location.href = '/admin/login.html'; return; } if (!response.ok) throw new Error(data && data.error || 'Request failed'); return data; }
+        function showNotice(message, error = false) { const notice = document.getElementById('notice'); notice.textContent = message; notice.className = `notice show ${error ? 'error' : ''}`; setTimeout(() => notice.classList.remove('show'), 3500); }
+        function renderRows(element, rows, columns = 5) { element.innerHTML = rows.length ? rows.join('') : `<tr><td colspan="${columns}" class="empty-state">Nothing to show yet.</td></tr>`; }
+
+        async function loadOverview() { const data = await api('/api/admin/overview'); Object.entries({ userCount: data.counts.customers + data.counts.technicians, customerCount: data.counts.customers, technicianCount: data.counts.technicians, requestCount: data.counts.requests, activeRequestCount: data.counts.activeRequests, completedRequestCount: data.counts.completedRequests, pendingTechnicianCount: data.counts.pendingTechnicians, ratingCount: data.counts.averageRating || '—' }).forEach(([id, value]) => document.getElementById(id).textContent = value); document.getElementById('overviewTechs').innerHTML = data.pendingTechnicians.length ? data.pendingTechnicians.map(tech => `<div class="list-row"><div><strong>${escapeHtml(tech.name || 'Unnamed technician')}</strong><small>${escapeHtml(tech.email || 'No email')}</small></div>${statusBadge(tech.status)}</div>`).join('') : '<div class="empty-state">No pending applications.</div>'; const statuses = Object.entries(data.requestStatuses); document.getElementById('requestSummary').innerHTML = statuses.length ? statuses.map(([status, count]) => `<div class="status-row"><span>${escapeHtml(status)}</span><strong>${count}</strong></div>`).join('') : '<div class="empty-state">No repair requests yet.</div>'; }
+        async function loadTechnicians() { const search = document.getElementById('techSearch').value; const status = document.getElementById('techStatus').value; state.technicians = await api(`/api/admin/users?role=technician&status=${encodeURIComponent(status)}&search=${encodeURIComponent(search)}`); renderRows(document.getElementById('techTableBody'), state.technicians.map(tech => `<tr><td><strong>${escapeHtml(tech.name || 'Unnamed')}</strong></td><td>${escapeHtml(tech.email || '—')}</td><td>${dateText(tech.createdAt)}</td><td>${statusBadge(tech.status)}</td><td class="action-group">${tech.status === 'pending_verification' ? `<button class="action-link" onclick="reviewTechnician('${tech.uid}')">View credentials</button>` : `<button class="action-link" onclick="setUserStatus('${tech.uid}','${tech.status === 'active' ? 'suspended' : 'active'}')">${tech.status === 'active' ? 'Suspend' : 'Activate'}</button>`}</td></tr>`)); }
+        async function loadAccounts() { const params = new URLSearchParams({ role: document.getElementById('accountRole').value, status: document.getElementById('accountStatus').value, search: document.getElementById('accountSearch').value }); state.users = await api(`/api/admin/users?${params}`); renderRows(document.getElementById('accountTableBody'), state.users.map(user => `<tr><td><strong>${escapeHtml(user.name || 'Unnamed')}</strong><small class="table-subtext">${escapeHtml(user.email || '—')}</small></td><td>${escapeHtml(user.role || '—')}</td><td>${dateText(user.createdAt)}</td><td>${statusBadge(user.status)}</td><td class="action-group"><button class="action-link" onclick="setUserStatus('${user.uid}','${user.status === 'active' ? 'suspended' : 'active'}')">${user.status === 'active' ? 'Suspend' : 'Activate'}</button><button class="action-link" onclick="setUserStatus('${user.uid}','inactive')">Deactivate</button><button class="action-link danger" onclick="setUserStatus('${user.uid}','banned')">Ban</button><button class="action-link" onclick="resetPassword('${user.uid}')">Reset password</button><button class="action-link danger" onclick="deleteUser('${user.uid}')">Delete</button></td></tr>`)); }
+        async function loadCollection(section) { const data = await api(`/api/admin/${section}`); if (section === 'requests') { const status = document.getElementById('requestFilter').value; const date = document.getElementById('requestDate').value; const filtered = data.filter(item => (status === 'all' || item.status === status) && (!date || String(item.createdAt || '').startsWith(date))); renderRows(document.getElementById('requestTableBody'), filtered.map(item => `<tr><td><strong>${escapeHtml(item.title || item.id)}</strong><small class="table-subtext">${dateText(item.createdAt)}</small></td><td>${escapeHtml(item.customerName || item.customerEmail || '—')}</td><td>${escapeHtml(item.applianceType || item.category || '—')}</td><td>${escapeHtml(item.location || '—')}</td><td>${statusBadge(item.status)}</td><td>${escapeHtml(item.technicianName || 'Unassigned')} ${['Cancelled', 'Pending'].includes(item.status) ? `<button class="action-link" onclick="reassignRequest('${item.id}')">Reassign</button>` : ''}</td></tr>`, 6)); } if (section === 'reports') renderRows(document.getElementById('reportsTableBody'), data.map(item => `<tr><td>${escapeHtml(item.title || item.id)}</td><td>${escapeHtml(item.reportedUserName || item.userName || item.userUid || '—')}</td><td>${escapeHtml(item.reason || item.description || '—')}</td><td>${statusBadge(item.status || 'open')}</td><td><button class="action-link" onclick="resolveReport('${item.id}','warn','${item.userUid || ''}')">Warn</button><button class="action-link" onclick="resolveReport('${item.id}','suspend','${item.userUid || ''}')">Suspend</button><button class="action-link danger" onclick="resolveReport('${item.id}','ban','${item.userUid || ''}')">Ban</button></td></tr>`), 5); if (section === 'reviews') renderRows(document.getElementById('reviewTableBody'), data.map(item => `<tr><td class="rating">${'★'.repeat(Math.min(5, Number(item.rating) || 0))}</td><td>${escapeHtml(item.comment || item.text || '—')}</td><td>${escapeHtml(item.technicianName || '—')}</td><td>${escapeHtml(item.customerName || '—')}</td><td>${dateText(item.createdAt)}</td><td><button class="action-link danger" onclick="removeReview('${item.id}')">Remove</button></td></tr>`), 6); if (section === 'categories') document.getElementById('categoryList').innerHTML = data.length ? data.map(item => `<span class="category-chip">${escapeHtml(item.name || item.title || item.id)} <button class="action-link" onclick="editCategory('${item.id}','${escapeHtml(item.name || '')}')">Edit</button> <button class="action-link danger" onclick="deleteCategory('${item.id}')">Remove</button></span>`).join('') : '<div class="empty-state">No categories yet.</div>'; if (section === 'announcements') document.getElementById('announcementList').innerHTML = data.length ? data.reverse().map(item => `<article class="announcement"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.message)}</p><small>${dateText(item.createdAt)}</small></article>`).join('') : '<div class="empty-state">No announcements yet.</div>'; }
+        function displayValue(value) { if (value === null || value === undefined || value === '') return '—'; if (typeof value === 'object') return JSON.stringify(value, null, 2); return String(value); }
+        function profileLabel(key) { return key.replace(/([A-Z])/g, ' $1').replace(/[_-]+/g, ' ').replace(/^./, character => character.toUpperCase()); }
+        function credentialValue(key, profile) { if (!profile[key]) return '<span class="muted">Not uploaded</span>'; const type = key === 'governmentIdFileUrl' ? 'government-id' : 'certificate'; const safeUrl = `/api/admin/technicians/${encodeURIComponent(profile.uid)}/credential/${type}`; return `<a href="${safeUrl}" target="_blank" rel="noopener">Open ${escapeHtml(profileLabel(key))}</a>`; }
+        function renderReview(profile) { const preferred = ['uid', 'name', 'email', 'phone', 'address', 'governmentIdNumber', 'skills', 'yearsExperience', 'status', 'verificationStatus', 'rejectionReason', 'governmentIdFileUrl', 'certificateFileUrl', 'createdAt']; const keys = [...preferred.filter(key => key in profile), ...Object.keys(profile).filter(key => !preferred.includes(key) && !['password', 'passwordHash', 'resetToken'].includes(key))]; document.getElementById('reviewTitle').textContent = `${profile.name || 'Technician'} application`; document.getElementById('reviewSubtitle').textContent = 'Review identity, skills, and protected local credentials before deciding.'; document.getElementById('reviewDetails').innerHTML = keys.map(key => `<div class="review-field${typeof profile[key] === 'object' ? ' wide' : ''}"><dt>${escapeHtml(profileLabel(key))}</dt><dd>${['governmentIdFileUrl', 'certificateFileUrl'].includes(key) ? credentialValue(key, profile) : escapeHtml(displayValue(profile[key]))}</dd></div>`).join(''); }
+        function closeReview() { document.getElementById('reviewModal').hidden = true; document.body.style.overflow = ''; }
+        async function reviewTechnician(uid) { const modal = document.getElementById('reviewModal'); const approve = document.getElementById('reviewApprove'); const reject = document.getElementById('reviewReject'); document.getElementById('reviewDetails').innerHTML = '<div class="empty-state">Loading profile...</div>'; approve.disabled = true; reject.disabled = true; modal.hidden = false; document.body.style.overflow = 'hidden'; try { const profile = await api(`/api/admin/technicians/${encodeURIComponent(uid)}`); renderReview(profile); approve.disabled = false; reject.disabled = false; approve.onclick = () => decideTechnician(uid, 'approve'); reject.onclick = () => decideTechnician(uid, 'reject'); } catch (error) { closeReview(); showNotice(error.message, true); } }
+        async function decideTechnician(uid, decision) { const reason = decision === 'reject' ? prompt('Reason for rejection (optional):') : ''; if (decision === 'reject' && reason === null) return; const approve = document.getElementById('reviewApprove'); const reject = document.getElementById('reviewReject'); approve.disabled = true; reject.disabled = true; try { await api(`/api/admin/technicians/${uid}/decision`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision, reason }) }); closeReview(); showNotice(`Application ${decision}d.`); await Promise.all([loadTechnicians(), loadOverview()]); } catch (error) { approve.disabled = false; reject.disabled = false; showNotice(error.message, true); } }
+        async function setUserStatus(uid, status) { try { await api(`/api/admin/users/${uid}/status`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) }); showNotice('Account status updated.'); await Promise.all([loadAccounts(), loadOverview()]); } catch (error) { showNotice(error.message, true); } }
+        async function deleteUser(uid) { if (!confirm('Delete this account permanently?')) return; try { await api(`/api/admin/users/${uid}`, { method: 'DELETE' }); showNotice('Account deleted.'); await Promise.all([loadAccounts(), loadOverview()]); } catch (error) { showNotice(error.message, true); } }
+        async function resetPassword(uid) { try { const result = await api(`/api/admin/users/${uid}/password-reset`, { method: 'POST' }); showNotice(`Password reset email sent to ${result.email}.`); } catch (error) { showNotice(error.message, true); } }
+        async function reassignRequest(id) { const technicianUid = prompt('Enter the technician UID to assign this request to:'); if (!technicianUid) return; const technicianName = prompt('Enter the technician name (optional):'); try { await api(`/api/admin/requests/${id}/reassign`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ technicianUid, technicianName }) }); showNotice('Repair request reassigned.'); loadCollection('requests'); } catch (error) { showNotice(error.message, true); } }
+        async function resolveReport(id, action, userUid) { const userStatus = action === 'suspend' ? 'suspended' : action === 'ban' ? 'banned' : 'active'; try { await api(`/api/admin/reports/${id}/resolve`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, userUid, userStatus }) }); showNotice('Report resolved.'); loadCollection('reports'); } catch (error) { showNotice(error.message, true); } }
+        async function removeReview(id) { if (!confirm('Remove this review?')) return; try { await api(`/api/admin/reviews/${id}`, { method: 'DELETE' }); showNotice('Review removed.'); loadCollection('reviews'); } catch (error) { showNotice(error.message, true); } }
+        async function editCategory(id, currentName) { const name = prompt('Category name:', currentName); if (!name || name === currentName) return; try { await api(`/api/admin/categories/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) }); showNotice('Category updated.'); loadCollection('categories'); } catch (error) { showNotice(error.message, true); } }
+        async function deleteCategory(id) { if (!confirm('Remove this category?')) return; try { await api(`/api/admin/categories/${id}`, { method: 'DELETE' }); showNotice('Category removed.'); loadCollection('categories'); } catch (error) { showNotice(error.message, true); } }
+        async function loadAnalytics() { const data = await api('/api/admin/analytics'); const total = Number(data.requestVolume) || 0; const done = Number(data.completedRequests) || 0; const reviews = Number(data.reviewCount) || 0; const rate = total ? Math.round((done / total) * 100) : 0; const maxCat = Math.max(0, ...data.popularCategories.map(item => Number(item.count) || 0)); const maxTech = Math.max(0, ...data.technicianPerformance.map(item => Number(item.requests) || 0)); document.getElementById('analyticsPanel').innerHTML = `<div class="stats-grid"><div class="stat-card accent"><span class="stat-label">Total requests</span><strong>${total}</strong><small>Across all services</small></div><div class="stat-card"><span class="stat-label">Completed jobs</span><strong>${done}</strong><small>Finished requests</small></div><div class="stat-card"><span class="stat-label">Completion rate</span><strong>${rate}%</strong><small>Of all placed</small></div><div class="stat-card"><span class="stat-label">Reviews submitted</span><strong>${reviews}</strong><small>From submitted reviews</small></div></div><div class="analytics-grid"><div class="panel"><div class="panel-heading"><h3>Popular categories</h3></div><div class="list-area">${data.popularCategories.length ? data.popularCategories.map(item => { const count = Number(item.count) || 0; const pct = maxCat ? Math.round((count / maxCat) * 100) : 0; return `<div class="metric-row"><div class="metric-label"><span>${escapeHtml(item.name)}</span><strong>${count} ${count === 1 ? 'job' : 'jobs'}</strong></div><div class="metric-bar"><i style="width:${pct}%"></i></div></div>`; }).join('') : '<div class="empty-state">No job data yet.</div>'}</div></div><div class="panel"><div class="panel-heading"><h3>Technician performance</h3></div><div class="list-area">${data.technicianPerformance.length ? data.technicianPerformance.map(item => { const requests = Number(item.requests) || 0; const completed = Number(item.completed) || 0; const pct = requests ? Math.round((completed / requests) * 100) : 0; return `<div class="metric-row"><div class="metric-label"><span>${escapeHtml(item.name)}</span><strong>${completed}/${requests} done</strong></div><div class="metric-bar" title="${pct}% completed"><i style="width:${pct}%"></i></div></div>`; }).join('') : '<div class="empty-state">No assigned work yet.</div>'}</div></div></div>`; }
+        async function loadCurrentView(view) { if (view === 'overview') return loadOverview(); if (view === 'technicians') return loadTechnicians(); if (view === 'accounts') return loadAccounts(); if (view === 'analytics') return loadAnalytics(); if (['requests', 'reports', 'reviews', 'categories', 'announcements'].includes(view)) return loadCollection(view); }
+        document.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => { const view = button.dataset.view; document.querySelectorAll('[data-view]').forEach(item => item.classList.toggle('active', item === button)); document.querySelectorAll('.view').forEach(item => item.classList.toggle('active', item.id === view)); loadCurrentView(view).catch(error => showNotice(error.message, true)); }));
+        document.querySelectorAll('[data-view-target]').forEach(button => button.addEventListener('click', () => document.querySelector(`[data-view="${button.dataset.viewTarget}"]`).click())); document.getElementById('logoutButton').addEventListener('click', async () => { await fetch('/api/admin/logout', { method: 'POST' }); window.location.href = '/admin/login.html'; });
+        document.getElementById('closeReview').addEventListener('click', closeReview); document.getElementById('reviewModal').addEventListener('click', event => { if (event.target.id === 'reviewModal') closeReview(); }); document.addEventListener('keydown', event => { if (event.key === 'Escape' && !document.getElementById('reviewModal').hidden) closeReview(); });
+        ['techSearch', 'techStatus'].forEach(id => document.getElementById(id).addEventListener('input', loadTechnicians)); ['accountSearch', 'accountRole', 'accountStatus'].forEach(id => document.getElementById(id).addEventListener('input', loadAccounts)); ['requestFilter', 'requestDate'].forEach(id => document.getElementById(id).addEventListener('input', () => loadCollection('requests'))); document.getElementById('refreshButton').addEventListener('click', () => loadCurrentView(document.querySelector('.view.active').id).then(() => showNotice('Data refreshed.')).catch(error => showNotice(error.message, true)));
+        document.getElementById('categoryForm').addEventListener('submit', async event => { event.preventDefault(); try { await api('/api/admin/categories', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: document.getElementById('categoryName').value }) }); event.target.reset(); showNotice('Category added.'); loadCollection('categories'); } catch (error) { showNotice(error.message, true); } }); document.getElementById('announcementForm').addEventListener('submit', async event => { event.preventDefault(); try { await api('/api/admin/announcements', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: document.getElementById('announcementTitle').value, message: document.getElementById('announcementMessage').value }) }); event.target.reset(); showNotice('Announcement published.'); loadCollection('announcements'); } catch (error) { showNotice(error.message, true); } }); api('/api/admin/session').then(session => { if (!session || !session.authenticated) window.location.href = '/admin/login.html'; else loadOverview().catch(error => showNotice(error.message, true)); });
+    </script>
+</body>
+</html>
+
+
+
+
+
+
