@@ -1,0 +1,235 @@
+CEBU ROOSEVELT MEMORIAL COLLEGES
+San Vicente St., Bogo City, Cebu
+
+COLLEGE OF COMPUTER STUDIES
+
+
+July 7, 2026
+
+DR. JONEL D. GELIG
+Dean, College of Computer Studies 
+
+Dear Sir:
+
+Good Day!
+	We, the third-year students pursuing a Bachelor of Science in Information Technology at Cebu Roosevelt Memorial Colleges, would like to propose a software project feasibility study as one of the course requirements. The project is entitled FixLink: An All-Around Technician Service Platform for Repair Request Management and Home-Based Technician Dispatch. This system designed to bridge the gap between customers with broken devices or appliances and skilled technicians available to repair them. Whether it's a system unit, monitor, refrigerator, washing machine, or other household equipment, customers can submit a repair request directly through the platform. Once a request is submitted, the system automatically notifies available technicians whose skills match the reported issue, streamlining what is traditionally a slow, word-of-mouth, or classified-ad-based process.
+Beyond solving the customer's repair problem, the platform also serves a secondary but equally important purpose: creating job opportunities for part-time workers or unemployed individuals who have experience repairing appliances and electronic devices. By registering as technicians on the platform, these individuals gain access to a steady stream of repair jobs without needing to invest in their own advertising or client-sourcing efforts.
+A key feature of the system is location-based home service customers provide their location when submitting a request, allowing matched technicians to travel directly to the customer's home to perform the repair, eliminating the need for the customer to transport heavy or bulky appliances to a repair shop.
+ This system will have the following initial scopes: 
+•	Repair Request Submission - Customers can create an account and submit repair requests specifying the device/appliance type, issue description, and preferred schedule. 
+•	Technician Registration & Verification - Technicians can register, list their skills/specializations (e.g., appliances, computers, electronics), and get verified before accepting jobs.
+•	Automated Technician Notification/Matching - The system automatically notifies technicians whose registered skills match the type of repair requested.
+•	Location-Based Service Matching - Customers input their address/location; the system matches them with technicians who can service that area. 
+•	Job Acceptance & Dispatch - Technicians can view, accept, or decline repair requests; accepted jobs are dispatched with customer details and location.
+•	In-App Communication - Basic messaging or contact exchange between customer and technician for coordination (e.g., confirming schedule, clarifying issue).
+•	Job Status Tracking - Both customer and technician can track the status of a repair request (Pending, Accepted, In Progress, Completed).
+•	Ratings & Feedback  - Customers can rate and leave feedback for technicians after service completion, helping maintain service quality.
+•	Technician Profile & Portfolio - Technicians can build a profile showcasing completed jobs, ratings, and skill certifications (if any).
+•	Admin Panel - System administrators can manage user accounts, monitor transactions, verify technician credentials, and resolve disputes.
+
+	In this regard, we look forward to your approval of this matter. 
+
+
+
+
+
+
+Respectfully yours,
+
+JONARD MASONG
+
+
+EDSIEL URSAL
+
+
+JAMES ROBERT ROJAS
+
+
+
+
+Noted by:
+
+
+CARL JOSHUA COSEP
+
+
+
+MARJORIE RESO, MIT
+
+
+
+
+Approved by:
+
+
+
+DR. JONEL D. GELIG
+Dean, College of Computer Studies
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+CEBU ROOSEVELT MEMORIAL COLLEGES
+San Vicente St., Bogo City, Cebu
+COLLEGE OF COMPUTER STUDIES
+
+
+
+
+
+FIXLINK: AN ALL AROUND TECHNICIAN SERVICE PLATFORM FOR REPAIR
+REQUEST MANAGEMENT AND HOME-BASE TECHNICIAN DISPATCH
+
+
+
+
+
+A System and Analysis, and Design(SAD)Project Presented
+To the Faculty of the College of Computer Studies, 
+Cebu Roosevelt Memorial Colleges
+
+
+
+
+
+In Partial  Fulfillment 
+Of the Requirements for the Degree of
+Bachelor of Science in Information Technology
+
+
+
+
+
+JONARD MASONG
+JAMES ROBERT A. ROAS
+EDSIEL URSAL
+
+
+
+JANUARY 2026 
+CHAPTER 1
+THE PROBLEM
+Introduction
+
+   In today's fast-paced environment, household appliances and electronic devices such as system units, monitors, refrigerators, washing machines, and other equipment have become essential to everyday living. However, when these items break down, customers are often left with limited and inconvenient options for getting them repaired. Traditional methods of finding a technician, such as asking for recommendations, browsing classified ads, or relying on word-of-mouth referrals, are slow, unreliable, and often result in customers being unable to find a qualified technician who is available and willing to travel to their location.
+
+The main issue in the current process of sourcing repair services is the lack of a centralized and organized system that connects customers directly to available and skilled technicians. Customers often have no way of verifying whether a technician has the right expertise for their specific problem, nor can they determine how quickly a technician can respond. This results in wasted time, inconsistent service quality, and, in many cases, customers being forced to transport heavy or bulky appliances to repair shops themselves. On the other hand, many skilled individuals who are experienced in appliance and device repair, including part-time workers and unemployed individuals, lack a reliable platform through which they can access consistent job opportunities, forcing them to rely on limited networks or informal arrangements.
+
+Solving this problem is essential for several reasons. First, providing customers with a fast and reliable way to find qualified technicians directly improves their quality of life by minimizing the downtime caused by broken appliances and devices. Second, giving technicians, especially part-time or unemployed individuals with repair skills, access to a steady stream of job opportunities helps address unemployment and underemployment while allowing them to earn a living using their existing expertise. Finally, a well-organized repair request and dispatch system reduces the inefficiencies of the current informal repair market, benefiting both the local economy and the community as a whole.
+  As a solution to this problem, this proposed project introduces FixLink, an all-around technician service platform that allows customers to submit repair requests for a wide range of appliances and devices. Once a request is submitted, the system automatically notifies available technicians whose registered skills match the reported problem. Customers can also provide their location so that matched technicians can offer home service, eliminating the need to transport the item to a repair shop. This not only provides a faster and more convenient repair process for customers but also opens a consistent source of job opportunities for skilled technicians, including those who are part-time workers or currently unemployed.
+
+In summary, FixLink offers an efficient and practical approach to the ongoing problems in the appliance and device repair industry. By connecting customers directly with matched, skilled technicians and enabling home-based service through location tracking, the system streamlines what has traditionally been a slow and unreliable process. At the same time, it creates a supplementary source of income for technicians in need of consistent work. Ultimately, this project aims to improve convenience for customers, provide livelihood opportunities for technicians, and contribute to a more organized and efficient repair service industry.
+Statement of the Problem
+    With the goal of improving the process of accessing appliance and device repair services, this study seeks to identify the different challenges present in the current repair-sourcing process. Efficient matching between customers and technicians plays a critical role in ensuring timely repairs, while also providing sustainable job opportunities for skilled individuals in the community.
+However, several key challenges were identified during the study, namely:
+  1. Inefficient and Unreliable Technician Sourcing Process
+●	Customers currently rely on word-of-mouth referrals, classified ads, or manual searching to find a technician. This process is slow, inconsistent, and does not guarantee that the technician found has the right skills for the specific repair needed.
+  2.  Lack of Real-Time Technician Availability
+●	There is no existing system that shows customers which technicians are currently available and near their location. This often leads to long waiting times or repeated failed attempts to contact a technician.
+  3.  Absence of a Centralized Repair Request Platform
+●	Repair requests are handled informally, without any centralized system to track, manage, or organize requests between multiple customers and technicians, resulting in miscommunication and delays.
+ 4. Limited Job Opportunities for Part-Time and Unemployed Technicians
+●	Many individuals with repair skills, particularly part-time workers or those currently unemployed, do not have consistent access to job opportunities due to the lack of a platform that connects them directly with customers in need of their services.
+5.  Inconvenience of Transporting Bulky Appliances
+●	Without a home-service option supported by location-based matching, customers with large or heavy appliances such as refrigerators and washing machines are often forced to find their own means of transporting these items to a repair shop.
+
+Statement of Purpose
+	This proposed project focuses on developing a system that generally aims to solve the problems identified above. Specifically, it seeks to:
+6.  Develop a platform that allows customers to submit repair requests for a wide range of appliances and devices.
+7.  Provide an automated technician notification system that matches available technicians to repair requests based on their registered skills.
+8.  Create a centralized system that organizes and tracks the status of repair requests from submission to completion.
+9.  Provide a source of consistent job opportunities for part-time or unemployed individuals with repair skills.
+10.  Enable location-based matching so that technicians can offer home service directly to the customer's location.
+
+Significance of the Study
+    Customers. This system provides customers with a faster and more convenient way to find qualified technicians for their broken appliances and devices. Instead of relying on unreliable referrals or classified ads, customers can submit a request and be matched with an available, skilled technician who can offer home service, saving them time and effort.
+  Technicians. This study provides skilled individuals, particularly part-time workers and unemployed persons with repair experience, a reliable platform through which they can access a consistent stream of job opportunities. This helps them earn a living using their existing skills without needing to invest in their own advertising or client-sourcing efforts.
+ 	Researchers. This project provides a significant contribution to the researchers' knowledge in the field of systems analysis and design, particularly in developing platforms that involve request-matching, dispatch logic, and location-based services.
+ 	Future Researchers. This study sets the stage for future researchers, who may use this project as a basis for their own ideas. This project can serve as a reference for their exploration of service-matching platforms and other systems related to livelihood and community-based service delivery.
+ 	Scope and Limitations
+This project primarily focuses on providing a platform that connects customers who have broken appliances or devices with available, skilled technicians. This proposed project helps improve efficiency in accessing repair services while creating job opportunities for technicians.
+Scope
+●    Customers can create an account and submit repair requests specifying the type of appliance or device, a description of the issue, and their preferred schedule.
+●    Technicians can register, list their skills or specializations (e.g., appliances, computers, electronics), and undergo verification before accepting jobs.
+●    The system automatically notifies technicians whose registered skills match the type of repair requested.
+●    Customers can provide their location so that the system can match them with technicians who can service that area and offer home service.
+●    Technicians can view, accept, or decline repair requests; accepted jobs are dispatched with the customer's details and location.
+●    Both customers and technicians can track the status of a repair request (Pending, Accepted, In Progress, Completed).
+●    Customers can rate and leave feedback for technicians after the service is completed.
+●    Technicians can build a profile showcasing completed jobs, ratings, and skill certifications, if any.
+●    System administrators can manage user accounts, monitor transactions, verify technician credentials, and resolve disputes.
+
+Limitations
+  In developing this project, the researchers acknowledge certain constraints. The system does not include an in-app payment or transaction feature; payment for repair services is arranged directly between the customer and the technician. The system does not provide diagnostic tools; it only facilitates connection and job matching, not actual technical repair guidance. Additionally, the system is limited to the appliances and devices explicitly listed by registered technicians and does not support all possible repair categories. Both the customer and technician sides of the platform also require internet connectivity in order to submit, receive, and track repair requests.
+Technical Background
+    The FixLink project uses several technologies to complete the full function of the repair request and technician dispatch system. These are some of the technologies planned to be used for this project: React Native with Expo for the mobile application, Node.js with Express for the backend server, Firebase or a similar cloud database for real-time data storage and synchronization, and Google Maps API for location-based technician matching.
+   React Native (Expo). Conceptually, this framework will be used to build the cross-platform mobile application used by both customers and technicians, allowing the system to run on both Android and iOS devices from a single codebase.
+   Node.js and Express. Technically, this will serve as the backend framework responsible for handling repair request submissions, technician matching logic, and communication between the mobile application and the database.
+   Firebase. Conceptually, in this project, Firebase will be used to store and sync repair request data, technician profiles, and job status updates in real time between customers, technicians, and administrators. Firebase Authentication will also ensure secure access for all registered users.
+    Google Maps API. Technically, this will be used to determine the customer's location upon request submission and to match the request with nearby available technicians, as well as to guide technicians to the customer's location for home service.
+
+
+Development Model
+	In this proposed project, the researchers utilizes the Agile Development Model as its basis. 
+Figure 1.1
+Agile Development Model
+
+
+
+
+
+
+
+
+
+
+	The development will process of this project will pass through this following phases:
+Requirement Gathering 
+    In this phase, the researchers will conduct a requirement analysis, which involves gathering information from potential customers and technicians to determine the needs of both stakeholders. All data gathered will be summarized and interpreted to determine the requirements for the system and the key areas to focus on.
+
+Design the Requirements
+   In the design phase, based on the Agile model, the researchers will design the system according to the data gathered in the requirement gathering phase. This includes developing prototype designs for the customer and technician interfaces based on the compiled data. After successful completion of this phase, the project will be ready for development.
+
+Construction/Iteration
+    In this phase, the development of the system will begin based on the findings of the previous phases. The planned design of the system, including the repair request submission, technician matching, and dispatch features, will be executed in this phase.
+
+Testing/Quality Assurance
+	The main goal of this phase in FixLink's development is to test whether the system's functionalities work properly. This phase involves different stages of assessment to ensure that each part of the system, including request submission, technician notification, and location-based matching, works efficiently and in line with the functional requirements. After determining problems within the system, the researchers will return to the previous phases to address them before conducting another round of testing.
+
+Deployment
+	The deployment phase starts only after the system has undergone several tests to check its performance. If there are still features that aren’t working correctly, the project won’t move forward to the deployment stage.
+Before deployment, a training session will be provided for the stakeholders to ensure they understand how to use the system properly. This is important to make sure that the system runs smoothly and performs at its best. The researchers will take their time to explain each function and guide the users to make the adoption process easier. After the training, a detailed plan will be made for deployment to prevent any issues or disruptions. The goal is to have everything ready and working without any surprises once the system is fully launched. Additionally, regular follow-ups will be conducted to address any concerns and ensure long-term success.
+Feedback
+    After the system has been deployed, the researchers will gather feedback from users and stakeholders about their experience with the system. This evaluation is crucial in helping the researchers identify areas that may need improvement or adjustment to ensure the system continues to provide value to its users.
+ 
+
+
+
+
+
+
+
+
+
+

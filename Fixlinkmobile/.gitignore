@@ -1,0 +1,15 @@
+node_modules/
+mobile/node_modules/
+backend/node_modules/
+.expo/
+dist/
+mobile/dist/
+build/
+backend/uploads/
+*.zip
+*.apk
+*/*.zip
+**/*.zip
+.env
+.env.*
+*.log
