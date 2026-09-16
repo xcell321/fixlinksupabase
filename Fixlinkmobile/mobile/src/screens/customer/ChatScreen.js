@@ -29,7 +29,7 @@ const formatMessageTime = (iso) => {
   return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
 };
 
-export default function ChatScreen({ currentUser, initialTarget = null }) {
+export default function ChatScreen({ currentUser, initialTarget = null, onActiveConversationChange }) {
   const isTechnician = currentUser?.role === 'technician';
   const [conversations, setConversations] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
@@ -105,6 +105,11 @@ export default function ChatScreen({ currentUser, initialTarget = null }) {
     };
   }, [selectedConversation?.jobId, currentUser?.uid]);
 
+  useEffect(() => {
+    onActiveConversationChange?.(selectedConversation?.jobId || null);
+    return () => onActiveConversationChange?.(null);
+  }, [selectedConversation?.jobId]);
+
   const currentMessages = selectedConversation ? (messagesByConv[selectedConversation.jobId] || []) : [];
 
   useEffect(() => {
@@ -134,7 +139,7 @@ export default function ChatScreen({ currentUser, initialTarget = null }) {
     }
   };
 
-  const activeConversations = conversations.filter((c) => ['accepted', 'in progress'].includes(String(c.status || '').toLowerCase()));
+  const activeConversations = conversations.filter((c) => ['accepted', 'confirmed', 'customer ready', 'in progress'].includes(String(c.status || '').toLowerCase()));
   const completedConversations = conversations.filter((c) => String(c.status || '').toLowerCase() === 'completed');
   const filters = [
     { key: 'all', label: 'All', count: conversations.length },

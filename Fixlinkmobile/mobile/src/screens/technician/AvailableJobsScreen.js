@@ -19,6 +19,8 @@ import {
   declineRepairRequest,
   fetchRepairRequests,
   fetchTechnicianJobs,
+  recordTechnicianArrival,
+  reportNoShow,
   updateJobStatus,
   updateTechnicianLocation,
   verifyCompletionCode
@@ -149,7 +151,7 @@ export default function AvailableJobsScreen({ technician, onNavigateToMap, onNav
       setJobs(Array.isArray(result) ? result : []);
       setAcceptedJobs(
         Array.isArray(assigned)
-          ? assigned.filter((job) => ['Accepted', 'In Progress'].includes(job.status))
+          ? assigned.filter((job) => ['Accepted', 'Confirmed', 'Customer Ready', 'In Progress'].includes(job.status))
           : []
       );
     } catch (error) {
@@ -219,6 +221,47 @@ export default function AvailableJobsScreen({ technician, onNavigateToMap, onNav
     } finally {
       setActionLoadingId(null);
     }
+  };
+
+  const handleArrival = async (job) => {
+    setActionLoadingId(job.id);
+    try {
+      await recordTechnicianArrival(job.id, technician?.uid);
+      setAcceptedJobs((currentJobs) =>
+        currentJobs.map((j) => (j.id === job.id ? { ...j, technicianArrivalAt: new Date().toISOString() } : j))
+      );
+      Alert.alert('Arrival recorded', 'The customer has been notified you are at the location.');
+    } catch (error) {
+      Alert.alert('Unable to record arrival', error?.error || 'Please try again.');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleNoShow = async (job) => {
+    Alert.alert('Report no-show?', 'This creates a record that no one was available at the service location.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Report', style: 'destructive', onPress: async () => {
+        setActionLoadingId(job.id);
+        try {
+          const result = await reportNoShow(job.id, technician?.uid, 'No one available at the service location');
+          setAcceptedJobs((currentJobs) => currentJobs.filter((j) => j.id !== job.id));
+          Alert.alert(
+            'No-show reported',
+            result?.level === 'restricted'
+              ? 'A report has been submitted for admin review.'
+              : result?.level === 'flagged'
+                ? 'Customer account flagged for review.'
+                : 'First warning issued to customer.'
+          );
+          loadJobs();
+        } catch (error) {
+          Alert.alert('Unable to report no-show', error?.error || 'Please try again.');
+        } finally {
+          setActionLoadingId(null);
+        }
+      } },
+    ]);
   };
 
   const openOtpModal = (job) => {
@@ -347,6 +390,11 @@ export default function AvailableJobsScreen({ technician, onNavigateToMap, onNav
       ) : (
         acceptedJobs.map((job) => {
           const isInProgress = job.status === 'In Progress';
+          const isAccepted = job.status === 'Accepted';
+          const isConfirmed = job.status === 'Confirmed';
+          const isReady = job.status === 'Customer Ready';
+          const hasArrived = !!job.technicianArrivalAt;
+          const canStart = isReady;
           return (
             <View key={job.id} style={styles.acceptedCard}>
               <View style={styles.acceptedTopRow}>
@@ -385,7 +433,32 @@ export default function AvailableJobsScreen({ technician, onNavigateToMap, onNav
 
               {/* Status Action Buttons */}
               <View style={styles.acceptedActionRow}>
-                {!isInProgress ? (
+                {!isInProgress && !hasArrived && (isConfirmed || isReady) && (
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <TouchableOpacity
+                      style={[styles.startJobButton, { flex: 1, backgroundColor: '#7C3AED' }]}
+                      onPress={() => handleArrival(job)}
+                      disabled={actionLoadingId === job.id}
+                    >
+                      {actionLoadingId === job.id ? (
+                        <ActivityIndicator color={colors.white} size="small" />
+                      ) : (
+                        <>
+                          <Ionicons name="navigate" size={15} color={colors.white} />
+                          <Text style={styles.startJobButtonText}>Mark Arrival</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.declineAction}
+                      onPress={() => handleNoShow(job)}
+                      disabled={actionLoadingId === job.id}
+                    >
+                      <Text style={styles.declineActionText}>No-Show</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+                {!isInProgress && canStart && (
                   <TouchableOpacity
                     style={styles.startJobButton}
                     onPress={() => handleStartJob(job)}
@@ -400,7 +473,8 @@ export default function AvailableJobsScreen({ technician, onNavigateToMap, onNav
                       </>
                     )}
                   </TouchableOpacity>
-                ) : (
+                )}
+                {isInProgress && (
                   <TouchableOpacity
                     style={styles.completeJobButton}
                     onPress={() => openOtpModal(job)}

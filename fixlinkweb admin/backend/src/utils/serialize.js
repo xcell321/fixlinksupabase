@@ -22,6 +22,7 @@ const serializeUser = (row) => {
     longitude: row.longitude,
     rating: row.rating,
     totalReviews: row.total_reviews || 0,
+    noShowCount: row.no_show_count || 0,
     profileImage: row.profile_image || null,
     createdAt: row.created_at || null,
     updatedAt: row.updated_at || null,
@@ -99,6 +100,23 @@ const serializeAnnouncement = (row) => ({
   createdAt: row.created_at || null,
 });
 
+const serializeIncident = (row) => ({
+  id: row.id,
+  jobId: row.job_id || null,
+  customerUid: row.customer_uid || null,
+  technicianUid: row.technician_uid || null,
+  type: row.type,
+  stage: row.stage,
+  reason: row.reason || null,
+  status: row.status || 'logged',
+  customerName: row.customer_name || null,
+  technicianName: row.technician_name || null,
+  applianceType: row.appliance_type || null,
+  jobLocation: row.location || null,
+  createdAt: row.created_at || null,
+  resolvedAt: row.resolved_at || null,
+});
+
 module.exports = {
   serializeUser,
   serializeJob,
@@ -106,4 +124,5 @@ module.exports = {
   serializeReview,
   serializeCategory,
   serializeAnnouncement,
+  serializeIncident,
 };

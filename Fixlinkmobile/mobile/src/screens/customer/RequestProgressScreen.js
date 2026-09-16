@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View, Alert, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, RefreshControl, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Skeleton from '../../components/Skeleton';
-import { cancelRepairRequest, fetchCompletedJobs, fetchCustomerRequests, fetchTechnicianRecommendations, submitTechnicianReview } from '../services/api';
+import { cancelRepairRequest, confirmRepairRequest, fetchCompletedJobs, fetchCustomerRequests, fetchTechnicianRecommendations, markCustomerReady, submitTechnicianReview } from '../services/api';
 import { fonts } from '../../theme';
 import { getApplianceIcon, getStatusColor, getStatusIcon } from '../../utils/applianceIcons';
 
@@ -54,7 +54,7 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
   };
 
   const pendingRequests = trackedRequests.filter((r) => (r.status || '').toLowerCase() === 'pending');
-  const activeRequests = trackedRequests.filter((r) => ['accepted', 'in progress'].includes((r.status || '').toLowerCase()));
+  const activeRequests = trackedRequests.filter((r) => ['accepted', 'confirmed', 'customer ready', 'in progress'].includes((r.status || '').toLowerCase()));
   const totalCount = trackedRequests.length + completedJobs.length;
 
   // Fetch AI recommendations once per pending job (cache by request id so the
@@ -142,7 +142,10 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
   const renderRequestCard = (req) => {
     const statusKey = String(req.status || '').toLowerCase();
     const isPending = statusKey === 'pending';
-    const isActive = ['accepted', 'in progress'].includes(statusKey);
+    const isAccepted = statusKey === 'accepted';
+    const isConfirmed = statusKey === 'confirmed';
+    const isReady = statusKey === 'customer ready';
+    const isActive = isAccepted || isConfirmed || isReady || statusKey === 'in progress';
     return (
       <View key={req.id} style={styles.card}>
         <View style={styles.cardHeader}>
@@ -152,7 +155,11 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
           <View style={styles.cardHeaderCopy}>
             <Text style={styles.applianceTitle} numberOfLines={1}>{req.applianceType}</Text>
             <Text style={styles.subLabel} numberOfLines={1}>
-              {req.technicianName ? `Tech: ${req.technicianName}` : (isPending ? 'Awaiting technician match' : 'Matching you with a technician')}
+              {req.technicianName
+                ? `Tech: ${req.technicianName}`
+                : isPending
+                  ? 'Awaiting technician match'
+                  : 'Matching you with a technician'}
             </Text>
           </View>
           {renderStatusPill(req.status)}
@@ -175,7 +182,23 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
           </View>
         )}
 
-        {isActive && req.verificationCode && (
+        {isConfirmed && (
+          <View style={styles.miniCodeBadge}>
+            <Ionicons name="key" size={14} color="#059669" />
+            <Text style={styles.miniCodeText}>
+              Arrival Code: <Text style={styles.miniCodeHighlight}>{req.arrivalCode}</Text>
+            </Text>
+          </View>
+        )}
+
+        {isReady && (
+          <View style={[styles.miniCodeBadge, { backgroundColor: '#F5F3FF', borderColor: '#DDD6FE' }]}>
+            <Ionicons name="checkmark-circle" size={14} color="#7C3AED" />
+            <Text style={[styles.miniCodeText, { color: '#5B21B6' }]}>Ready for your technician</Text>
+          </View>
+        )}
+
+        {isActive && req.verificationCode && !isConfirmed && (
           <View style={styles.miniCodeBadge}>
             <Ionicons name="key" size={14} color="#059669" />
             <Text style={styles.miniCodeText}>
@@ -191,12 +214,78 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
               <Text style={styles.trackMapCardText}>Track</Text>
             </TouchableOpacity>
           )}
+          {isAccepted && (
+            <TouchableOpacity
+              style={[styles.trackMapCardButton, { backgroundColor: '#7C3AED' }]}
+              onPress={() => Alert.alert('Confirm repair?', 'This confirms you need the repair and will be at the service location.', [
+                { text: 'Not yet', style: 'cancel' },
+                { text: 'Confirm', onPress: async () => {
+                  try {
+                    await confirmRepairRequest(req.id);
+                    fetchAll();
+                    setTrackedRequests((prev) => prev.map((r) => r.id === req.id ? { ...r, status: 'Confirmed' } : r));
+                  } catch (error) {
+                    Alert.alert('Unable to confirm', error?.error || 'Please try again.');
+                  }
+                } },
+              ])}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="checkmark" size={15} color={colors.white} style={{ marginRight: 6 }} />
+              <Text style={styles.trackMapCardText}>Confirm</Text>
+            </TouchableOpacity>
+          )}
+          {isConfirmed && (
+            <TouchableOpacity
+              style={[styles.trackMapCardButton, { backgroundColor: '#0F766E' }]}
+              onPress={() => Alert.alert('Mark ready?', 'Confirm that someone will be at the service location to meet the technician.', [
+                { text: 'Not yet', style: 'cancel' },
+                { text: 'Ready', onPress: async () => {
+                  try {
+                    await markCustomerReady(req.id);
+                    fetchAll();
+                    setTrackedRequests((prev) => prev.map((r) => r.id === req.id ? { ...r, status: 'Customer Ready' } : r));
+                  } catch (error) {
+                    Alert.alert('Unable to mark ready', error?.error || 'Please try again.');
+                  }
+                } },
+              ])}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="flag" size={15} color={colors.white} style={{ marginRight: 6 }} />
+              <Text style={styles.trackMapCardText}>I'm Ready</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity style={styles.viewDetailsButton} onPress={() => onViewDetails(req)} activeOpacity={0.85}>
             <Ionicons name="eye-outline" size={16} color={colors.teal} style={{ marginRight: 6 }} />
             <Text style={styles.viewDetailsText}>Details</Text>
           </TouchableOpacity>
-          {isPending && (
-            <TouchableOpacity style={styles.cancelButton} onPress={() => handleCancelRequest(req.id)} activeOpacity={0.85}>
+          {(isPending || isAccepted || isConfirmed || isReady) && (
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => {
+                const message = isPending
+                  ? 'This can only be done before a technician accepts the request.'
+                  : isReady
+                    ? 'Cancel now before the technician starts the repair. This will be recorded for review.'
+                    : isConfirmed
+                      ? 'Cancel now before the technician travels.'
+                      : 'Cancel now before marking the request ready.';
+                Alert.alert('Cancel request?', message, [
+                  { text: 'Keep request', style: 'cancel' },
+                  { text: 'Cancel request', style: 'destructive', onPress: async () => {
+                    try {
+                      await cancelRepairRequest(req.id);
+                      fetchAll();
+                      setTrackedRequests((current) => current.map((request) => request.id === req.id ? { ...request, status: 'Cancelled' } : request));
+                    } catch (error) {
+                      Alert.alert('Unable to cancel', error?.error || 'The request could not be cancelled.');
+                    }
+                  } },
+                ]);
+              }}
+              activeOpacity={0.85}
+            >
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
           )}

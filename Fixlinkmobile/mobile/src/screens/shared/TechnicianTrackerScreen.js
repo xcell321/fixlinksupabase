@@ -79,7 +79,7 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
     fetchTechnicianJobs(currentUser.uid)
       .then((jobs) => {
         const activeList = Array.isArray(jobs)
-          ? jobs.filter((j) => ['Accepted', 'In Progress'].includes(j.status))
+          ? jobs.filter((j) => ['Accepted', 'Confirmed', 'Customer Ready', 'In Progress'].includes(j.status))
           : [];
         setAcceptedJobsList(activeList);
         if (!initialJob && activeList.length > 0) {
@@ -99,7 +99,7 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
     }
   }, [initialJob, currentUser]);
 
-  const isAccepted = ['Accepted', 'In Progress'].includes(activeJob?.status);
+  const isAccepted = ['Accepted', 'Confirmed', 'Customer Ready', 'In Progress'].includes(activeJob?.status);
 
   // Discard any stale response from a previously selected job.
   const activeJobIdRef = useRef(activeJob?.id);

@@ -18,7 +18,10 @@ export const getStatusColor = (status) => {
   switch (String(status || '').toLowerCase()) {
     case 'completed': return '#059669';
     case 'in progress': return '#2563EB';
+    case 'customer ready': return '#7C3AED';
+    case 'confirmed': return '#0F766E';
     case 'accepted': return '#0F766E';
+    case 'no-show': return '#DC2626';
     case 'pending': return '#D97706';
     case 'cancelled': return '#E53935';
     default: return '#5A7A91';
@@ -29,7 +32,10 @@ export const getStatusIcon = (status) => {
   switch (String(status || '').toLowerCase()) {
     case 'completed': return 'checkmark-circle';
     case 'in progress': return 'sync';
+    case 'customer ready': return 'flag';
+    case 'confirmed': return 'hand-left';
     case 'accepted': return 'hand-left';
+    case 'no-show': return 'alert-circle';
     case 'pending': return 'time';
     case 'cancelled': return 'close-circle';
     default: return 'ellipsis-horizontal';
@@ -39,11 +45,14 @@ export const getStatusIcon = (status) => {
 export const getStatusGuidance = (status) => {
   const s = String(status || '').toLowerCase();
   if (s === 'pending') return { title: 'Finding your technician', body: "You'll be notified the moment one accepts your request." };
-  if (s === 'accepted') return { title: 'Technician on the way', body: 'Follow them live on the map and have the entry-ready details handy.' };
+  if (s === 'accepted') return { title: 'Confirm your repair', body: 'Confirm the request so your technician knows you really need the repair and will be at the location.' };
+  if (s === 'confirmed') return { title: 'Mark it ready', body: 'Let your technician know the service location is ready to receive them.' };
+  if (s === 'customer ready') return { title: 'Technician on the way', body: 'Follow them live on the map and have the entry-ready details handy.' };
   if (s === 'in progress') return { title: 'Repairs underway', body: "Keep your phone nearby — your technician may check in with updates." };
   if (s === 'completed') return { title: 'Job complete', body: 'A quick review helps your technician and the next customer.' };
+  if (s === 'no-show') return { title: 'No-show reported', body: 'The technician found no one at the location. Please reach out to support.' };
   if (s === 'cancelled') return { title: 'Request cancelled', body: "No worries — submit a new request whenever you're ready." };
   return { title: 'Request received', body: 'We’ll get back to you shortly with the next steps.' };
 };
 
-export const STEPS = ['Submitted', 'Accepted', 'In progress', 'Done'];
+export const STEPS = ['Submitted', 'Accepted', 'Confirmed', 'Ready', 'In progress', 'Done'];

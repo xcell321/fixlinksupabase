@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, StatusBar, Modal, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
@@ -17,8 +17,9 @@ import MapTrackerScreen from '../screens/shared/MapTrackerScreen';
 import TechnicianTrackerScreen from '../screens/shared/TechnicianTrackerScreen';
 import AvailableJobsScreen from '../screens/technician/AvailableJobsScreen';
 import TechnicianProfileScreen from '../screens/technician/TechnicianProfileScreen';
-import { fetchUnreadMessageNotifications, setAuthToken, updateCustomerProfile } from '../screens/services/api';
+import { fetchUnreadMessageNotifications, setAuthToken, updateCustomerProfile, markJobMessagesRead } from '../screens/services/api';
 import { fonts } from '../theme';
+import MessageBanner from '../components/MessageBanner';
 
 const colors = { ink: '#102A43', teal: '#0F766E', canvas: '#F5F8FA', white: '#FFFFFF', muted: '#5A7A91', line: '#D9E2EC' };
 
@@ -35,6 +36,13 @@ export default function AppNavigator() {
   const [acceptedOnlyProgress, setAcceptedOnlyProgress] = useState(false);
   const [viewedTechnician, setViewedTechnician] = useState(null);
   const [recoveryParams, setRecoveryParams] = useState(null);
+  const [banner, setBanner] = useState(null);
+  const [activeChatJobId, setActiveChatJobId] = useState(null);
+  const bannerRef = useRef(null);
+  const activeChatJobIdRef = useRef(null);
+  const seenNotifIdsRef = useRef(new Set());
+  const bootstrappedRef = useRef(false);
+  const bannerQueueRef = useRef([]);
 
   useEffect(() => {
     const handleRecoveryUrl = (url) => {
@@ -53,6 +61,11 @@ export default function AppNavigator() {
   useEffect(() => {
     if (!user?.uid || !user?.role) {
       setChatNotifications([]);
+      bootstrappedRef.current = false;
+      seenNotifIdsRef.current.clear();
+      bannerQueueRef.current.length = 0;
+      bannerRef.current = null;
+      setBanner(null);
       return undefined;
     }
 
@@ -60,19 +73,52 @@ export default function AppNavigator() {
     const loadNotifications = async () => {
       try {
         const notifications = await fetchUnreadMessageNotifications(user.uid, user.role);
-        if (isMounted) setChatNotifications(Array.isArray(notifications) ? notifications : []);
+        if (!isMounted) return;
+        const list = Array.isArray(notifications) ? notifications : [];
+        setChatNotifications(list);
+
+        if (!bootstrappedRef.current) {
+          bootstrappedRef.current = true;
+          list.forEach((n) => {
+            const dedupKey = String(n.type === 'job' ? `job-${n.id}` : n.messageId || '');
+            if (dedupKey) seenNotifIdsRef.current.add(dedupKey);
+          });
+          return;
+        }
+
+        list.forEach((n) => {
+          const dedupKey = String(n.type === 'job' ? `job-${n.id}` : n.messageId || '');
+          if (!dedupKey || seenNotifIdsRef.current.has(dedupKey)) return;
+          seenNotifIdsRef.current.add(dedupKey);
+          if (n.jobId && n.jobId === activeChatJobIdRef.current && n.type === 'chat') return;
+          if (bannerRef.current) {
+            bannerQueueRef.current.push(n);
+          } else {
+            bannerRef.current = n;
+            setBanner(n);
+          }
+        });
       } catch (error) {
         console.warn('Unable to refresh chat notifications:', error);
       }
     };
 
+    seenNotifIdsRef.current.clear();
+    bannerQueueRef.current.length = 0;
+    bannerRef.current = null;
+    setBanner(null);
+    bootstrappedRef.current = false;
     loadNotifications();
-    const intervalId = setInterval(loadNotifications, 30000);
+    const intervalId = setInterval(loadNotifications, 10000);
     return () => {
       isMounted = false;
       clearInterval(intervalId);
     };
   }, [user?.uid, user?.role]);
+
+  useEffect(() => {
+    activeChatJobIdRef.current = activeChatJobId;
+  }, [activeChatJobId]);
 
   const handleLogout = () => { 
     setAuthToken(null);
@@ -82,6 +128,8 @@ export default function AppNavigator() {
     setSelectedJobForMap(null); 
     setSelectedChatTarget(null);
     setViewedTechnician(null);
+    setActiveChatJobId(null);
+    setBanner(null);
     setChatNotifications([]);
     setAuthMode('login'); 
   };
@@ -114,6 +162,35 @@ export default function AppNavigator() {
   const activeTab = isCustomer ? customerTab : technicianTab;
   const setTab = isCustomer ? setCustomerTab : setTechnicianTab;
   const navItems = isCustomer ? customerTabs : techTabs;
+
+  const dequeueBanner = () => {
+    const next = bannerQueueRef.current.shift() || null;
+    bannerRef.current = next;
+    setBanner(next);
+  };
+
+  const dismissBanner = () => dequeueBanner();
+
+  const openBannerNotification = (notification) => {
+    if (!notification) return;
+    dequeueBanner();
+    if (notification.type === 'job') {
+      if (isCustomer) {
+        setAcceptedOnlyProgress(true);
+        setCustomerTab('progress');
+      } else {
+        setTechnicianTab('jobs');
+      }
+      return;
+    }
+    setSelectedChatTarget({
+      id: notification.jobId,
+      customerName: isCustomer ? user.name : notification.senderName,
+      technicianName: isCustomer ? notification.senderName : undefined,
+    });
+    markJobMessagesRead(notification.jobId, user.uid).catch((error) => console.warn('Unable to mark banner chat read:', error));
+    setTab('chat');
+  };
   const screen = isCustomer ? (
     customerTab === 'dashboard' ? <DashboardScreen user={user} notificationCount={chatNotifications.length} onOpenNotifications={() => setNotificationsOpen(true)} onNavigateToSubmit={() => setCustomerTab('submit')} onNavigateToProgress={() => { setAcceptedOnlyProgress(false); setCustomerTab('progress'); }} onTrackAcceptedJob={() => { setAcceptedOnlyProgress(true); setCustomerTab('progress'); }} onOpenRequest={(req) => { setSelectedRequest(req); setCustomerTab('details'); }} /> :
     customerTab === 'submit' ? <SubmitRequestScreen currentUser={user} customerName={user.name} onNavigateToProgress={() => setCustomerTab('progress')} /> :
@@ -122,11 +199,11 @@ export default function AppNavigator() {
     customerTab === 'techProfile' ? <TechnicianProfileScreen technician={viewedTechnician || {}} readOnly onBack={() => setCustomerTab('progress')} /> :
     customerTab === 'map' ? <MapTrackerScreen currentUser={user} selectedJob={selectedRequest} onBack={() => setCustomerTab('progress')} /> :
     customerTab === 'profile' ? <CustomerProfileScreen user={user} onLogout={handleLogout} onUpdateProfile={handleCustomerProfileUpdate} /> : 
-    <ChatScreen currentUser={user} initialTarget={selectedChatTarget} />
+    <ChatScreen currentUser={user} initialTarget={selectedChatTarget} onActiveConversationChange={setActiveChatJobId} />
   ) : (
     technicianTab === 'jobs' ? <AvailableJobsScreen technician={user} notificationCount={chatNotifications.length} onOpenNotifications={() => setNotificationsOpen(true)} onNavigateToMap={(job) => { setSelectedJobForMap(job); setTechnicianTab('map'); }} onNavigateToChat={(job) => { setSelectedChatTarget(job); setTechnicianTab('chat'); }} /> : 
     technicianTab === 'map' ? <TechnicianTrackerScreen currentUser={user} selectedJob={selectedJobForMap} onNavigateToJobs={() => setTechnicianTab('jobs')} /> : 
-    technicianTab === 'chat' ? <ChatScreen currentUser={user} initialTarget={selectedChatTarget} /> :
+    technicianTab === 'chat' ? <ChatScreen currentUser={user} initialTarget={selectedChatTarget} onActiveConversationChange={setActiveChatJobId} /> :
     <TechnicianProfileScreen technician={user} onLogout={handleLogout} />
   );
 
@@ -134,6 +211,8 @@ export default function AppNavigator() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.canvas} />
       
+      <MessageBanner banner={banner} onDismiss={dismissBanner} onPress={() => banner && openBannerNotification(banner)} />
+
       <View style={styles.screenContainer}>{screen}</View>
 
       <Modal visible={notificationsOpen} transparent animationType="fade" onRequestClose={() => setNotificationsOpen(false)}>
@@ -141,28 +220,41 @@ export default function AppNavigator() {
           <TouchableOpacity style={styles.notificationPanel} activeOpacity={1}>
             <View style={styles.panelHeader}><View><Text style={styles.panelKicker}>FIXLINK UPDATES</Text><Text style={styles.panelTitle}>Notifications</Text></View><TouchableOpacity style={styles.closeButton} onPress={() => setNotificationsOpen(false)}><Ionicons name="close" size={18} color={colors.ink} /></TouchableOpacity></View>
             <ScrollView showsVerticalScrollIndicator={false}>
-              {chatNotifications.map((notification) => (
-                <TouchableOpacity
-                  key={`${notification.jobId}-${notification.id}`}
-                  style={styles.notice}
-                  onPress={() => {
-                    setSelectedChatTarget({
-                      id: notification.jobId,
-                      customerName: isCustomer ? user.name : notification.senderName,
-                      technicianName: isCustomer ? notification.senderName : undefined,
-                    });
-                    setNotificationsOpen(false);
-                    setTab('chat');
-                  }}
-                >
-                  <View style={styles.noticeIcon}><Ionicons name="chatbubble-ellipses" size={18} color={colors.teal} /></View>
-                  <View style={styles.noticeCopy}>
-                    <Text style={styles.noticeTitle}>New message from {notification.senderName}</Text>
-                    <Text style={styles.noticeText} numberOfLines={2}>{notification.text}</Text>
-                    <Text style={styles.noticeTime}>Unread</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
+              {chatNotifications.map((notification) => {
+                const isJob = notification.type === 'job';
+                return (
+                  <TouchableOpacity
+                    key={`${notification.jobId}-${notification.id}-${notification.messageId || ''}`}
+                    style={styles.notice}
+                    onPress={() => {
+                      if (isJob) {
+                        setNotificationsOpen(false);
+                        if (isCustomer) {
+                          setAcceptedOnlyProgress(true);
+                          setCustomerTab('progress');
+                        } else {
+                          setTechnicianTab('jobs');
+                        }
+                        return;
+                      }
+                      setSelectedChatTarget({
+                        id: notification.jobId,
+                        customerName: isCustomer ? user.name : notification.senderName,
+                        technicianName: isCustomer ? notification.senderName : undefined,
+                      });
+                      setNotificationsOpen(false);
+                      setTab('chat');
+                    }}
+                  >
+                    <View style={[styles.noticeIcon, isJob && styles.noticeIconGold]}><Ionicons name={isJob ? 'construct' : 'chatbubble-ellipses'} size={18} color={colors.teal} /></View>
+                    <View style={styles.noticeCopy}>
+                      <Text style={styles.noticeTitle}>{isJob ? (notification.senderName ? `${notification.senderName} · request update` : 'Request update') : `New message from ${notification.senderName}`}</Text>
+                      <Text style={styles.noticeText} numberOfLines={2}>{notification.text}</Text>
+                      <Text style={styles.noticeTime}>Unread</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
               <View style={styles.notice}><View style={styles.noticeIcon}><Ionicons name="checkmark-circle" size={19} color={colors.teal} /></View><View style={styles.noticeCopy}><Text style={styles.noticeTitle}>You’re all set</Text><Text style={styles.noticeText}>Your FixLink account is ready for service requests.</Text><Text style={styles.noticeTime}>Just now</Text></View></View>
               <View style={styles.notice}><View style={[styles.noticeIcon, styles.noticeIconGold]}><Ionicons name="sparkles" size={18} color="#B7791F" /></View><View style={styles.noticeCopy}><Text style={styles.noticeTitle}>{isCustomer ? 'Need something fixed?' : 'New jobs nearby'}</Text><Text style={styles.noticeText}>{isCustomer ? 'Add a request and we’ll match you with a verified technician.' : 'Refresh your jobs feed to see the latest repair requests.'}</Text><Text style={styles.noticeTime}>Today</Text></View></View>
             </ScrollView>

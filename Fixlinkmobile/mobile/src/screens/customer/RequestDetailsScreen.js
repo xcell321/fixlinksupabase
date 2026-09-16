@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, SafeAreaView, StatusBar } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, SafeAreaView, StatusBar, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { fetchTechnicianProfile } from '../services/api';
+import { confirmRepairRequest, fetchTechnicianProfile, markCustomerReady } from '../services/api';
 import { fonts } from '../../theme';
 import { getApplianceIcon, getStatusColor, getStatusIcon, getStatusGuidance, STEPS } from '../../utils/applianceIcons';
 
@@ -9,6 +9,7 @@ const colors = { ink: '#102A43', teal: '#0F766E', tealLight: '#E6F6F3', green: '
 
 export default function RequestDetailsScreen({ request, onBack, onMessageTechnician, onTrackMap }) {
   const [techProfile, setTechProfile] = useState(null);
+  const [workflowLoading, setWorkflowLoading] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -26,11 +27,27 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
   const statusKey = status.toLowerCase();
   const statusColor = getStatusColor(status);
   const guidance = getStatusGuidance(status);
-  const isAccepted = ['accepted', 'in progress'].includes(statusKey);
+  const isAccepted = statusKey === 'accepted';
+  const isConfirmed = statusKey === 'confirmed';
+  const isReady = statusKey === 'customer ready';
+  const isInProgress = statusKey === 'in progress';
+  const isActive = isAccepted || isConfirmed || isReady || isInProgress;
   const isCancelled = statusKey === 'cancelled';
   const isCompleted = statusKey === 'completed';
 
-  const currentStep = isCancelled ? 0 : isCompleted ? 4 : statusKey === 'in progress' ? 3 : statusKey === 'accepted' ? 2 : 1;
+  const currentStep = isCancelled
+    ? 0
+    : isCompleted
+      ? 6
+      : isInProgress
+        ? 5
+        : isReady
+          ? 4
+          : isConfirmed
+            ? 3
+            : isAccepted
+              ? 2
+              : 1;
 
   // Technician rating data
   const reviews = Array.isArray(techProfile?.reviews) && techProfile.reviews.length > 0 ? techProfile.reviews : null;
@@ -59,6 +76,40 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
     : request.preferredTime || request.preferredDate || (request.scheduledDate
         ? `${new Date(request.scheduledDate).toLocaleDateString()} at ${new Date(request.scheduledDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
         : 'Not set');
+
+  const handleConfirmRepair = () => {
+    Alert.alert('Confirm repair?', 'This confirms you need the repair and will be at the service location.', [
+      { text: 'Not yet', style: 'cancel' },
+      { text: 'Confirm', onPress: async () => {
+        setWorkflowLoading('confirm');
+        try {
+          await confirmRepairRequest(request.id);
+          onBack?.();
+        } catch (error) {
+          Alert.alert('Unable to confirm', error?.error || 'Please try again.');
+        } finally {
+          setWorkflowLoading(null);
+        }
+      } },
+    ]);
+  };
+
+  const handleMarkReady = () => {
+    Alert.alert('Mark ready?', 'Confirm that someone will be at the service location to meet the technician.', [
+      { text: 'Not yet', style: 'cancel' },
+      { text: 'Ready', onPress: async () => {
+        setWorkflowLoading('ready');
+        try {
+          await markCustomerReady(request.id);
+          onBack?.();
+        } catch (error) {
+          Alert.alert('Unable to mark ready', error?.error || 'Please try again.');
+        } finally {
+          setWorkflowLoading(null);
+        }
+      } },
+    ]);
+  };
 
   const activityRows = [
     request.createdAt && { icon: 'paper-plane-outline', label: 'Submitted', date: new Date(request.createdAt).toLocaleDateString() },
@@ -229,7 +280,7 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
             )}
 
             {/* Completion code */}
-            {isAccepted && request.verificationCode && (
+            {(isConfirmed || isReady || isInProgress) && request.verificationCode && (
               <View style={styles.codeCard}>
                 <View style={styles.codeCardHeader}>
                   <Ionicons name="key-outline" size={18} color={colors.teal} />
@@ -248,8 +299,66 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
               </View>
             )}
 
+            {/* Arrival code — visible only while the customer is confirming (acts as
+                a confirmation token the person at the service location gives the tech
+                on arrival) */}
+            {isConfirmed && request.arrivalCode && (
+              <View style={[styles.codeCard, { backgroundColor: '#F5F3FF', borderColor: '#DDD6FE' }]}>
+                <View style={styles.codeCardHeader}>
+                  <Ionicons name="map-outline" size={18} color="#7C3AED" />
+                  <Text style={[styles.codeCardTitle, { color: '#5B21B6' }]}>Arrival Code</Text>
+                </View>
+                <View style={styles.codeDigitsRow}>
+                  {String(request.arrivalCode).split('').map((digit, idx) => (
+                    <View key={idx} style={[styles.codeDigitBox, { borderColor: '#7C3AED' }]}>
+                      <Text style={styles.codeDigitText}>{digit}</Text>
+                    </View>
+                  ))}
+                </View>
+                <Text style={[styles.codeCardSub, { color: '#4C1D95' }]}>
+                  Share this with the person at the service location. They give it to the technician to confirm arrival.
+                </Text>
+              </View>
+            )}
+
+            {/* Confirm / Ready action buttons */}
+            {isAccepted && (
+              <TouchableOpacity
+                style={[styles.trackMapButton, { backgroundColor: '#7C3AED', marginBottom: 10 }]}
+                onPress={handleConfirmRepair}
+                disabled={workflowLoading === 'confirm'}
+                activeOpacity={0.88}
+              >
+                {workflowLoading === 'confirm'
+                  ? <ActivityIndicator color={colors.white} />
+                  : (
+                    <>
+                      <Ionicons name="checkmark-circle-outline" size={18} color={colors.white} style={{ marginRight: 8 }} />
+                      <Text style={styles.primaryButtonText}>Confirm Repair</Text>
+                    </>
+                  )}
+              </TouchableOpacity>
+            )}
+            {isConfirmed && (
+              <TouchableOpacity
+                style={[styles.trackMapButton, { backgroundColor: colors.teal, marginBottom: 10 }]}
+                onPress={handleMarkReady}
+                disabled={workflowLoading === 'ready'}
+                activeOpacity={0.88}
+              >
+                {workflowLoading === 'ready'
+                  ? <ActivityIndicator color={colors.white} />
+                  : (
+                    <>
+                      <Ionicons name="flag-outline" size={18} color={colors.white} style={{ marginRight: 8 }} />
+                      <Text style={styles.primaryButtonText}>I'm Ready for the Technician</Text>
+                    </>
+                  )}
+              </TouchableOpacity>
+            )}
+
             {/* Actions */}
-            {isAccepted && onTrackMap && (
+            {isActive && onTrackMap && (
               <TouchableOpacity style={styles.trackMapButton} onPress={() => onTrackMap(request)} activeOpacity={0.88}>
                 <Ionicons name="map" size={18} color={colors.white} style={{ marginRight: 8 }} />
                 <Text style={styles.primaryButtonText}>Track Technician on Live Map</Text>
@@ -263,7 +372,7 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
         )}
 
         {/* Tracking privacy notice */}
-        {!isAccepted && !isCompleted && (
+        {!isActive && !isCompleted && (
           <View style={styles.noticeCard}>
             <Ionicons name="shield-outline" size={20} color={colors.teal} />
             <View style={{ flex: 1 }}>

@@ -34,6 +34,7 @@ create table if not exists public.users (
   total_reviews int not null default 0,
   is_available boolean not null default false,
   profile_image text,
+  no_show_count int not null default 0,
   updated_at timestamptz,
   created_at timestamptz not null default now()
 );
@@ -67,8 +68,17 @@ create table if not exists public.announcements (
 
 -- ---------------------------------------------------------------------
 -- JOBS (consolidates Firestore repairRequests + acceptedJobs)
--- State machine: Pending -> Accepted -> In Progress -> Completed
---                with Cancelled branches
+-- State machine: Pending -> Accepted -> Confirmed -> Customer Ready
+--                -> In Progress -> Completed
+--                with Cancelled and No-Show branches
+--
+-- Anti-abuse/confirmation workflow fields:
+--   * service_latitude/longitude + confirmed_service_location hold the
+--     location the technician should travel to (snapshot at submit time).
+--   * customer_latitude/longitude hold the CUSTOMER'S live GPS, kept
+--     separate so a customer away from the service location is never
+--     treated as a fake request, and so live GPS updates never overwrite
+--     the confirmed service destination on the map.
 -- ---------------------------------------------------------------------
 create table if not exists public.jobs (
   id uuid primary key default gen_random_uuid(),
@@ -83,18 +93,30 @@ create table if not exists public.jobs (
   location text not null,
   latitude double precision,
   longitude double precision,
+  customer_latitude double precision,
+  customer_longitude double precision,
+  confirmed_service_location text,
+  service_latitude double precision,
+  service_longitude double precision,
   preferred_date text,
   preferred_time text,
   scheduled_date text,
   photo_url text,
-  status text not null default 'Pending' check (status in ('Pending', 'Accepted', 'In Progress', 'Completed', 'Cancelled')),
+  status text not null default 'Pending' check (status in ('Pending', 'Accepted', 'Confirmed', 'Customer Ready', 'In Progress', 'Completed', 'Cancelled', 'No-Show')),
   is_other boolean not null default false,
   declined_by uuid references public.users(id) on delete set null,
   verification_code text,
+  verification_code_for_arrival text,
   accepted_at timestamptz,
+  customer_confirmation_timestamp timestamptz,
+  customer_ready_timestamp timestamptz,
   started_at timestamptz,
+  technician_arrival_timestamp timestamptz,
   completed_at timestamptz,
   cancelled_at timestamptz,
+  cancellation_stage text,
+  cancelled_by text,
+  cancellation_reason text,
   location_updated_at timestamptz,
   review_id uuid,
   reviewed_at timestamptz,
@@ -155,6 +177,31 @@ create index if not exists idx_notifications_recipient on public.notifications (
 create index if not exists idx_notifications_job on public.notifications (job_id);
 
 -- ---------------------------------------------------------------------
+-- SERVICE INCIDENTS (anti-abuse / no-show history)
+-- Records the stage of a cancellation and any possible no-show so a
+-- customer's history can be reviewed before the admin takes action.
+-- Stages: before_accept, after_accept, after_confirmation, after_ready,
+--         after_travel
+-- Types:  cancellation, no_show
+-- Status: logged, warning, flagged, reviewed, resolved
+-- ---------------------------------------------------------------------
+create table if not exists public.service_incidents (
+  id uuid primary key default gen_random_uuid(),
+  job_id uuid references public.jobs(id) on delete set null,
+  customer_uid uuid references public.users(id) on delete set null,
+  technician_uid uuid references public.users(id) on delete set null,
+  type text not null check (type in ('cancellation', 'no_show')),
+  stage text not null check (stage in ('before_accept', 'after_accept', 'after_confirmation', 'after_ready', 'after_travel')),
+  reason text,
+  status text not null default 'logged' check (status in ('logged', 'warning', 'flagged', 'reviewed', 'resolved')),
+  created_at timestamptz not null default now(),
+  resolved_at timestamptz
+);
+
+create index if not exists idx_service_incidents_customer on public.service_incidents (customer_uid, created_at desc);
+create index if not exists idx_service_incidents_job on public.service_incidents (job_id);
+
+-- ---------------------------------------------------------------------
 -- REVIEWS
 -- ---------------------------------------------------------------------
 create table if not exists public.reviews (
@@ -208,6 +255,8 @@ alter table public.message_reads enable row level security;
 alter table public.notifications enable row level security;
 alter table public.reviews enable row level security;
 alter table public.reports enable row level security;
+alter table public.service_incidents enable row level security;
+alter table public.password_resets enable row level security;
 
 -- =====================================================================
 -- RPC FUNCTIONS
@@ -324,3 +373,68 @@ begin
   where u.id = p_technician_uid;
 end;
 $$;
+
+-- Record a no-show incident atomically: insert the incident row and bump the
+-- customer's no_show_count in one transaction so history and counter never
+-- drift out of sync.
+create or replace function public.record_no_show(
+  p_job_id uuid,
+  p_customer_uid uuid,
+  p_technician_uid uuid,
+  p_stage text,
+  p_reason text
+) returns int
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_count int;
+begin
+  -- Lock the customer row first to prevent concurrent count drift.
+  select no_show_count into v_count
+  from public.users
+  where id = p_customer_uid
+  for update;
+
+  if v_count is null then
+    v_count := 0;
+  end if;
+
+  insert into public.service_incidents (job_id, customer_uid, technician_uid, type, stage, reason, status)
+  values (p_job_id, p_customer_uid, p_technician_uid, 'no_show', p_stage, p_reason, 'logged');
+
+  update public.users
+    set no_show_count = v_count + 1,
+        updated_at = now()
+  where id = p_customer_uid;
+
+  return v_count + 1;
+end;
+$$;
+
+-- ---------------------------------------------------------------------
+-- MIGRATIONS (existing databases)
+-- Safe to re-run alongside the create-table block above for projects
+-- created before the anti-abuse/confirmation workflow existed.
+-- ---------------------------------------------------------------------
+alter table public.users add column if not exists no_show_count int not null default 0;
+
+alter table public.jobs add column if not exists customer_latitude double precision;
+alter table public.jobs add column if not exists customer_longitude double precision;
+alter table public.jobs add column if not exists confirmed_service_location text;
+alter table public.jobs add column if not exists service_latitude double precision;
+alter table public.jobs add column if not exists service_longitude double precision;
+alter table public.jobs add column if not exists verification_code_for_arrival text;
+alter table public.jobs add column if not exists customer_confirmation_timestamp timestamptz;
+alter table public.jobs add column if not exists customer_ready_timestamp timestamptz;
+alter table public.jobs add column if not exists technician_arrival_timestamp timestamptz;
+alter table public.jobs add column if not exists cancellation_stage text;
+alter table public.jobs add column if not exists cancelled_by text;
+alter table public.jobs add column if not exists cancellation_reason text;
+
+-- Expand the jobs status and notifications type check constraints.
+alter table public.jobs drop constraint if exists jobs_status_check;
+alter table public.jobs add constraint jobs_status_check check (status in ('Pending', 'Accepted', 'Confirmed', 'Customer Ready', 'In Progress', 'Completed', 'Cancelled', 'No-Show'));
+
+alter table public.notifications drop constraint if exists notifications_type_check;
+alter table public.notifications add constraint notifications_type_check check (type in ('chat', 'job', 'system'));
