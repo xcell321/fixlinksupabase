@@ -27,6 +27,7 @@ const serializeUser = (row) => {
   if (row.total_reviews != null) user.totalReviews = row.total_reviews;
   if (row.is_available != null) user.isAvailable = row.is_available;
   if (row.profile_image) user.profileImage = row.profile_image;
+  if (row.no_show_count != null) user.noShowCount = row.no_show_count;
   return user;
 };
 

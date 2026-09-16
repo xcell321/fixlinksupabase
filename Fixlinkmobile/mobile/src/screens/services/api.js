@@ -1,14 +1,15 @@
 import axios from 'axios';
-import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
-// IMPORTANT NOTE FOR MOBILE TESTING:
-// - If using Android Emulator, use 'http://10.0.2.2:5000'
-// - If using iOS Simulator, use 'http://localhost:5000'
-// - If using a physical device, use your computer's local network IP address (e.g., 'http://192.168.1.36:5000')
-// - Web (browser) uses localhost so the dev server can reach the backend on this machine
-const API_BASE_URL = Platform.OS === 'web'
-  ? 'http://localhost:5050/api'
-  : 'http://192.168.1.36:5050/api';
+// The backend URL is NOT hardcoded to a specific IP anymore. `expo start`
+// already knows the machine's current host (e.g. '192.168.1.36:8081'), so we
+// reuse that host for the API. Switching Wi-Fi networks picks up the new IP
+// automatically — just restart `expo start`. Falls back to localhost when the
+// host is unavailable (standalone build, web).
+const devHost =
+  String(Constants.expoConfig?.hostUri ?? '').split(':')[0] || 'localhost';
+
+const API_BASE_URL = `http://${devHost}:5050/api`;
 
 export { API_BASE_URL };
 
@@ -108,8 +109,12 @@ export const fetchUnreadMessageNotifications = async (uid, role) => (await api.g
 export const fetchMessageInbox = async (uid, role) => (await api.get('/requests/messages/inbox', { params: { uid, role } })).data;
 export const markJobMessagesRead = async (jobId, viewerUid) => (await api.put(`/requests/accepted/${encodeURIComponent(jobId)}/messages/read`, { viewerUid })).data;
 export const declineRepairRequest = async (jobId, technicianUid) => (await api.put(`/requests/${jobId}/decline`, { technicianUid })).data;
-export const cancelRepairRequest = async (requestId) => (await api.put(`/requests/${encodeURIComponent(requestId)}/cancel`)).data;
-export const updateJobStatus = async (jobId, status, technicianUid) => (await api.put(`/requests/accepted/${jobId}/status`, { status, technicianUid })).data;
+export const cancelRepairRequest = async (requestId, cancellationReason) => (await api.put(`/requests/${encodeURIComponent(requestId)}/cancel`, { cancellationReason })).data;
+export const updateJobStatus = async (jobId, status, technicianUid, cancellationReason) => (await api.put(`/requests/accepted/${jobId}/status`, { status, technicianUid, cancellationReason })).data;
+export const confirmRepairRequest = async (jobId) => (await api.post(`/requests/${encodeURIComponent(jobId)}/confirm-repair`)).data;
+export const markCustomerReady = async (jobId) => (await api.post(`/requests/${encodeURIComponent(jobId)}/customer-ready`)).data;
+export const recordTechnicianArrival = async (jobId, technicianUid, arrivalCode) => (await api.post(`/requests/${encodeURIComponent(jobId)}/arrive`, { technicianUid, arrivalCode })).data;
+export const reportNoShow = async (jobId, technicianUid, reason) => (await api.post(`/requests/${encodeURIComponent(jobId)}/report-no-show`, { technicianUid, reason })).data;
 export const fetchAcceptedJobLocation = async (jobId) => (await api.get(`/requests/accepted/${jobId}/location`)).data;
 export const fetchJobLiveTracking = async (jobId) => (await api.get(`/requests/accepted/${jobId}/live-tracking`)).data;
 export const updateCustomerLocation = async (jobId, customerUid, location) => (await api.put(`/requests/accepted/${jobId}/customer-location`, { customerUid, ...location })).data;

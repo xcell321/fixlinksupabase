@@ -289,7 +289,7 @@ router.post('/forgot-password', async (req, res) => {
     query.set('token', token);
     const deepLink = `fixlink://recovery?${query.toString()}`;
 
-    sendPasswordResetEmail(sanitizedEmail, deepLink).catch((err) =>
+    sendPasswordResetEmail(sanitizedEmail, deepLink, req.headers?.host).catch((err) =>
       console.error('Failed to send reset email:', err)
     );
 

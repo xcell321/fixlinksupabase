@@ -34,7 +34,7 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
   };
 
   const pendingCount = trackedRequests.filter((r) => (r.status || '').toLowerCase() === 'pending').length;
-  const activeCount = trackedRequests.filter((r) => ['accepted', 'in progress'].includes((r.status || '').toLowerCase())).length;
+  const activeCount = trackedRequests.filter((r) => ['accepted', 'confirmed', 'customer ready', 'in progress'].includes((r.status || '').toLowerCase())).length;
   const completedCount = completedJobs.length;
 
   const recentRequests = [...trackedRequests, ...completedJobs]

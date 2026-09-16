@@ -8,6 +8,28 @@ const LOCATIONIQ_KEY = process.env.LOCATIONIQ_ACCESS_TOKEN || '';
 const SEARCH_BASE_URL = 'https://us1.locationiq.com/v1';
 const TILES_BASE_URL = 'https://tiles.locationiq.com/v3/streets/r';
 
+// Server-side tile cache + in-flight dedupe. Leaflet bursts ~9 tiles per map
+// view and pans flush many more; caching means each tile hits LocationIQ at
+// most once, cutting both latency and LocationIQ free-tier rate-limit (429)
+// exposure dramatically.
+const tileCache = new Map();
+const tileInFlight = new Map();
+const TILE_CACHE_MAX = 800;
+
+const putTile = (key, buffer) => {
+  tileCache.set(key, buffer);
+  if (tileCache.size > TILE_CACHE_MAX) {
+    const oldest = tileCache.keys().next().value;
+    if (oldest !== undefined) tileCache.delete(oldest);
+  }
+};
+
+const sendTile = (res, buffer) => {
+  res.set('Content-Type', 'image/png');
+  res.set('Cache-Control', 'public, max-age=86400');
+  res.send(buffer);
+};
+
 const fetchJson = async (url, timeoutMs = 6000) => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -32,20 +54,35 @@ router.get('/tiles/:z/:x/:y.png', async (req, res) => {
   }
   if (!LOCATIONIQ_KEY) return res.status(502).send('Map tiles are not configured.');
 
+  const cacheKey = `${z}/${x}/${y}`;
+  const cached = tileCache.get(cacheKey);
+  if (cached) return sendTile(res, cached);
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8000);
+  const fetchTile = async () => {
+    try {
+      const url = `${TILES_BASE_URL}/${z}/${x}/${y}.png?key=${encodeURIComponent(LOCATIONIQ_KEY)}`;
+      const response = await fetch(url, { signal: controller.signal });
+      if (!response.ok) throw new Error(`LocationIQ tile ${response.status}`);
+      return Buffer.from(await response.arrayBuffer());
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
+  let pending = tileInFlight.get(cacheKey);
+  if (!pending) {
+    pending = fetchTile().finally(() => tileInFlight.delete(cacheKey));
+    tileInFlight.set(cacheKey, pending);
+  }
+
   try {
-    const url = `${TILES_BASE_URL}/${z}/${x}/${y}.png?key=${encodeURIComponent(LOCATIONIQ_KEY)}`;
-    const response = await fetch(url, { signal: controller.signal });
-    if (!response.ok) return res.status(response.status).send('Tile unavailable');
-    const buffer = await response.arrayBuffer();
-    res.set('Content-Type', 'image/png');
-    res.set('Cache-Control', 'public, max-age=86400');
-    res.send(Buffer.from(buffer));
+    const buffer = await pending;
+    putTile(cacheKey, buffer);
+    return sendTile(res, buffer);
   } catch (error) {
-    res.status(502).send('Tile unavailable');
-  } finally {
-    clearTimeout(timer);
+    return res.status(502).send('Tile unavailable');
   }
 });
 

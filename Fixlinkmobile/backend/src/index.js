@@ -27,11 +27,16 @@ app.use(express.urlencoded({ extended: true }));
 // Rate limiters — blocks excess requests instantly, before touching the database
 const globalLimiter = createRateLimiter({
   windowMs: 60000,
-  max: 60,
+  max: 300,
   message: 'Too many requests from this IP, please try again later.',
 });
 
-app.use('/api', globalLimiter);
+app.use('/api', (req, res, next) => {
+  // Map tiles burst ~9 requests per view and pan even more; they are cached
+  // server-side and must never be cut off by the API limiter.
+  if (req.path.startsWith('/maps/tiles/')) return next();
+  return globalLimiter(req, res, next);
+});
 
 // Serve static files (uploads)
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));

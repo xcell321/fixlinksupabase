@@ -79,7 +79,7 @@ export default function MapTrackerScreen({ currentUser, selectedJob: initialJob,
     }
   }, [currentUser, initialJob]);
 
-  const isAccepted = ['Accepted', 'In Progress'].includes(activeJob?.status);
+  const isAccepted = ['Accepted', 'Confirmed', 'Customer Ready', 'In Progress'].includes(activeJob?.status);
 
   // Always reflect the currently selected job. Any late response from a
   // previous job (route request, geocode, refresh) is discarded with this ref.
@@ -162,7 +162,7 @@ export default function MapTrackerScreen({ currentUser, selectedJob: initialJob,
           { accuracy: Location.Accuracy.Balanced, timeInterval: 8000, distanceInterval: 15 },
           async (pos) => {
             const next = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
-            if (active) setCustomerCoords((curr) => ({ ...curr, ...next }));
+            if (!active) return;
             try { await updateCustomerLocation(activeJob.id, currentUser.uid, next); } catch (e) {}
           }
         );

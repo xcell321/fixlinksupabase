@@ -2,7 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const router = express.Router();
 const { supabase } = require('../config/supabase');
-const { serializeUser, serializeJob, serializeReport, serializeReview, serializeCategory, serializeAnnouncement } = require('../utils/serialize');
+const { serializeUser, serializeJob, serializeReport, serializeReview, serializeCategory, serializeAnnouncement, serializeIncident } = require('../utils/serialize');
 
 const sessions = new Map();
 
@@ -11,7 +11,8 @@ const tableNames = {
   reports: 'reports',
   reviews: 'reviews',
   categories: 'categories',
-  announcements: 'announcements'
+  announcements: 'announcements',
+  incidents: 'service_incidents'
 };
 
 const status = row => row.status || (row.skills && row.skills.status) || (row.disabled ? 'inactive' : 'active');
@@ -95,7 +96,7 @@ router.get('/overview', async (req, res) => {
         pendingTechnicians: pendingTechnicians.length,
         requests: jobs.length,
         completedRequests,
-        activeRequests: jobs.filter(job => ['pending', 'accepted', 'in progress'].includes(String(job.status || 'pending').toLowerCase())).length,
+        activeRequests: jobs.filter(job => ['pending', 'accepted', 'confirmed', 'customer ready', 'in progress'].includes(String(job.status || 'pending').toLowerCase())).length,
         reviews: reviews.length,
         averageRating: Number(averageRating.toFixed(1))
       },
@@ -293,6 +294,70 @@ router.get('/analytics', async (req, res) => {
     const categories = jobs.reduce((result, job) => { const category = job.appliance_type || job.category || 'Other'; result[category] = (result[category] || 0) + 1; return result; }, {});
     res.json({ requestVolume: jobs.length, completedRequests: jobs.filter(job => String(job.status).toLowerCase() === 'completed').length, technicianPerformance, popularCategories: Object.entries(categories).sort((left, right) => right[1] - left[1]).map(([name, count]) => ({ name, count })), reviewCount: reviews.length });
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET: Anti-abuse / no-show incidents, enriched with request context. Admins
+// review these before taking serious action against a customer.
+router.get('/incidents', async (req, res) => {
+  try {
+    const { data: rows, error } = await supabase
+      .from('service_incidents')
+      .select('*, jobs(id, customer_name, technician_name, appliance_type, location, status)')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+
+    const type = String(req.query.type || 'all').toLowerCase();
+    const statusFilter = String(req.query.status || 'all').toLowerCase();
+    const stage = String(req.query.stage || 'all').toLowerCase();
+
+    const incidents = (rows || []).filter((incident) => {
+      const matchesType = type === 'all' || String(incident.type).toLowerCase() === type;
+      const matchesStatus = statusFilter === 'all' || String(incident.status).toLowerCase() === statusFilter;
+      const matchesStage = stage === 'all' || String(incident.stage).toLowerCase() === stage;
+      return matchesType && matchesStatus && matchesStage;
+    }).map((incident) => ({
+      ...serializeIncident(incident),
+      customerName: incident.customer_name || incident.jobs?.customer_name || null,
+      technicianName: incident.technician_name || incident.jobs?.technician_name || null,
+      applianceType: incident.jobs?.appliance_type || null,
+      jobLocation: incident.jobs?.location || null,
+      jobStatus: incident.jobs?.status || null,
+    }));
+
+    res.json(incidents);
+  } catch (error) {
+    console.error('Error loading service incidents:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PATCH: Update an incident's review status (logged -> warning/flagged/reviewed/resolved).
+router.patch('/incidents/:id/status', async (req, res) => {
+  try {
+    const allowed = ['logged', 'warning', 'flagged', 'reviewed', 'resolved'];
+    const { status: statusValue } = req.body;
+    if (!allowed.includes(statusValue)) return res.status(400).json({ error: 'Invalid incident status' });
+
+    const updates = { status: statusValue, updated_at: new Date().toISOString() };
+    if (statusValue === 'resolved') updates.resolved_at = new Date().toISOString();
+    await supabase.from('service_incidents').update(updates).eq('id', req.params.id);
+    res.json({ message: 'Incident status updated', status: statusValue });
+  } catch (error) {
+    console.error('Error updating incident status:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PATCH: Reset a customer's no-show counter after the admin has reviewed their
+// incidents (e.g. the customer proved they were not at fault).
+router.patch('/customers/:uid/reset-no-show', async (req, res) => {
+  try {
+    await supabase.from('users').update({ no_show_count: 0, updated_at: new Date().toISOString() }).eq('id', req.params.uid);
+    res.json({ message: 'No-show counter reset' });
+  } catch (error) {
+    console.error('Error resetting no-show counter:', error);
     res.status(500).json({ error: error.message });
   }
 });
