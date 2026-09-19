@@ -9,6 +9,8 @@ const {
   buildCandidatePayload,
 } = require('../service/technicianMatch');
 const { chatComplete, isOmniRouteConfigured } = require('../utils/omniRoute');
+const { getSchedulesForTechnicians, dayKeyOf, availabilityForDay } = require('../utils/techSchedule');
+const { getActiveJobCountsForTechnicians, getWorkloadStatus } = require('../utils/workload');
 
 router.use(requireAuth);
 
@@ -37,6 +39,8 @@ const serializeCandidate = (candidate) => ({
   reason: candidate.reason || '',
   confidence: Number(candidate.confidence) || 0,
   profileImage: candidate.profileImage || null,
+  activeJobs: Number(candidate.activeJobs) || 0,
+  workloadStatus: candidate.workloadStatus || 'available',
 });
 
 // POST /api/ai/detect-category — Requirement 1: analyze a customer's
@@ -87,7 +91,7 @@ router.get('/recommend', async (req, res) => {
       }
     }
 
-    const candidates = getEligibleCandidates({ job, technicians, requiredSkills });
+    let candidates = getEligibleCandidates({ job, technicians, requiredSkills });
     if (candidates.length === 0) {
       return res.status(200).json({
         ai: 'deterministic',
@@ -105,7 +109,55 @@ router.get('/recommend', async (req, res) => {
       });
     }
 
-    const objective = rankObjective(job, candidates, 10);
+    // Workload capacity: 0-2 available, 3-5 busy (still eligible), 6+ at_capacity (excluded from automatic AI matching)
+    // Order: eligibility -> skill/category -> verification -> workload -> distance/schedule/rating
+    // Do not cancel existing jobs, do not disable account – just filter automatic recommendations.
+    try {
+      const workloadMap = await getActiveJobCountsForTechnicians(candidates.map((c) => c.uid));
+      const filtered = [];
+      for (const c of candidates) {
+        const activeJobs = workloadMap.get(String(c.uid)) ?? 0;
+        const workloadStatus = getWorkloadStatus(activeJobs);
+        c.activeJobs = activeJobs;
+        c.workloadStatus = workloadStatus;
+        if (workloadStatus === 'at_capacity') continue;
+        filtered.push(c);
+      }
+      candidates = filtered;
+    } catch (workloadError) {
+      console.warn('Workload filter unavailable, skipping:', workloadError.message);
+      candidates.forEach((c) => {
+        if (c.activeJobs == null) c.activeJobs = 0;
+        if (!c.workloadStatus) c.workloadStatus = 'available';
+      });
+    }
+    if (candidates.length === 0) {
+      return res.status(200).json({
+        ai: 'deterministic',
+        interpretation,
+        job: {
+          id: job.id,
+          applianceType: job.appliance_type,
+          category: job.category,
+          description: job.description,
+          latitude: job.latitude ?? null,
+          longitude: job.longitude ?? null,
+        },
+        recommendations: [],
+        note: 'No eligible technicians match this request yet.',
+      });
+    }
+
+    let objective = rankObjective(job, candidates, 10);
+    // Slight priority reduction for busy (3-5) without overpowering skill/rating/distance.
+    // Penalty 0.06 preserves transparency and keeps other factors dominant.
+    objective = objective.map((c) => {
+      if (c.workloadStatus === 'busy') {
+        const penalized = Math.max(0, Number(c.totalScore) - 0.06);
+        return { ...c, totalScore: Number(penalized.toFixed(4)) };
+      }
+      return c;
+    }).sort((a, b) => b.totalScore - a.totalScore);
     let recommendations = [];
     let mode = 'deterministic';
 
@@ -169,6 +221,21 @@ router.get('/recommend', async (req, res) => {
     }
 
     recommendations.forEach((c, index) => { if (!c.rank) c.rank = index + 1; });
+
+    // ADDITIVE schedule visibility: same-day availability + safe upcoming
+    // schedule per recommended technician, in ONE batched query (no N+1).
+    // Ranking, scores, reasons, and order above are untouched.
+    try {
+      const requestDay = dayKeyOf({ scheduled_date: job.scheduled_date, preferred_date: job.preferred_date });
+      const schedulesByUid = await getSchedulesForTechnicians(recommendations.map((c) => c.uid));
+      recommendations.forEach((c) => {
+        const schedule = schedulesByUid.get(String(c.uid)) || [];
+        c.availability = availabilityForDay(requestDay, schedule);
+        c.upcomingSchedule = schedule.slice(0, 5);
+      });
+    } catch (scheduleError) {
+      console.warn('Technician schedule unavailable, omitting availability:', scheduleError.message);
+    }
 
     return res.status(200).json({
       ai: mode,

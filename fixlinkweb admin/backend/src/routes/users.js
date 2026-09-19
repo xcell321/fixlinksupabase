@@ -7,21 +7,19 @@ router.get('/pending-technicians', async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('users')
-      .select('id, name, email, status')
+      .select('id, name, email, status, verification_status, role')
       .eq('role', 'technician')
-      .eq('status', 'pending_verification')
-      .order('created_at', { ascending: false });
-
+      .eq('status', 'pending_verification');
     if (error) throw error;
-
-    res.status(200).json((data || []).map(user => ({
-      uid: user.id,
-      name: user.name || 'N/A',
-      email: user.email || 'N/A',
-      status: user.status
-    })));
+    const pendingTechs = (data || []).map((u) => ({
+      uid: u.id,
+      name: u.name || 'N/A',
+      email: u.email || 'N/A',
+      status: u.status || u.verification_status || 'pending_verification',
+    }));
+    res.status(200).json(pendingTechs);
   } catch (error) {
-    console.error('Error fetching pending technicians:', error);
+    console.error('Error fetching pending technicians:', error.message);
     res.status(500).json({ error: error.message });
   }
 });

@@ -9,10 +9,12 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        :root { --ink: #102A43; --teal: #0F766E; --teal-dark: #075E59; --teal-light: #E6F6F3; --canvas: #F5F8FA; --white: #FFFFFF; --muted: #5A7A91; --line: #D9E2EC; --danger: #E53935; }
+        :root { --ink: #102A43; --teal: #0F766E; --teal-dark: #075E59; --teal-light: #E6F6F3; --canvas: #F5F8FA; --white: #FFFFFF; --muted: #5A7A91; --line: #D9E2EC; --line-soft: #E3ECF2; --danger: #E53935; --hud-grid: rgba(15,118,110,0.06); }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { display: grid; min-height: 100vh; place-items: center; background: var(--canvas); background-image: linear-gradient(135deg, rgba(15, 118, 110, 0.05), transparent 42%), linear-gradient(315deg, rgba(7, 94, 89, 0.04), transparent 48%); font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; color: var(--ink); }
-        .login-card { width: min(440px, calc(100% - 2rem)); background: var(--white); border: 1px solid var(--line); border-radius: 22px; box-shadow: 0 20px 55px rgba(16, 42, 67, 0.1); padding: 2.5rem 2rem; }
+        ::selection { background: rgba(15,118,110,0.18); }
+        :focus-visible { outline: 3px solid rgba(15,118,110,0.22); outline-offset: 2px; }
+        body { display: grid; min-height: 100vh; place-items: center; background: var(--canvas); background-image: radial-gradient(circle at 1px 1px, var(--hud-grid) 1px, transparent 0), linear-gradient(135deg, rgba(15, 118, 110, 0.05), transparent 42%), linear-gradient(315deg, rgba(7, 94, 89, 0.04), transparent 48%); background-size: 22px 22px, auto, auto; font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; color: var(--ink); }
+        .login-card { width: min(440px, calc(100% - 2rem)); background: var(--white); border: 1px solid var(--line); border-radius: 22px; box-shadow: 0 20px 55px rgba(16, 42, 67, 0.1), 0 1px 0 rgba(15,118,110,0.08) inset; padding: 2.5rem 2rem; }
         .brand { display: flex; flex-direction: column; align-items: center; margin-bottom: 2.5rem; }
         .logo { display: grid; place-items: center; width: 54px; height: 54px; background: linear-gradient(135deg, var(--teal), var(--teal-dark)); color: #fff; border-radius: 16px; margin-bottom: 0.9rem; }
         .logo svg { width: 26px; height: 26px; fill: currentColor; }

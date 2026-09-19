@@ -62,7 +62,7 @@ FixLink is engineered on a decoupled three-tier architecture:
 │ • `jobs` (Pending + Accepted states)  │ │ • Reverse Geocoding (Coords)   │
 │ • `messages` + `message_reads` (Chat) │ │ • Driving Direction Polyline   │
 │ • `reviews` (5-Star Ratings & Notes)  │ │ • Leaflet.js Interactive Tiles │
-│ • `notifications` (Chat badges)       │ │ • Supabase Auth + JWT          │
+│ • `notifications` (Chat+Job, two-step, read/read_at) │ │ • Supabase Auth + JWT          │
 │ • `announcements` (Admin Alerts)      │ │ • Supabase Storage (uploads)   │
 │ • `categories` (Device catalog)       │ │                                │
 └───────────────────────────────────────┘ └────────────────────────────────┘
@@ -166,6 +166,18 @@ To prevent fraudulent completions and ensure physical technician presence:
 2. **Accepted / In Progress Status:** Mutual live tracking unlocks. The technician's device sends coordinate updates via `PUT /api/users/:id/location`.
 3. The customer polls `GET /api/requests/accepted/:id/live-tracking`, receiving both coordinates and LocationIQ driving geometry.
 4. **Termination:** As soon as the job is marked `Completed` or `Cancelled`, all location streaming immediately ceases.
+
+### 5.4 Technician Workload & Capacity System ( `backend/src/utils/workload.js` )
+**Active definition:** `Accepted`, `Confirmed`, `Customer Ready`, `In Progress` are active (require work); `Pending`, `Completed`, `Cancelled`, `No-Show` are not. Counted live via `getTechnicianActiveJobCount(uid)` / batch `getActiveJobCountsForTechnicians(uids)` (`select count head:true`).
+
+**Levels:** `0–2 available` (fully eligible), `3–5 busy` (still eligible, slight priority dip), `6+ at_capacity` (excluded from automatic AI, existing jobs untouched, auto-recover when ≤5).
+
+**Pipeline order (AI):** 1) verified/active gate + skill match (`technicianMatch.js:getEligibleCandidates`) → 2) workload annotate + filter `at_capacity` → 3) `rankObjective` + `-0.06` penalty for `busy` → 4) distance/rating/reviews/experience → 5) schedule visibility (`techSchedule.js`) kept separate (workload ≠ same-day availability). Response adds `{activeJobs, workloadStatus}`.
+
+**Accept guard (authoritative):** `PUT /api/requests/:id/accept` re-counts before `rpc accept_job`; if `at_capacity` → `409 {code:TECHNICIAN_AT_CAPACITY, activeJobs, workloadStatus}`. Handles race (AI advisory vs accept authoritative); recovery automatic on next `Completed`.
+
+### 5.5 Notification Two-Step Deep-Link & Read Persistence ( `mobile/src/navigation/AppNavigator.js` )
+`notifications` (`read/read_at`) serves badge `filter(!read).length` (10s poll `GET /api/requests/notifications` limit 100, sorted desc) and deep-link. **1st tap** → `detailCard` + optimistic `read=true` (badge –1, never negative) + fire-and-forget `PUT /api/requests/notifications/:id/read` (404 → keep optimistic, no warn). **2nd tap** same `id` → `GET /api/requests/job/:id` ownership check → `chat`→ exact `ChatScreen` thread, `job` Completed→ `RequestProgressScreen` `focusedJobId`+`autoExpandReview` (completed card `cardFocused`), other `job`→ `RequestDetailsScreen` / technician `AvailableJobsScreen` `highlightedJobId`. Deleted job → `detailError` keep notification, no crash. `read/read_at` persists across refresh/reopen/restart.
 
 ---
 

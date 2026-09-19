@@ -1,6 +1,7 @@
 const dns = require('dns');
 const { promisify } = require('util');
 const nodemailer = require('nodemailer');
+const { getPublicBaseUrl } = require('./network');
 
 const lookup = promisify(dns.lookup);
 
@@ -49,9 +50,7 @@ const sendPasswordResetEmail = async (to, link, requestHost) => {
   // forwards the token into the app. The deep link is still shown as plain
   // text for users who cannot open it directly.
   const resolvedLink = link || '';
-  const baseUrl = requestHost
-    ? `http://${requestHost}`
-    : (process.env.PUBLIC_BASE_URL || 'http://localhost:5050');
+  const baseUrl = getPublicBaseUrl(requestHost);
   const landingUrl = new URL('/reset-password', baseUrl);
   if (resolvedLink.startsWith('fixlink://')) {
     const query = resolvedLink.replace('fixlink://recovery?', '');

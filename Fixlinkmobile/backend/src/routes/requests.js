@@ -7,6 +7,7 @@ const { resolveCoordinates } = require('../utils/geocode');
 const { analyzeRepairDescription, isOmniRouteConfigured } = require('../service/repairAnalyzer');
 const { requireAuth } = require('../middleware/requireAuth');
 const { createRateLimiter } = require('../middleware/rateLimit');
+const { getTechnicianActiveJobCount, getWorkloadStatus } = require('../utils/workload');
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 // In-memory dedupe ledger: kills duplicate-submit write amplification without any extra DB reads.
@@ -110,7 +111,6 @@ const serializeJob = (row) => {
   if (row.photo_url) job.photoUrl = row.photo_url;
   if (row.declined_by) job.declinedBy = row.declined_by;
   if (row.verification_code) job.verificationCode = row.verification_code;
-  if (row.verification_code_for_arrival) job.arrivalCode = row.verification_code_for_arrival;
   if (row.accepted_at) job.acceptedAt = new Date(row.accepted_at).toISOString();
   if (row.customer_confirmation_timestamp) job.customerConfirmedAt = new Date(row.customer_confirmation_timestamp).toISOString();
   if (row.customer_ready_timestamp) job.customerReadyAt = new Date(row.customer_ready_timestamp).toISOString();
@@ -607,6 +607,18 @@ router.get('/messages/inbox', async (req, res) => {
       });
     }
 
+    // Peer phone lookup: registered phone number from users table.
+    // Technician sees customer phone, customer sees technician phone.
+    const peerUidField = role === 'technician' ? 'customer_uid' : 'technician_uid';
+    const peerUids = [...new Set(jobs.map((j) => j[peerUidField]).filter(Boolean).map(String))];
+    const phoneByUid = {};
+    if (peerUids.length > 0) {
+      const { data: peerRows } = await supabase.from('users').select('id, phone').in('id', peerUids);
+      (peerRows || []).forEach((r) => {
+        phoneByUid[String(r.id)] = r.phone || null;
+      });
+    }
+
     const inbox = jobs.map((job) => {
       if (String(job.status || '').toLowerCase() === 'cancelled') return null;
 
@@ -617,14 +629,18 @@ router.get('/messages/inbox', async (req, res) => {
       ).length;
 
       const peerName = role === 'technician' ? job.customer_name : job.technician_name;
+      const peerUid = job[peerUidField] ? String(job[peerUidField]) : null;
       return {
         jobId: job.id,
+        jobCode: String(job.id || '').slice(0, 6).toUpperCase(),
+        peerUid,
+        peerPhone: peerUid ? phoneByUid[peerUid] || null : null,
         peerName: peerName || (role === 'technician' ? 'Customer' : 'Technician'),
         peerInitial: String(peerName || (role === 'technician' ? 'C' : 'T')).charAt(0).toUpperCase(),
         applianceType: job.appliance_type || 'Repair Job',
         status: job.status || 'Active',
         lastMessage: lastMessage
-          ? { text: lastMessage.text || '', senderName: lastMessage.sender_name || 'Contact', timestamp: lastMessage.timestamp ? new Date(lastMessage.timestamp).toISOString() : null }
+          ? { text: lastMessage.text || '', senderName: lastMessage.sender_name || 'Contact', senderUid: lastMessage.sender_uid ? String(lastMessage.sender_uid) : null, timestamp: lastMessage.timestamp ? new Date(lastMessage.timestamp).toISOString() : null }
           : null,
         unreadCount,
       };
@@ -634,6 +650,116 @@ router.get('/messages/inbox', async (req, res) => {
   } catch (error) {
     console.error('Error loading inbox:', error);
     res.status(500).json({ error: 'Unable to load inbox.' });
+  }
+});
+
+// -----------------------------------------------------------------
+// Notifications: two-step interaction + read/unread sync
+// -----------------------------------------------------------------
+// GET /requests/notifications -> all notifications for current user (read + unread)
+// Supports the notification panel two-step UX: first click shows details and
+// marks single notification read, second click navigates to exact related
+// job/chat. Returns read boolean so badge can be derived as unreadCount.
+router.get('/notifications', async (req, res) => {
+  try {
+    const uid = String(req.authUser.uid);
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('recipient_uid', uid)
+      .in('type', ['chat', 'job'])
+      .order('timestamp', { ascending: false })
+      .limit(100);
+    if (error) throw error;
+    const notifications = (data || []).map((n) => ({
+      id: n.id,
+      jobId: n.job_id,
+      messageId: n.message_id,
+      type: n.type,
+      senderName: n.sender_name || 'Contact',
+      text: n.text,
+      timestamp: n.timestamp ? new Date(n.timestamp).toISOString() : null,
+      read: n.read === true,
+      readAt: n.read_at ? new Date(n.read_at).toISOString() : null,
+    }));
+    res.json(notifications);
+  } catch (error) {
+    console.error('Error loading notifications:', error);
+    res.status(500).json({ error: 'Unable to load notifications.' });
+  }
+});
+
+// PUT /requests/notifications/:id/read -> mark single notification read
+// Idempotent: clicking already-read does NOT decrement count again, never negative.
+router.put('/notifications/:id/read', async (req, res) => {
+  try {
+    const uid = String(req.authUser.uid);
+    const notifId = String(req.params.id || '').trim();
+    if (!notifId) return res.status(400).json({ error: 'Notification id is required.' });
+    const { data: existing, error: fetchError } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('id', notifId)
+      .maybeSingle();
+    if (fetchError) {
+      console.error('Error fetching notification for mark-read:', fetchError.message);
+      return res.status(500).json({ error: 'Unable to mark notification as read.' });
+    }
+    if (!existing) {
+      // Notification may have been cascade-deleted with its job or never existed.
+      // Per spec keep notification available and still mark as read optimistically – treat as alreadyRead success, no 404 noise.
+      return res.json({ alreadyRead: true, read: true, notFound: true });
+    }
+    if (String(existing.recipient_uid) !== uid) return res.status(403).json({ error: 'Not authorized.' });
+    if (existing.read === true) {
+      return res.json({ alreadyRead: true, read: true });
+    }
+    const nowIso = new Date().toISOString();
+    const { error: updateError } = await supabase
+      .from('notifications')
+      .update({ read: true, read_at: nowIso })
+      .eq('id', notifId)
+      .eq('recipient_uid', uid);
+    if (updateError) throw updateError;
+    // For chat notifications also mark the underlying message as read so
+    // inbox unreadCount stays in sync without requiring a separate call.
+    if (existing.message_id) {
+      const { error: mrError } = await supabase.from('message_reads').insert({
+        message_id: existing.message_id,
+        user_uid: uid,
+        read_at: nowIso,
+      });
+      if (mrError && !String(mrError.code).includes('23505') && !/duplicate/i.test(String(mrError.message || ''))) {
+        console.warn('Unable to sync message_reads for notification:', mrError.message);
+      }
+    }
+    res.json({ marked: true, read: true });
+  } catch (error) {
+    console.error('Error marking notification read:', error);
+    res.status(500).json({ error: 'Unable to mark notification as read.' });
+  }
+});
+
+// GET /requests/job/:id -> fetch single job for notification deep-link
+// Validates ownership/visibility: only customer_uid or technician_uid owner,
+// or a technician viewing a Pending job may access.
+router.get('/job/:id', async (req, res) => {
+  try {
+    const job = await resolveJob(req.params.id);
+    if (!job) return res.status(404).json({ error: 'Job not found.' });
+    const uid = String(req.authUser.uid);
+    // Need role from users table to allow Pending visibility for technicians
+    const { data: userRow } = await supabase.from('users').select('role').eq('id', uid).maybeSingle();
+    const role = String(userRow?.role || '').toLowerCase();
+    const isOwner = uid === String(job.customer_uid || '') || uid === String(job.technician_uid || '');
+    const isPendingAndTech = String(job.status || '').toLowerCase() === 'pending' && role === 'technician';
+    if (!isOwner && !isPendingAndTech) {
+      return res.status(403).json({ error: 'Not authorized to view this job.' });
+    }
+    res.json(serializeJob(job));
+  } catch (error) {
+    console.error('Error loading job:', error);
+    res.status(500).json({ error: 'Unable to load job.' });
   }
 });
 
@@ -756,6 +882,18 @@ router.get('/customer/:customerName', async (req, res) => {
   } catch (error) {
     console.error('Error loading customer requests:', error);
     res.status(500).json({ error: 'Unable to load request status.' });
+  }
+});
+
+router.get('/technician/:technicianUid/workload', async (req, res) => {
+  try {
+    if (req.params.technicianUid !== req.authUser.uid) return res.status(403).json({ error: 'Technician identity does not match the authenticated account.' });
+    const activeJobs = await getTechnicianActiveJobCount(req.params.technicianUid);
+    const workloadStatus = getWorkloadStatus(activeJobs);
+    res.json({ activeJobs, workloadStatus });
+  } catch (error) {
+    console.error('Error loading technician workload:', error);
+    res.status(500).json({ error: 'Unable to load workload.' });
   }
 });
 
@@ -1057,14 +1195,6 @@ router.put('/accepted/:id/status', async (req, res) => {
   }
 });
 
-// Generate a fresh 4-digit code for anyone at the service location.
-const generateArrivalCode = (job) => {
-  if (!job.verification_code_for_arrival) {
-    return String(Math.floor(1000 + Math.random() * 9000));
-  }
-  return job.verification_code_for_arrival;
-};
-
 // 4. Customer confirms the technician's acceptance. This is the anti-spam
 // checkpoint: a request does NOT move forward until the customer confirms
 // they really need the repair and provides confirmation they will be present
@@ -1080,7 +1210,6 @@ router.post('/:id/confirm-repair', async (req, res) => {
       return res.status(409).json({ error: 'This request can only be confirmed after a technician accepts it.' });
     }
 
-    const arrivalCode = generateArrivalCode(job);
     const confirmationTime = new Date().toISOString();
     await supabase
       .from('jobs')
@@ -1088,7 +1217,6 @@ router.post('/:id/confirm-repair', async (req, res) => {
         status: 'Confirmed',
         customer_confirmation_timestamp: confirmationTime,
         updated_at: confirmationTime,
-        ...(job.verification_code_for_arrival ? {} : { verification_code_for_arrival: arrivalCode }),
       })
       .eq('id', job.id);
 
@@ -1104,7 +1232,6 @@ router.post('/:id/confirm-repair', async (req, res) => {
       message: 'Repair request confirmed.',
       status: 'Confirmed',
       customerConfirmedAt: confirmationTime,
-      arrivalCode,
     });
   } catch (error) {
     console.error('Error confirming repair request:', error);
@@ -1146,11 +1273,9 @@ router.post('/:id/customer-ready', async (req, res) => {
 });
 
 // 6. Technician records physical arrival at the confirmed service location.
-// An optional OTP (generated for the customer at confirmation) proves the
-// technician actually reached someone at the location.
 router.post('/:id/arrive', async (req, res) => {
   try {
-    const { technicianUid, arrivalCode } = req.body || {};
+    const { technicianUid } = req.body || {};
     if (!technicianUid || technicianUid !== req.authUser.uid) {
       return res.status(403).json({ error: 'Technician identity does not match the authenticated account.' });
     }
@@ -1158,12 +1283,6 @@ router.post('/:id/arrive', async (req, res) => {
     if (!job || job.technician_uid !== technicianUid) return res.status(404).json({ error: 'Assigned job not found.' });
     if (!['Confirmed', 'Customer Ready'].includes(job.status)) {
       return res.status(409).json({ error: 'You can only mark arrival after the customer confirms the request.' });
-    }
-
-    if (arrivalCode && job.verification_code_for_arrival) {
-      if (String(arrivalCode).trim() !== String(job.verification_code_for_arrival).trim()) {
-        return res.status(400).json({ error: 'Invalid arrival code.' });
-      }
     }
 
     const arrivalTime = new Date().toISOString();
@@ -1309,6 +1428,23 @@ router.put('/:id/accept', async (req, res) => {
       return res.status(400).json({ error: 'Technician identity is required to accept a job.' });
     }
     if (technicianUid !== req.authUser.uid) return res.status(403).json({ error: 'Technician identity does not match the authenticated account.' });
+
+    // Authoritative workload validation: recalculate current active jobs before accepting
+    // Do not rely only on AI filtering – handles race where AI was stale.
+    try {
+      const activeJobs = await getTechnicianActiveJobCount(technicianUid);
+      const workloadStatus = getWorkloadStatus(activeJobs);
+      if (workloadStatus === 'at_capacity') {
+        return res.status(409).json({
+          code: 'TECHNICIAN_AT_CAPACITY',
+          message: `You currently have ${activeJobs} active repair requests and cannot automatically accept another request.`,
+          activeJobs,
+          workloadStatus,
+        });
+      }
+    } catch (workloadError) {
+      console.warn('Workload capacity check failed, proceeding with accept:', workloadError.message);
+    }
 
     const { data: jobId, error } = await supabase.rpc('accept_job', {
       p_job_id: id,

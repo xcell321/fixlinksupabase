@@ -3,6 +3,8 @@ const multer = require('multer');
 const router = express.Router();
 const { supabase, uploadBuffer } = require('../config/supabase');
 const { serializeUser } = require('../utils/serialize');
+const { requireAuth } = require('../middleware/requireAuth');
+const { getTechnicianSchedule, dayKeyOf, availabilityForDay } = require('../utils/techSchedule');
 
 const portfolioUpload = multer({
   storage: multer.memoryStorage(),
@@ -67,7 +69,40 @@ router.get('/:id/profile', async (req, res) => {
   }
 });
 
+// GET /api/users/:technicianUid/schedule — customer-safe technician
+// schedule visibility. Authenticated. Returns ONLY safe schedule fields
+// for occupied jobs (no customer PII, no GPS, never full job rows).
+// Optional ?date=ISO: also returns availability ('available' | 'busy')
+// for that calendar day using the same-day rule.
+router.get('/:technicianUid/schedule', requireAuth, async (req, res) => {
+  try {
+    const technicianUid = String(req.params.technicianUid || '').trim();
+    if (!technicianUid) return res.status(400).json({ error: 'Technician identity is required.' });
+
+    const { data: tech } = await supabase
+      .from('users')
+      .select('id, role')
+      .eq('id', technicianUid)
+      .maybeSingle();
+    if (!tech || String(tech.role || '') !== 'technician') {
+      return res.status(404).json({ error: 'Technician schedule not found.' });
+    }
+
+    const jobs = await getTechnicianSchedule(technicianUid);
+    const requestedDay = req.query.date ? dayKeyOf({ scheduled_date: String(req.query.date) }) : null;
+    res.json({
+      technicianUid,
+      availability: requestedDay ? availabilityForDay(requestedDay, jobs) : jobs.length > 0 ? 'busy' : 'available',
+      jobs,
+    });
+  } catch (error) {
+    console.error('Error loading technician schedule:', error);
+    res.status(500).json({ error: 'Unable to load technician schedule.' });
+  }
+});
+
 router.put('/:id/location', async (req, res) => {
+
   const latitude = Number(req.body?.latitude);
   const longitude = Number(req.body?.longitude);
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return res.status(400).json({ error: 'Valid coordinates are required.' });

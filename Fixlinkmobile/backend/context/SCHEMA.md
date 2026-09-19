@@ -19,6 +19,7 @@ erDiagram
     JOBS ||--o| REVIEWS : "generates upon completion"
     MESSAGES ||--o{ MESSAGE_READS : "read by"
     USERS ||--o{ NOTIFICATIONS : receives
+    USERS ||--o{ PASSWORD_RESETS : "issued reset links"
 
     USERS {
         uuid id PK "Supabase Auth user id"
@@ -91,6 +92,14 @@ erDiagram
         boolean read
         timestamptz timestamp
     }
+
+    PASSWORD_RESETS {
+        uuid id PK
+        uuid user_id FK
+        text token_hash "SHA-256 fingerprint of the reset token"
+        timestamptz expires_at
+        timestamptz used_at "non-null once redeemed (single-use)"
+    }
 ```
 
 ---
@@ -158,7 +167,7 @@ Represents the **entire request lifecycle**: unassigned pending requests and acc
 | `reviewed_at` | `timestamptz` | Optional | Review submission timestamp. |
 | `created_at` | `timestamptz` | **Required** | Request submission timestamp. |
 
-**Status values:** `Pending` → `Accepted` → `In Progress` → `Completed` (via OTP), with `Cancelled` branches.
+**Status values:** `Pending` → `Accepted` → `Confirmed` → `Customer Ready` → `In Progress` → `Completed` (via OTP), with `Cancelled` and `No-Show` branches. **Active workload statuses (technician capacity):** `Accepted`, `Confirmed`, `Customer Ready`, `In Progress` (counted for workload; `Pending`, `Completed`, `Cancelled`, `No-Show` are not active).
 
 ---
 
@@ -203,7 +212,7 @@ Captures 5-star feedback and written testimonials for completed repairs.
 ---
 
 ### 2.6 `notifications`
-In-app unread/read badge system for chat fan-out.
+In-app unread/read badge + two-step deep-link system for chat and job workflow.
 
 | Column | Type | Requirement | Description |
 |---|---|---|---|
@@ -211,13 +220,17 @@ In-app unread/read badge system for chat fan-out.
 | `recipient_uid` | `uuid` FK | **Required** | References `users.id` of the receiver. |
 | `sender_uid` | `uuid` FK | Optional | References `users.id` of the sender. |
 | `sender_name` | `text` | Optional | Sender display name. |
-| `job_id` | `uuid` FK | Optional | References `jobs.id`. |
+| `job_id` | `uuid` FK | Optional | References `jobs.id` (`on delete cascade` – if job deleted, row removed, but UI keeps optimistic read). |
 | `message_id` | `uuid` FK | Optional | References `messages.id`. |
-| `type` | `text` | **Required** | `'chat'` (current) or `'job'`/`'system'` (reserved). |
-| `text` | `text` | Optional | Short notification body. |
-| `read` | `boolean` | **Required** | Unread/read flag. |
-| `read_at` | `timestamptz` | Optional | Read timestamp. |
-| `timestamp` | `timestamptz` | **Required** | Creation timestamp. |
+| `type` | `text` | **Required** | `'chat'` (new message) or `'job'` (`Request Update`/`Accepted`/`Completed`); `'system'` reserved and not currently emitted. |
+| `text` | `text` | Optional | Short notification body (never title-only routing). |
+| `read` | `boolean` | **Required** | Unread/read flag – first tap flips `read=true` (optimistic) and badge `filter(!read).length` decrements by 1, never negative. |
+| `read_at` | `timestamptz` | Optional | Read timestamp set on `PUT /api/requests/notifications/:id/read`. |
+| `timestamp` | `timestamptz` | **Required** | Creation timestamp (sort `desc`, limit 100). |
+
+**Two-step interaction ( `mobile/src/navigation/AppNavigator.js` ):** 1st tap → show `detailCard` (sender/text/time/jobCode) + optimistic `read=true` + fire-and-forget `PUT …/read` (404 → keep optimistic, no warn). 2nd tap same `id` → `GET /api/requests/job/:id` validate ownership → `chat`→ exact `ChatScreen` thread (`jobId`), `job` Completed→ `RequestProgressScreen` `focusedJobId`+`autoExpandReview` (completed card highlighted), otherwise `RequestDetailsScreen`/technician `AvailableJobsScreen` `highlightedJobId`.
+
+**Persistence:** `read/read_at` persisted in `notifications`; badge derived from `GET /api/requests/notifications` (`read + unread`, not legacy `GET /api/requests/messages/unread` unread-only). Re-poll 10s, reopen, or restart all reflect DB state. Mark failure 404 keeps optimistic, other errors revert and show `detailError`.
 
 ---
 
@@ -243,6 +256,34 @@ Admin-managed skill categories; `devices` drives the customer device picker and 
 | `name` | `text` (unique) | **Required** | Category name, e.g., `'Home Appliances'`. |
 | `devices` | `jsonb` | **Required** | Device list under the category. |
 | `created_at` / `updated_at` | `timestamptz` | Optional | Creation/update timestamps. |
+
+---
+
+### 2.9 `password_resets`
+Backs **single-use** password-reset links. When a reset link is issued for an account, any still-unused rows for that user are deleted and one row is inserted holding a one-way fingerprint of the signed reset token. Redeeming a link marks the row `used_at` in a single atomic update, so the same link can never succeed twice.
+
+| Column | Type | Requirement | Description |
+|---|---|---|---|
+| `id` | `uuid` PK | **Required** | Auto-generated ID. |
+| `user_id` | `uuid` FK | **Required** | References `users.id`; cascade deletes on account removal. |
+| `token_hash` | `text` | **Required** | SHA-256 (`token + RESET_TOKEN_SECRET`) fingerprint; the raw token is never stored. |
+| `expires_at` | `timestamptz` | **Required** | Full link expiry (30 min, matches JWT `exp`). |
+| `used_at` | `timestamptz` | Optional | Becomes non-null on successful redemption (single-use marker). |
+| `created_at` | `timestamptz` | **Required** | Issuance timestamp. |
+
+Indexes: `password_resets_token_hash_idx (token_hash)`, `password_resets_user_id_idx (user_id)`, `password_resets_expires_at_idx (expires_at)`.
+
+---
+
+### 2.10 `workload` (virtual, computed — no migration)
+
+Workload is **not stored** as a column; it is computed live from `jobs`:
+
+- **Definition:** `activeJobs = COUNT(*) FROM jobs WHERE technician_uid = :uid AND status IN ('Accepted','Confirmed','Customer Ready','In Progress')` (helpers `backend/src/utils/workload.js:getTechnicianActiveJobCount`, `getActiveJobCountsForTechnicians` via `count head:true` + fallback `select id`). `Pending`, `Completed`, `Cancelled`, `No-Show` are **not** counted.
+- **Levels:** `0–2 → available`, `3–5 → busy`, `6+ → at_capacity` (`getWorkloadStatus`).
+- **AI filtering:** `GET /api/ai/recommend` annotates `candidate.activeJobs/workloadStatus`, filters `at_capacity` out, applies `-0.06` score penalty for `busy` (does not overpower skill/rating/distance). Response exposes `{activeJobs, workloadStatus}` (no customer PII).
+- **Accept guard:** `PUT /api/requests/:id/accept` recalculates count before `rpc accept_job`; if `at_capacity` → `409 {code:'TECHNICIAN_AT_CAPACITY', activeJobs, workloadStatus}`. Advisory (AI) + authoritative (accept) prevents stale-race over-accept; automatic recovery when count falls to `≤5`.
+- **Endpoint:** `GET /api/requests/technician/:uid/workload → {activeJobs, workloadStatus}` (auth: `uid===auth`).
 
 ---
 

@@ -38,6 +38,15 @@ The user logged in as a technician and sent a chat message to a customer. When l
 ### 5. Submit Request (`mobile/src/screens/customer/SubmitRequestScreen.js` & `AppNavigator.js`)
 - Pass `currentUser` (or `customerUid: user.uid`) to `SubmitRequestScreen` so new service requests always store `customerUid`.
 
+### 6. Technician Workload & Capacity (`backend/src/utils/workload.js`, `backend/src/routes/ai.js`, `backend/src/routes/requests.js`)
+- Helper `getTechnicianActiveJobCount` / `getActiveJobCountsForTechnicians` counts `status IN (Accepted,Confirmed,Customer Ready,In Progress)` (`count head:true`). Levels `0–2 available`, `3–5 busy`, `6+ at_capacity`.
+- AI `GET /api/ai/recommend` annotates `activeJobs/workloadStatus`, filters `at_capacity`, `-0.06` penalty for `busy`, sorts, adds schedule separately. Exposes `{activeJobs, workloadStatus}`.
+- Accept `PUT /api/requests/:id/accept` re-checks count before `rpc accept_job`; `at_capacity` → `409 TECHNICIAN_AT_CAPACITY`. `GET /api/requests/technician/:uid/workload` for UI. Auto-recover when `≤5`.
+- Mobile `AvailableJobsScreen` `fetchTechnicianWorkload` → `3–5` `You're Currently Busy… Cancel/Accept Anyway`, `6+` `You're At Capacity… OK` + block; `RequestProgressScreen` `focusedJobId/autoExpandReview` → `Busy/Available — X active jobs` chip (teal/gold) plus separate schedule row.
+
+### 7. Notification Two-Step (`mobile/src/navigation/AppNavigator.js`, `backend/src/routes/requests.js`)
+- `GET /api/requests/notifications` (10s poll, limit 100, read+unread) badge `filter(!read).length`; `PUT /api/requests/notifications/:id/read` optimistic fire-and-forget (404 keep optimistic), `GET /api/requests/job/:id` ownership check → `chat`→ thread, `job` Completed→ `RequestProgressScreen` focused, else `RequestDetailsScreen`/tech `highlightedJobId`.
+
 ---
 
 ## Verification Plan
@@ -45,6 +54,7 @@ The user logged in as a technician and sent a chat message to a customer. When l
 ### Automated / Backend Verification
 - Test `GET /api/requests/customer/Edsiel%20Ursal` and verify it returns the active accepted jobs.
 - Test `POST /api/requests/accepted/:id/messages` and `GET /api/requests/accepted/:id/messages` to verify messages are stored and retrieved in Firestore.
+- Test workload: `0–2` → `available` in AI, `3–5` → `busy` still in AI with penalty, `6+` → excluded; `PUT /:id/accept` at `5` → `200`, at `6` → `409 TECHNICIAN_AT_CAPACITY`, after `Completed` → `5` → eligible again; `GET /technician/:uid/workload` auth.
 
 ### End-to-End Verification
 - Log in as Technician (e.g., Dustine Villaruz or Benjie Quinio).
@@ -55,3 +65,5 @@ The user logged in as a technician and sent a chat message to a customer. When l
 - Open conversation: Verify the technician's message is visible on the left side.
 - Reply as Customer (e.g. "Thank you, see you soon!").
 - Confirm both messages persist across reloads and account switches.
+- Technician with `3–5` active jobs → AI card shows `Busy — 4 active jobs` + schedule `2 jobs scheduled on this date`; accept shows busy warning; `6+` not in AI, accept shows at-capacity `OK`.
+- Notification 1st tap → detail + badge –1 no spinner; 2nd tap same → exact `chat`/Completed `progress+review`/`details`/tech `highlightedCard`; deleted job → `detailError` no crash; refresh retains read.
