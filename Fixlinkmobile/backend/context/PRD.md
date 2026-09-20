@@ -120,19 +120,28 @@ FixLink was conceptualized to achieve five specific objectives:
 - `FR-MATCH-04`: Decline capability: Technicians can dismiss an available job, hiding it from their feed without canceling it for other qualified technicians.
 - `FR-MATCH-05`: Atomic acceptance: Accepting a job moves the record from `repairRequests` to `acceptedJobs`, assigns `technicianUid`, and generates a random 4-digit verification code.
 
-### Module 4: Mutual Live Tracking & Navigation (FR-MAP)
+### Module 4: Technician Workload & Capacity (FR-WORKLOAD)
+- `FR-WORKLOAD-01`: Active workload defined as `Accepted`, `Confirmed`, `Customer Ready`, `In Progress` (not `Pending`/`Completed`/`Cancelled`/`No-Show`), computed live from `jobs` via `getTechnicianActiveJobCount` / `getActiveJobCountsForTechnicians` (no stored column, no migration).
+- `FR-WORKLOAD-02`: Levels `0–2 available` (fully eligible), `3–5 busy` (still eligible, slight `–0.06` ranking dip, not overpowering skill/rating/distance), `6+ at_capacity` (excluded from automatic `GET /api/ai/recommend`).
+- `FR-WORKLOAD-03`: AI pipeline order: verified/active + skill → workload filter (`at_capacity` out, `busy` penalty) → distance/schedule/rating → schedule visibility kept separate (`techSchedule.js`).
+- `FR-WORKLOAD-04`: `GET /api/ai/recommend` response adds safe `{activeJobs, workloadStatus}` (`available`/`busy`/`at_capacity`) per candidate; `6+` never appears.
+- `FR-WORKLOAD-05`: Authoritative `PUT /api/requests/:id/accept` re-checks count before `rpc accept_job`; if `at_capacity` → `409 {code:TECHNICIAN_AT_CAPACITY, activeJobs, workloadStatus}`; existing jobs untouched, auto-recover when ≤5.
+- `FR-WORKLOAD-06`: `GET /api/requests/technician/:uid/workload` returns `{activeJobs, workloadStatus}` (auth `uid===auth`).
+- `FR-WORKLOAD-07`: Mobile `Available — 2 active jobs` / `Busy — 4 active jobs` chip on AI cards; `Busy` accept shows `You're Currently Busy…4… Cancel / Accept Anyway`; `At Capacity` shows `You're At Capacity…6… OK` and blocks.
+
+### Module 5: Mutual Live Tracking & Navigation (FR-MAP)
 - `FR-MAP-01`: Upon job acceptance, mutual location tracking is unlocked for both parties.
 - `FR-MAP-02`: Technicians stream real-time GPS coordinates to the server via background/foreground geolocation.
 - `FR-MAP-03`: LocationIQ routing engine calculates driving route, road polyline geometry, distance in kilometers, and estimated time of arrival (ETA) in minutes.
 - `FR-MAP-04`: MapTrackerScreen renders an interactive Leaflet.js map inside a React Native WebView showing customer home pin, moving technician vehicle pin, and full path.
 - `FR-MAP-05`: External navigation fallback: One-tap button allows technician to launch Google Maps or Apple Maps turn-by-turn turn directions.
 
-### Module 5: Communication & Execution (FR-COMM)
+### Module 6: Communication & Execution (FR-COMM)
 - `FR-COMM-01`: In-app messaging thread (`ChatScreen`) created specifically for each accepted job, supporting text messages and timestamps.
 - `FR-COMM-02`: Direct telephone dialer trigger allowing customer or technician to dial cellular numbers for urgent updates (e.g., security gate pass, landmarks).
 - `FR-COMM-03`: Technician can update job status from `Accepted` to `In Progress` upon arriving at the customer's residence.
 
-### Module 6: Secure Completion & Reviews (FR-VERIF)
+### Module 7: Secure Completion & Reviews (FR-VERIF)
 - `FR-VERIF-01`: Customer dashboard displays a unique 4-digit completion OTP during `In Progress` status.
 - `FR-VERIF-02`: Technician must enter this 4-digit code on their device to conclude the job.
 - `FR-VERIF-03`: Server validates OTP; if correct, transitions job status to `Completed`, archives active tracking, and prompts customer for feedback.

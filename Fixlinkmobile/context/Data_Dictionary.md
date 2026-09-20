@@ -45,7 +45,7 @@
 | preferredTime | String | Preferred time window for the repair (e.g., Morning (8AM-12PM)). |
 | scheduledDate | String | Full date and time the repair is scheduled (ISO-8601). |
 | photoUrl | String | URL of the uploaded photo of the appliance. |
-| status | String | Status of the repair request. Values: Pending, Cancelled. |
+| status | String | Status of the repair request. Values: Pending, Accepted, Confirmed, Customer Ready, In Progress, Completed, Cancelled, No-Show. Active workload = Accepted/Confirmed/Customer Ready/In Progress. |
 | isOther | Boolean | Flag indicating whether the appliance is an "other" category. |
 | declinedBy | String | UID of the technician who declined the request. |
 | createdAt | String | Date and time the request was submitted (ISO-8601). |
@@ -101,20 +101,22 @@
 | requestId | String | ID of the completed job being reviewed (references jobs.id). |
 | createdAt | String | Date and time the review was submitted (ISO-8601). |
 
-## Table: notifications
+## Table: notifications (two-step, read persistence)
 
 | Field Name | Data Type | Description |
 |---|---|---|
-| type | String | Type of notification. Currently only chat. |
-| recipientUid | String | UID of the user receiving the notification (references users.uid). |
+| type | String | Type of notification. Values: chat (New Message), job (Request Update/Accepted/Completed). System reserved, not emitted. Routing uses type + jobId/messageId, never title-only. |
+| recipientUid | String | UID of the user receiving the notification (references users.uid). Auth: recipient_uid===auth. |
 | senderUid | String | UID of the user who triggered the notification (references users.uid). |
 | senderName | String | Full name of the sender. |
-| jobId | String | ID of the related job (references jobs.id). |
+| jobId | String | ID of the related job (references jobs.id, on delete cascade – UI keeps optimistic read if deleted). |
 | messageId | String | ID of the related chat message (references messages.id). |
 | text | String | Notification message content. |
-| timestamp | String | Date and time the notification was created (ISO-8601). |
-| read | Boolean | Flag indicating whether the notification has been read. Values: true, false. |
-| readAt | String | Date and time the notification was read (ISO-8601). |
+| timestamp | String | Date and time the notification was created (ISO-8601). Sorted desc, limit 100. |
+| read | Boolean | Flag indicating whether the notification has been read. First tap → optimistic read=true, badge filter(!read).length –1, fire-and-forget PUT /api/requests/notifications/:id/read (404 keep optimistic, no warn). |
+| readAt | String | Date and time the notification was read (ISO-8601). Persisted across poll/reopen/restart. |
+
+**Virtual workload (computed, not stored):** `activeJobs: number` + `workloadStatus: available (0–2) | busy (3–5) | at_capacity (6+)` exposed in `GET /api/ai/recommend` candidates and `GET /api/requests/technician/:uid/workload`. Not stored, counted via `jobs.status IN (Accepted,Confirmed,Customer Ready,In Progress)`.
 
 ## Table: announcements
 

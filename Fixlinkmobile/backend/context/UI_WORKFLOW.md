@@ -205,6 +205,12 @@ graph TD
 
 ---
 
+### Screen 5b: AI Recommended Technicians + Workload (inside `RequestProgressScreen.js` – pending only)
+- **Purpose:** Show 3 best eligible technicians for a pending request (deterministic `technicianMatch.js` + OmniRoute AI) with safe schedule visibility and now workload.
+- **Eligibility order:** verified/active → skill/category → workload (`0–2 available`, `3–5 busy`, `6+ at_capacity` excluded) → distance/rating → schedule. `6+` never appears as recommended.
+- **Card layout (existing + workload):** rank, avatar, `name · X% match`, `reason`, `★ rating · reviews · yrs · km · AI confidence`, **workload chip** `Available — 2 active jobs` (teal `checkmark-circle-outline`) or `Busy — 4 active jobs` (gold `time-outline`), skill chips, `Has a scheduled job that day` / `Available for this schedule` (gold/green), upcoming schedule `calendar/time · appliance`. Workload and schedule are separate rows; workload does not hide schedule.
+- **Data:** `GET /api/ai/recommend?jobId=` returns `activeJobs/workloadStatus` per candidate (no customer PII).
+
 ### Screen 6: Detailed Request Summary (`RequestDetailsScreen.js`)
 - **Purpose:** Full administrative breakdown of an individual repair order for historical auditing and deep review.
 - **Visual Layout:**
@@ -229,7 +235,7 @@ graph TD
     - **Preferred Schedule:** Date and time slot.
     - **Action Row:**
       - Decline Button (Red text: `"Decline"`): Dismisses card from this technician's feed without affecting other technicians.
-      - Accept Button (Teal filled: `"Accept Job"`): Prompts confirmation modal.
+      - Accept Button (Teal filled: `"Accept Job"`): Triggers workload check → `0–2` normal accept; `3–5` shows `You're Currently Busy — 4 active … Cancel / Accept Anyway`; `6+` shows `You're At Capacity — 6 active … OK` and blocks (backend `409 TECHNICIAN_AT_CAPACITY` authoritative, auto-recover when ≤5).
   - **Active Jobs Section:**
     - Once a job is accepted, it docks at the top of the screen in an "Active Job in Progress" card.
     - Action Buttons on Active Card:
@@ -242,6 +248,11 @@ graph TD
   - On match: Displays success confetti, marks job `Completed`, and prompts technician to upload before/after photos to their portfolio.
 
 ---
+
+### Screen 7b: Notifications Panel ( `mobile/src/navigation/AppNavigator.js` – `Modal` )
+- **Purpose:** Unified `notifications` (`read/read_at`) inbox for `chat` + `job` (limit 100, sort `timestamp desc`, badge `filter(!read).length`).
+- **Two-step:** 1st tap → `detailCard` (sender/type/text/time/`#JOBCODE`, `Tap again to open…`) + optimistic `read=true` (badge –1, fire-and-forget `PUT /api/requests/notifications/:id/read`, 404 keep optimistic, no spinner) → 2nd tap same `id` → `GET /api/requests/job/:id` ownership check → `chat`→ exact `ChatScreen` thread (`jobId`), `job` Completed→ `RequestProgressScreen` `focusedJobId`+`autoExpandReview` (completed card `cardFocused`), otherwise `RequestDetailsScreen`/technician `AvailableJobsScreen` `highlightedJobId` (`highlightedCard`). No `jobId` → `detailError`; deleted → keep notification, show `detailError`.
+- **Persistence:** `read/read_at` DB-persisted; 10s poll `GET /api/requests/notifications` keeps badge synced across refresh/reopen/restart; already-read does not decrement, never negative.
 
 ### Screen 8: Mutual Live Map Tracker (`MapTrackerScreen.js`)
 - **Purpose:** Full-screen interactive map displaying live mutual tracking between customer home and en-route technician.

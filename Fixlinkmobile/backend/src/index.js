@@ -55,4 +55,16 @@ app.use('/api/maps', mapsRoutes);
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
+    try {
+        const { getLocalIp } = require('./utils/network');
+        const autoIp = getLocalIp();
+        const autoUrl = `http://${autoIp}:${PORT}`;
+        const envUrl = String(process.env.PUBLIC_BASE_URL || '').trim();
+        console.log(`🔗 Auto-detected PUBLIC_BASE_URL=${autoUrl} (for password-reset email links)`);
+        if (envUrl && envUrl !== autoUrl) {
+            console.log(`   .env PUBLIC_BASE_URL=${envUrl} will be used if set; leave empty to auto-detect, or set https domain for prod`);
+        } else if (!envUrl) {
+            console.log(`   .env PUBLIC_BASE_URL is empty — using auto-detected IP; email links will be reachable from phone on same WiFi`);
+        }
+    } catch (_) {}
 });
