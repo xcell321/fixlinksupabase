@@ -15,6 +15,25 @@ FixLink mobile is a **role-driven, high-contrast, outdoor-legible** service disp
 - Optimistic UI for notifications (badge `filter(!read).length` instant) + fire-and-forget `PUT` ; authoritative backend for workload/capacity.
 - Reuse `serializeJob`/`getEligibleCandidates`/`techSchedule` helpers, never duplicate status logic.
 
+### 1.1 UX Goals & Design Rationale
+The visual system exists to serve four practical UX goals identified during requirements gathering for a home-repair dispatch context:
+
+1. **Trust at a glance.** Customers are inviting a stranger into their home; the design leans on verification cues (`Avatar Verified Technician`, Gov ID/TESDA badges, star ratings, completion codes) rendered in calm teal/ink rather than alarming colors, so credibility signals read as reassurance, not warning.
+2. **Legibility in the field.** Technicians use the app outdoors, on the move, often one-handed. High-contrast `ink`-on-`canvas` text, large `44–48px` touch targets, `tabular-nums` for distances/codes, and a HUD-style map overlay keep critical data (distance, ETA, job code) readable in bright sunlight and glanceable without stopping.
+3. **Status transparency over configuration.** Both personas mostly *read* state (pending → accepted → in progress → completed) rather than configure it. The `ProgressRail`/`StatusPill` pattern is repeated everywhere so a user never has to relearn what a color or icon means between the Dashboard, Requests, and Chat.
+4. **Low-friction dispatch.** Technician-side workload gating (`Available` teal / `Busy` gold / `At Capacity` blocked) is surfaced *before* the accept action, not after a failed request — preventing a frustrating accept-then-reject loop and reducing perceived latency with optimistic notification badges while the backend stays authoritative for anything capacity-related.
+
+### 1.2 Role-Based Information Architecture
+| Concern | Customer framing | Technician framing |
+|---|---|---|
+| Primary object | "My request" (appliance-centric) | "A job" (schedule/route-centric) |
+| Home screen | Dashboard: stats + recent requests + CTA | Jobs: nearby dispatch queue + active jobs |
+| Trust signal shown | Technician's rating/verification | Customer's address/schedule reliability |
+| Map use | Track *a* technician en route | Navigate to *a* job, see nearby queue |
+| Terminal action | Leave a review | Complete OTP handshake + build portfolio |
+
+This split keeps a single design language (same tokens, components, spacing) while letting copy, ordering, and emphasis diverge per role — avoiding a "generic marketplace app" feel in favor of task-specific framing.
+
 ---
 
 ## 2. Color System — Exact Hex (`mobile/src/theme.tsx:9-30`)
@@ -158,7 +177,25 @@ Anti-slop press tokens: `pressed {scale 0.97, opacity 0.96}`, `pressedSoft {scal
 
 ---
 
-## 9. Prototype Interaction Map
+## 9. UX Flow Narratives (Why Each Step Exists)
+
+**Customer — from problem to fixed appliance:**
+1. *Submit Request* — a low-effort funnel (category → device → photo → address → schedule) so a stressed customer with a broken appliance can finish in under a minute; `Locate Me` removes manual address typing.
+2. *Request Progress (Pending)* — instead of a silent wait, the AI-recommended panel shows *which* technician is likely to be matched and their live workload (`Available`/`Busy`), turning dead time into reassurance.
+3. *Active → Track* — live map + ETA reduces "where is my technician" support burden and anxiety of letting a stranger into the home.
+4. *OTP Confirm/Ready/Complete* — a shared one-time code at arrival and completion gives the customer a lightweight, tamper-evident way to confirm the right person showed up and the job is genuinely done, without any signature or payment step (cash-on-service).
+5. *Review* — closes the loop, feeding the rating that later informs other customers' trust signals and the technician's `AI Recommended` ranking.
+
+**Technician — from idle to portfolio:**
+1. *Availability toggle* — an explicit on/off switch (not silent background tracking) respects technician agency over when they receive dispatch offers.
+2. *Dispatch Queue* — ranked by proximity (`distancePill`) so technicians triage the closest, most winnable jobs first, reducing travel cost.
+3. *Workload gating (3–5 Busy / 6+ At Capacity)* — surfaced *on the card*, before the tap, so a technician never accepts a job only to be blocked by the backend — respecting their time and avoiding a dead-end interaction.
+4. *Active Card → Map → OTP Start/Complete* — mirrors the customer's OTP step exactly (same code, same visual language) so both sides trust the same artifact.
+5. *Portfolio* — every completed job with photos becomes proof-of-work, turning routine job completion into a compounding asset for the technician's profile.
+
+---
+
+## 9.1 Prototype Interaction Map
 
 ```
 Login → (role customer) → Dashboard → +Request → Submit → Progress (Pending → AI 5b → Available/Busy chip) → Details → Track → Map ↔ Chat
@@ -174,6 +211,10 @@ Expo prototype runs `npx expo start` (SDK 57) on `Fixlinkmobile/mobile`, API `ht
 
 ## 10. Accessibility & Quality
 - `accessibilityRole button/label/hint/state selected/expanded`, `hitSlop 6-10`, `minHeight 44-48` touch targets, `press` GPU only (scale+opacity), `shadows.elevation` 3-6, `placeholderTextColor muted`, `selectable` phone, `fontScaling` via `Inter`.
+- **Color contrast:** body text (`ink #102A43` on `canvas #F5F8FA` / `white #FFFFFF`) exceeds WCAG AA (4.5:1) for normal text; status colors (`error`, `danger`, `green`, `gold`) are never the *only* signal — always paired with an icon and/or text label (e.g. `Busy` gold chip always carries the word "Busy", not color alone).
+- **Motion & feedback:** haptic (`Vibration.vibrate(60)`) confirms banners/OTP success without relying on animation alone; all press states use `transform`/`opacity` only (no layout-shifting animations) to stay smooth on lower-end Android devices common among target users.
+- **Form resilience:** required fields (registration, submit request) show inline validation rather than blocking modal alerts; photo/document uploads show thumbnail + remove (`X`) affordance so users can recover from a wrong selection without restarting the flow.
+- **Offline/latency tolerance:** `Skeleton` loading states shown on `Dashboard`, `RequestProgress`, `AvailableJobs`, and `Chat` so slow mobile connections (common outside Metro Cebu) never present a blank screen.
 
 ---
 

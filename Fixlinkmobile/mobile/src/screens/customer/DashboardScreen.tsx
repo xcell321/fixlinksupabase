@@ -11,13 +11,14 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
   const [completedJobs, setCompletedJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [tipDismissed, setTipDismissed] = useState(false);
 
   const firstName = (user?.name || 'there').split(' ')[0];
   const name = user?.name;
   const uid = user?.uid;
 
   const fetchAll = () => Promise.all([
-    fetchCompletedJobs(name).then(setCompletedJobs).catch(() => setCompletedJobs([])),
+    fetchCompletedJobs(name, uid).then(setCompletedJobs).catch(() => setCompletedJobs([])),
     fetchCustomerRequests(name, uid).then(setTrackedRequests).catch(() => setTrackedRequests([])),
   ]);
 
@@ -139,13 +140,24 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
         </TouchableOpacity>
       )}
 
-      <View style={styles.tipCard}>
-        <Ionicons name="sparkles-outline" size={21} color={colors.gold} />
-        <View style={{ flex: 1 }}>
-          <Text style={styles.tipTitle}>Quick tip</Text>
-          <Text style={styles.tipCopy}>Add a photo to your request so technicians can prepare before they arrive.</Text>
+      {!tipDismissed && (
+        <View style={styles.tipCard}>
+          <Ionicons name="sparkles-outline" size={21} color={colors.gold} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.tipTitle}>Quick tip</Text>
+            <Text style={styles.tipCopy}>Add a photo to your request so technicians can prepare before they arrive.</Text>
+          </View>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss tip"
+            onPress={() => setTipDismissed(true)}
+            hitSlop={8}
+            style={styles.tipDismiss}
+          >
+            <Ionicons name="close" size={14} color={colors.muted} />
+          </TouchableOpacity>
         </View>
-      </View>
+      )}
     </ScrollView>
   );
 }
@@ -207,4 +219,5 @@ const styles = StyleSheet.create({
   tipCard: { backgroundColor: '#FFF8E7', borderRadius: 18, padding: 14, flexDirection: 'row', gap: 12, alignItems: 'flex-start', borderWidth: 1, borderColor: '#FDE68A' },
   tipTitle: { color: '#8A5B00', fontFamily: fonts.bold, fontSize: 13, marginBottom: 3 },
   tipCopy: { color: '#9A711E', fontSize: 12, lineHeight: 17, fontFamily: fonts.regular },
+  tipDismiss: { width: 28, height: 28, borderRadius: 10, backgroundColor: colors.white, borderWidth: 1, borderColor: '#FDE68A', alignItems: 'center', justifyContent: 'center' },
 });

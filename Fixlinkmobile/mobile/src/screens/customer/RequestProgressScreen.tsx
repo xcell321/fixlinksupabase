@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Skeleton from '../../components/Skeleton';
 import { cancelRepairRequest, confirmRepairRequest, fetchCompletedJobs, fetchCustomerRequests, fetchTechnicianRecommendations, markCustomerReady, submitTechnicianReview } from '../services/api';
 import { colors, fonts, shadows } from '../../theme';
-import { getApplianceIcon, getStatusColor, getStatusIcon } from '../../utils/applianceIcons';
+import { getApplianceIcon, getStatusColor, getStatusGuidance, getStatusIcon } from '../../utils/applianceIcons';
 import type { ScheduleAvailability, TechnicianScheduleItem } from '../../types/schedule';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -23,6 +23,7 @@ interface ServiceRequest {
   preferredDate?: string;
   preferredTime?: string;
   scheduledDate?: string;
+  photoUrl?: string | null;
 }
 
 interface CompletedJob {
@@ -115,7 +116,7 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
   const fetchAll = (): Promise<void> => {
     let failed = false;
     return Promise.all([
-      fetchCompletedJobs(customerName)
+      fetchCompletedJobs(customerName, customerUid)
         .then((data) => setCompletedJobs(Array.isArray(data) ? (data as CompletedJob[]) : []))
         .catch(() => { failed = true; setCompletedJobs([]); }),
       fetchCustomerRequests(customerName, customerUid)
@@ -272,22 +273,29 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
         accessibilityRole="text"
         accessibilityLabel={`Request progress: step ${current + 1} of ${PROGRESS_STEPS.length}, ${PROGRESS_STEPS[current]}`}
       >
-        {PROGRESS_STEPS.map((step, i) => {
-          const done = i < current;
-          const isCurrent = i === current;
-          return (
-            <View key={step} style={styles.railStep}>
-              <View style={styles.railTrack}>
-                {i > 0 && <View style={[styles.railLine, i <= current && styles.railLineDone]} />}
-                <View style={[styles.railDot, done && styles.railDotDone, isCurrent && styles.railDotCurrent]}>
-                  {done && <Ionicons name="checkmark" size={9} color={colors.white} accessible={false} />}
+        <View style={styles.railHeader}>
+          <Text style={styles.railKicker}>PROGRESS HISTORY</Text>
+        </View>
+        <View style={styles.railBody}>
+          {PROGRESS_STEPS.map((step, i) => {
+            const done = i < current;
+            const isCurrent = i === current;
+            const isUpcoming = i > current;
+            return (
+              <View key={step} style={styles.railStep}>
+                <View style={styles.railTrack}>
+                  {i > 0 && <View style={[styles.railLine, (done || isCurrent) && styles.railLineDone, isUpcoming && styles.railLineUpcoming]} />}
+                  <View style={[styles.railDot, done && styles.railDotDone, isCurrent && styles.railDotCurrent, isUpcoming && styles.railDotUpcoming]}>
+                    {done && <Ionicons name="checkmark" size={8} color={colors.white} accessible={false} />}
+                    {isUpcoming && <View style={styles.railDotInner} />}
+                  </View>
+                  {i < PROGRESS_STEPS.length - 1 && <View style={[styles.railLine, i < current && styles.railLineDone, isUpcoming && styles.railLineUpcoming]} />}
                 </View>
-                {i < PROGRESS_STEPS.length - 1 && <View style={[styles.railLine, i < current && styles.railLineDone]} />}
+                <Text style={[styles.railLabel, isCurrent && styles.railLabelCurrent, isUpcoming && styles.railLabelUpcoming]} numberOfLines={1}>{step}</Text>
               </View>
-              <Text style={[styles.railLabel, isCurrent && styles.railLabelCurrent]} numberOfLines={1}>{step}</Text>
-            </View>
-          );
-        })}
+            );
+          })}
+        </View>
       </View>
     );
   };
@@ -345,6 +353,9 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
     const isConfirmed = statusKey === 'confirmed';
     const isReady = statusKey === 'customer ready';
     const isActive = isAccepted || isConfirmed || isReady || statusKey === 'in progress';
+    const statusColor = getStatusColor(req.status);
+    const guidance = getStatusGuidance(req.status);
+    const showWaitingInfo = isPending || (statusKey === 'in progress' && !isAccepted && !isConfirmed && !isReady);
     const cancelMessage = isPending
       ? 'This can only be done before a technician accepts the request.'
       : isReady
@@ -353,8 +364,10 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
           ? 'Cancel now before the technician travels.'
           : 'Cancel now before marking the request ready.';
     const isFocused = focusedJobId && String(focusedJobId) === String(req.id);
+    const hasPrimaryAction = isAccepted || isConfirmed || isReady || (isActive && statusKey === 'in progress');
     return (
       <View key={req.id} style={[styles.card, isFocused && styles.cardFocused]}>
+        {/* 1 — CURRENT STATUS HERO: strongest visual near top */}
         <View style={styles.cardHeader}>
           <View style={[styles.iconChip, isActive ? styles.iconChipBlue : styles.iconChipAmber]}>
             <Ionicons name={applianceIconName(req.applianceType)} size={22} color={isActive ? colors.accentBlue : colors.gold} accessible={false} />
@@ -372,15 +385,169 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
           {renderStatusPill(req.status)}
         </View>
 
-        {isActive && renderProgressRail(req.status)}
+        <View style={[styles.statusHero, { backgroundColor: statusColor + '10', borderColor: statusColor + '22' }]}>
+          <View style={[styles.statusHeroIcon, { backgroundColor: statusColor + '16', borderColor: statusColor + '28' }]}>
+            <Ionicons name={statusIconName(req.status)} size={18} color={statusColor} accessible={false} />
+          </View>
+          <View style={styles.statusHeroCopy}>
+            <Text style={styles.statusHeroKicker} accessibilityRole="text">
+              CURRENT STATUS — <Text style={[styles.statusHeroStatus, { color: statusColor }]}>{req.status || 'Pending'}</Text>
+            </Text>
+            <Text style={styles.statusHeroTitle} numberOfLines={1}>{guidance.title}</Text>
+            <Text style={styles.statusHeroBody} numberOfLines={2}>{guidance.body}</Text>
+          </View>
+        </View>
 
+        {/* 2 — NEXT ACTION: directly below status, visually dominant */}
+        {isAccepted && (
+          <View style={styles.nextActionBlock}>
+            <Text style={styles.nextActionKicker}>NEXT ACTION REQUIRED</Text>
+            <View style={styles.primaryRow}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Confirm repair for ${req.applianceType ?? 'this request'}`}
+                accessibilityHint="Confirm you need the repair"
+                onPress={() => confirmRepair(req)}
+                style={({ pressed }) => [styles.primaryButton, styles.nextActionPrimary, pressed && styles.pressed]}
+              >
+                <Ionicons name="checkmark-circle" size={16} color={colors.white} accessible={false} />
+                <Text style={styles.primaryButtonText}>Confirm Repair</Text>
+              </Pressable>
+              {onTrackMap && (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Track repair for ${req.applianceType ?? 'this request'}`}
+                  accessibilityHint="Open live tracking on the map"
+                  onPress={() => onTrackMap(req)}
+                  style={({ pressed }) => [styles.secondaryAction, pressed && styles.pressedSoft]}
+                >
+                  <Ionicons name="map" size={15} color={colors.teal} accessible={false} />
+                  <Text style={styles.secondaryActionText}>Track</Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
+        )}
+        {isConfirmed && (
+          <View style={styles.nextActionBlock}>
+            <Text style={styles.nextActionKicker}>NEXT ACTION REQUIRED</Text>
+            <View style={styles.primaryRow}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Mark ready for ${req.applianceType ?? 'this request'}`}
+                accessibilityHint="Confirm someone will meet the technician"
+                onPress={() => markReady(req)}
+                style={({ pressed }) => [styles.primaryButton, styles.nextActionPrimary, pressed && styles.pressed]}
+              >
+                <Ionicons name="flag" size={16} color={colors.white} accessible={false} />
+                <Text style={styles.primaryButtonText}>I&apos;m Ready</Text>
+              </Pressable>
+              {onTrackMap && (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Track repair for ${req.applianceType ?? 'this request'}`}
+                  onPress={() => onTrackMap(req)}
+                  style={({ pressed }) => [styles.secondaryAction, pressed && styles.pressedSoft]}
+                >
+                  <Ionicons name="map" size={15} color={colors.teal} accessible={false} />
+                  <Text style={styles.secondaryActionText}>Track</Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
+        )}
+        {isReady && (
+          <View style={styles.nextActionBlock}>
+            <Text style={styles.nextActionKicker}>WHAT&apos;S NEXT</Text>
+            <View style={styles.calmingInfo}>
+              <Ionicons name="hourglass-outline" size={15} color={colors.teal} accessible={false} />
+              <Text style={styles.calmingInfoText}>Your location is marked ready — follow the technician live on the map.</Text>
+            </View>
+            {onTrackMap && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Track repair for ${req.applianceType ?? 'this request'}`}
+                onPress={() => onTrackMap(req)}
+                style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
+              >
+                <Ionicons name="map" size={15} color={colors.white} accessible={false} />
+                <Text style={styles.primaryButtonText}>Track Technician</Text>
+              </Pressable>
+            )}
+          </View>
+        )}
+        {statusKey === 'in progress' && (
+          <View style={styles.nextActionBlock}>
+            <Text style={styles.nextActionKicker}>WHAT&apos;S NEXT</Text>
+            <View style={styles.calmingInfo}>
+              <Ionicons name="construct-outline" size={15} color={colors.teal} accessible={false} />
+              <Text style={styles.calmingInfoText}>Repairs are underway — keep your phone nearby for updates.</Text>
+            </View>
+            {onTrackMap && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Track repair for ${req.applianceType ?? 'this request'}`}
+                onPress={() => onTrackMap(req)}
+                style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
+              >
+                <Ionicons name="map" size={15} color={colors.white} accessible={false} />
+                <Text style={styles.primaryButtonText}>Track Technician</Text>
+              </Pressable>
+            )}
+          </View>
+        )}
+        {showWaitingInfo && isPending && (
+          <View style={styles.nextActionBlock}>
+            <View style={styles.calmingInfo}>
+              <Ionicons name="time-outline" size={15} color={colors.muted} accessible={false} />
+              <Text style={styles.calmingInfoText}>Waiting for a technician to accept — we&apos;ll notify you the moment someone does.</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Completion code is only relevant when it is the next step — show it right after next action */}
+        {isActive && req.verificationCode && !isConfirmed && (
+          <View style={styles.completionBadge}>
+            <Ionicons name="key-outline" size={14} color={colors.white} accessible={false} />
+            <Text style={styles.completionText}>
+              Completion Code: <Text style={styles.completionCode}>{req.verificationCode}</Text>
+            </Text>
+          </View>
+        )}
+        {isReady && (
+          <View style={styles.readyBadge}>
+            <Ionicons name="checkmark-circle" size={14} color={colors.teal} accessible={false} />
+            <Text style={styles.readyText}>Ready for your technician</Text>
+          </View>
+        )}
+
+        {/* 3 — JOB SUMMARY: scannable facts */}
         {req.description ? <Text style={styles.description} numberOfLines={2}>{req.description}</Text> : null}
+
+        {req.photoUrl ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`View photo for ${req.applianceType ?? 'this request'}`}
+            accessibilityHint="Opens request details with the attached photo"
+            onPress={() => onViewDetails(req)}
+            style={({ pressed }) => [styles.photoBadge, pressed && styles.pressedSoft]}
+          >
+            <Image source={{ uri: req.photoUrl }} style={styles.photoBadgeThumb} />
+            <Ionicons name="image-outline" size={15} color={colors.teal} accessible={false} />
+            <Text style={styles.photoBadgeText} numberOfLines={1}>Photo attached</Text>
+            <Ionicons name="chevron-forward" size={15} color={colors.muted} accessible={false} />
+          </Pressable>
+        ) : null}
 
         <View style={styles.metaRow}>
           {renderMetaItem('calendar-outline', formatCardDate(req.createdAt))}
           {req.location ? renderMetaItem('location-outline', req.location) : null}
         </View>
 
+        {/* 4 — PROGRESS HISTORY: de-emphasized, below facts */}
+        {isActive && renderProgressRail(req.status)}
+
+        {/* 5 — SECONDARY: AI support (when pending) */}
         {isPending && (
           <View style={styles.aiPanel}>
             <View style={styles.aiPanelHeader}>
@@ -391,86 +558,28 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
           </View>
         )}
 
-        {isReady && (
-          <View style={styles.readyBadge}>
-            <Ionicons name="checkmark-circle" size={14} color={colors.teal} accessible={false} />
-            <Text style={styles.readyText}>Ready for your technician</Text>
-          </View>
-        )}
-
-        {isActive && req.verificationCode && !isConfirmed && (
-          <View style={styles.completionBadge}>
-            <Ionicons name="key-outline" size={14} color={colors.white} accessible={false} />
-            <Text style={styles.completionText}>
-              Completion Code: <Text style={styles.completionCode}>{req.verificationCode}</Text>
-            </Text>
-          </View>
-        )}
-
         {(isActive || isPending) && (
-          <View style={styles.cardActions}>
-            {(isActive || isAccepted) && (
-              <View style={styles.primaryRow}>
-                {isActive && onTrackMap && (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`Track repair for ${req.applianceType ?? 'this request'}`}
-                    accessibilityHint="Open live tracking on the map"
-                    onPress={() => onTrackMap(req)}
-                    style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
-                  >
-                    <Ionicons name="map" size={15} color={colors.white} accessible={false} />
-                    <Text style={styles.primaryButtonText}>Track</Text>
-                  </Pressable>
-                )}
-                {isAccepted && (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`Confirm repair for ${req.applianceType ?? 'this request'}`}
-                    accessibilityHint="Confirm you need the repair"
-                    onPress={() => confirmRepair(req)}
-                    style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
-                  >
-                    <Ionicons name="checkmark" size={15} color={colors.white} accessible={false} />
-                    <Text style={styles.primaryButtonText}>Confirm</Text>
-                  </Pressable>
-                )}
-                {isConfirmed && (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`Mark ready for ${req.applianceType ?? 'this request'}`}
-                    accessibilityHint="Confirm someone will meet the technician"
-                    onPress={() => markReady(req)}
-                    style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
-                  >
-                    <Ionicons name="flag" size={15} color={colors.white} accessible={false} />
-                    <Text style={styles.primaryButtonText}>I&apos;m Ready</Text>
-                  </Pressable>
-                )}
-              </View>
-            )}
-            <View style={styles.secondaryRow}>
+          <View style={styles.secondaryActionsRow}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`View details of ${req.applianceType ?? 'this request'}`}
+              onPress={() => onViewDetails(req)}
+              style={({ pressed }) => [styles.detailsButton, pressed && styles.pressedSoft]}
+            >
+              <Ionicons name="eye-outline" size={16} color={colors.teal} accessible={false} />
+              <Text style={styles.detailsButtonText}>Details</Text>
+            </Pressable>
+            {(isPending || isAccepted || isConfirmed || isReady) && (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`View details of ${req.applianceType ?? 'this request'}`}
-                onPress={() => onViewDetails(req)}
-                style={({ pressed }) => [styles.detailsButton, pressed && styles.pressedSoft]}
+                accessibilityLabel={`Cancel request for ${req.applianceType ?? 'this request'}`}
+                accessibilityHint="Asks for confirmation first"
+                onPress={() => cancelWithMessage(req, cancelMessage)}
+                style={({ pressed }) => [styles.cancelButton, pressed && styles.pressedSoft]}
               >
-                <Ionicons name="eye-outline" size={16} color={colors.teal} accessible={false} />
-                <Text style={styles.detailsButtonText}>Details</Text>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
               </Pressable>
-              {(isPending || isAccepted || isConfirmed || isReady) && (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Cancel request for ${req.applianceType ?? 'this request'}`}
-                  accessibilityHint="Asks for confirmation first"
-                  onPress={() => cancelWithMessage(req, cancelMessage)}
-                  style={({ pressed }) => [styles.cancelButton, pressed && styles.pressedSoft]}
-                >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </Pressable>
-              )}
-            </View>
+            )}
           </View>
         )}
       </View>
@@ -956,23 +1065,51 @@ const styles = StyleSheet.create({
   donePill: { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 999, borderWidth: 1, borderColor: colors.green + '40', backgroundColor: colors.green + '15', flexDirection: 'row', alignItems: 'center', gap: 4 },
   donePillText: { fontSize: 11, fontFamily: fonts.bold, color: colors.green },
 
-  description: { fontSize: 13, color: colors.muted, marginBottom: 14, lineHeight: 19, fontFamily: fonts.regular },
+  description: { fontSize: 13, color: colors.muted, marginBottom: 12, lineHeight: 19, fontFamily: fonts.regular },
+  photoBadge: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, borderRadius: 12, padding: 7, paddingRight: 10, marginBottom: 12 },
+  photoBadgeThumb: { width: 36, height: 36, borderRadius: 8, backgroundColor: colors.line },
+  photoBadgeText: { flex: 1, color: colors.teal, fontSize: 12, fontFamily: fonts.semiBold },
   sectionHint: { color: colors.muted, fontSize: 12, lineHeight: 17, fontFamily: fonts.regular },
   metaRow: { flexDirection: 'row', gap: 14, marginBottom: 14, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: colors.line },
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1 },
   metaText: { color: colors.muted, fontSize: 12, fontFamily: fonts.medium, flex: 1 },
 
-  // Status progress rail
-  rail: { flexDirection: 'row', marginBottom: 14, paddingVertical: 10, paddingHorizontal: 4, backgroundColor: colors.canvas, borderRadius: 14, borderWidth: 1, borderColor: colors.lineSoft },
+  // Current status hero (strongest visual, still compact)
+  statusHero: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, borderWidth: 1, marginBottom: 12 },
+  statusHeroIcon: { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center', borderWidth: 1, marginTop: 1 },
+  statusHeroCopy: { flex: 1 },
+  statusHeroKicker: { color: colors.muted, fontSize: 9, letterSpacing: 1.1, fontFamily: fonts.bold, marginBottom: 2 },
+  statusHeroStatus: { fontSize: 9, fontFamily: fonts.extraBold },
+  statusHeroTitle: { color: colors.ink, fontSize: 13, fontFamily: fonts.bold, marginBottom: 2 },
+  statusHeroBody: { color: colors.muted, fontSize: 12, lineHeight: 16, fontFamily: fonts.regular },
+
+  // Next action — visually dominant, directly below status
+  nextActionBlock: { gap: 8, marginBottom: 12 },
+  nextActionKicker: { color: colors.teal, fontSize: 9, letterSpacing: 1.2, fontFamily: fonts.bold },
+  nextActionPrimary: { flex: 1.35 },
+  secondaryAction: { flex: 1, minHeight: 48, borderRadius: 14, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  secondaryActionText: { color: colors.teal, fontFamily: fonts.bold, fontSize: 13 },
+  calmingInfo: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.tealLight, borderRadius: 12, borderWidth: 1, borderColor: colors.hudBorder, paddingHorizontal: 12, paddingVertical: 10 },
+  calmingInfoText: { flex: 1, color: colors.ink, fontSize: 12, lineHeight: 16, fontFamily: fonts.medium },
+
+  // De-emphasized progress history — supports, does not compete
+  rail: { marginBottom: 12, paddingVertical: 8, paddingHorizontal: 6, backgroundColor: colors.canvas, borderRadius: 12, borderWidth: 1, borderColor: colors.lineSoft, opacity: 0.97 },
+  railHeader: { marginBottom: 6, paddingHorizontal: 2 },
+  railKicker: { color: colors.muted, fontSize: 8, letterSpacing: 1.2, fontFamily: fonts.bold },
+  railBody: { flexDirection: 'row' },
   railStep: { flex: 1, alignItems: 'center' },
   railTrack: { flexDirection: 'row', alignItems: 'center', width: '100%' },
-  railLine: { flex: 1, height: 2, backgroundColor: colors.line },
+  railLine: { flex: 1, height: 1.5, backgroundColor: colors.line },
   railLineDone: { backgroundColor: colors.teal },
-  railDot: { width: 18, height: 18, borderRadius: 9, backgroundColor: colors.white, borderWidth: 2, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
+  railLineUpcoming: { backgroundColor: colors.lineSoft },
+  railDot: { width: 16, height: 16, borderRadius: 8, backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
   railDotDone: { backgroundColor: colors.teal, borderColor: colors.teal },
-  railDotCurrent: { borderColor: colors.tealDark, borderWidth: 3 },
-  railLabel: { color: colors.muted, fontSize: 9, fontFamily: fonts.semiBold, marginTop: 4, textAlign: 'center' },
+  railDotCurrent: { borderColor: colors.tealDark, borderWidth: 2.5 },
+  railDotUpcoming: { backgroundColor: colors.white, borderColor: colors.lineSoft },
+  railDotInner: { width: 5, height: 5, borderRadius: 3, backgroundColor: colors.lineSoft },
+  railLabel: { color: colors.muted, fontSize: 8, fontFamily: fonts.semiBold, marginTop: 4, textAlign: 'center' },
   railLabelCurrent: { color: colors.tealDark, fontFamily: fonts.bold },
+  railLabelUpcoming: { color: '#94A3B8', fontFamily: fonts.medium },
 
   // Codes
   readyBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.tealLight, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 12, borderWidth: 1, borderColor: colors.hudBorder, marginBottom: 12, gap: 8 },
@@ -985,6 +1122,7 @@ const styles = StyleSheet.create({
   cardActions: { gap: 10 },
   primaryRow: { flexDirection: 'row', gap: 10 },
   secondaryRow: { flexDirection: 'row', gap: 10 },
+  secondaryActionsRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
   primaryButton: { flex: 1, minHeight: 48, borderRadius: 14, backgroundColor: colors.teal, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, ...shadows.card },
   primaryButtonText: { color: colors.white, fontFamily: fonts.bold, fontSize: 14 },
   detailsButton: { flex: 1, minHeight: 48, borderRadius: 14, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },

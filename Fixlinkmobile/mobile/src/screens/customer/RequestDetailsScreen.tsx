@@ -1,16 +1,16 @@
 ﻿// @ts-nocheck - migrated from .js, preserve working state; types to be refined incrementally
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, SafeAreaView, StatusBar, Alert, ActivityIndicator } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, SafeAreaView, StatusBar, Alert, ActivityIndicator, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { confirmRepairRequest, fetchTechnicianProfile, markCustomerReady } from '../services/api';
-import { fonts } from '../../theme';
+import { PhotoLightbox } from '../../components/RequestPhoto';
+import { colors, fonts } from '../../theme';
 import { getApplianceIcon, getStatusColor, getStatusIcon, getStatusGuidance, STEPS } from '../../utils/applianceIcons';
-
-const colors = { ink: '#102A43', teal: '#0F766E', tealLight: '#E6F6F3', green: '#059669', canvas: '#F5F8FA', white: '#FFFFFF', muted: '#5A7A91', line: '#D9E2EC', error: '#E53935', blue: '#2563EB', amber: '#D97706' };
 
 export default function RequestDetailsScreen({ request, onBack, onMessageTechnician, onTrackMap }) {
   const [techProfile, setTechProfile] = useState(null);
   const [workflowLoading, setWorkflowLoading] = useState(null);
+  const [photoViewerVisible, setPhotoViewerVisible] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -204,6 +204,22 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
           <View style={styles.divider} />
           <Text style={styles.fieldLabel}>PROBLEM DESCRIPTION</Text>
           <Text style={styles.fieldText}>{request.description || 'No description provided'}</Text>
+
+          <Text style={[styles.fieldLabel, { marginTop: 16 }]}>ATTACHED PHOTO</Text>
+          {request.photoUrl ? (
+            <TouchableOpacity style={styles.photoWrap} onPress={() => setPhotoViewerVisible(true)} activeOpacity={0.85}>
+              <Image source={{ uri: request.photoUrl }} style={styles.photoImage} resizeMode="cover" />
+              <View style={styles.photoHintRow}>
+                <Ionicons name="expand-outline" size={14} color={colors.teal} />
+                <Text style={styles.photoHintText}>Tap to view full size</Text>
+              </View>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.photoEmpty}>
+              <Ionicons name="image-outline" size={16} color={colors.muted} />
+              <Text style={styles.photoEmptyText}>No photo attached to this request.</Text>
+            </View>
+          )}
         </View>
 
         {/* Schedule & Location */}
@@ -363,6 +379,14 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
           </View>
         )}
       </ScrollView>
+
+      <PhotoLightbox
+        visible={photoViewerVisible}
+        photoUrl={request.photoUrl}
+        title="Problem photo"
+        subtitle="Attached to this request"
+        onClose={() => setPhotoViewerVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -418,6 +442,13 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: colors.line, marginVertical: 16 },
   fieldLabel: { color: colors.muted, fontSize: 10, letterSpacing: 1.2, fontFamily: fonts.bold, marginBottom: 6 },
   fieldText: { color: colors.ink, fontSize: 14, fontFamily: fonts.medium, lineHeight: 21 },
+
+  photoWrap: { marginTop: 8, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, borderRadius: 14, padding: 8 },
+  photoImage: { width: '100%', height: 190, borderRadius: 10, backgroundColor: colors.line },
+  photoHintRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8 },
+  photoHintText: { color: colors.teal, fontSize: 12, fontFamily: fonts.semiBold },
+  photoEmpty: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, borderRadius: 14, padding: 14, marginTop: 8 },
+  photoEmptyText: { color: colors.muted, fontSize: 13, fontFamily: fonts.medium },
 
   iconRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, gap: 12 },
   iconBubble: { width: 40, height: 40, borderRadius: 13, backgroundColor: colors.tealLight, alignItems: 'center', justifyContent: 'center' },

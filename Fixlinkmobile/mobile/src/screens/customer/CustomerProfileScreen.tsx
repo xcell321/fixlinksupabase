@@ -1,9 +1,10 @@
 ﻿// @ts-nocheck - migrated from .js, preserve working state; types to be refined incrementally
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, TextInput, Alert, ActivityIndicator, Image } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, TextInput, Alert, ActivityIndicator, Image, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { fonts } from '../../theme';
+import { colors as themeColors, fonts } from '../../theme';
+import HelpSheet from '../../components/HelpSheet';
 
 const colors = { ink: '#102A43', teal: '#0F766E', canvas: '#F5F8FA', white: '#FFFFFF', muted: '#5A7A91', line: '#D9E2EC', error: '#E53935' };
 
@@ -14,6 +15,7 @@ export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile 
   const [address, setAddress] = useState(user?.address || '');
   const [profileImage, setProfileImage] = useState(user?.profileImage || null);
   const [loading, setLoading] = useState(false);
+  const [helpVisible, setHelpVisible] = useState(false);
 
   const pickImage = async () => {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -173,13 +175,31 @@ export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile 
               </TouchableOpacity>
             </View>
           ) : (
-            <TouchableOpacity style={styles.logoutButton} onPress={onLogout}>
-              <Ionicons name="log-out-outline" size={18} color="#DC2626" />
-              <Text style={styles.logoutText}>Log Out</Text>
-            </TouchableOpacity>
+            <>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Help and how it works"
+                onPress={() => setHelpVisible(true)}
+                style={({ pressed }) => [styles.helpRow, pressed && styles.pressedSoft]}
+              >
+                <View style={styles.helpIconWrap}>
+                  <Ionicons name="help-circle-outline" size={18} color={themeColors.teal} />
+                </View>
+                <View style={styles.helpCopy}>
+                  <Text style={styles.helpTitle}>Help & How It Works</Text>
+                  <Text style={styles.helpSub}>Workflow, tracking, OTP and reviews</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={themeColors.muted} />
+              </Pressable>
+              <TouchableOpacity style={styles.logoutButton} onPress={onLogout}>
+                <Ionicons name="log-out-outline" size={18} color="#DC2626" />
+                <Text style={styles.logoutText}>Log Out</Text>
+              </TouchableOpacity>
+            </>
           )}
         </View>
       </View>
+      <HelpSheet visible={helpVisible} role="customer" onClose={() => setHelpVisible(false)} />
     </ScrollView>
   );
 }
@@ -217,5 +237,11 @@ const styles = StyleSheet.create({
   saveButton: { flex: 2, height: 50, borderRadius: 14, backgroundColor: colors.teal, alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 8px rgba(15,118,110,0.2)', elevation: 4 },
   logoutButton: { backgroundColor: '#FFF5F5', borderWidth: 1, borderColor: '#FECACA', height: 50, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 16 },
   logoutText: { color: '#DC2626', fontSize: 14, fontFamily: fonts.bold },
-  primaryButtonText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold, letterSpacing: 0.5 }
+  primaryButtonText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold, letterSpacing: 0.5 },
+  pressedSoft: { transform: [{ scale: 0.97 }], opacity: 0.94 },
+  helpRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 14, paddingHorizontal: 14, minHeight: 52, marginTop: 12 },
+  helpIconWrap: { width: 36, height: 36, borderRadius: 11, backgroundColor: themeColors.tealLight, borderWidth: 1, borderColor: themeColors.hudBorder, alignItems: 'center', justifyContent: 'center' },
+  helpCopy: { flex: 1 },
+  helpTitle: { color: colors.ink, fontSize: 13, fontFamily: fonts.bold },
+  helpSub: { color: colors.muted, fontSize: 11, fontFamily: fonts.regular, marginTop: 2 },
 });

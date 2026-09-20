@@ -19,10 +19,8 @@ import TechnicianTrackerScreen from '../screens/shared/TechnicianTrackerScreen';
 import AvailableJobsScreen from '../screens/technician/AvailableJobsScreen';
 import TechnicianProfileScreen from '../screens/technician/TechnicianProfileScreen';
 import { fetchNotifications, fetchUnreadMessageNotifications, setAuthToken, updateCustomerProfile, markJobMessagesRead, markNotificationRead, fetchJobById } from '../screens/services/api';
-import { fonts } from '../theme';
+import { colors, fonts } from '../theme';
 import MessageBanner from '../components/MessageBanner';
-
-const colors = { ink: '#102A43', teal: '#0F766E', canvas: '#F5F8FA', white: '#FFFFFF', muted: '#5A7A91', line: '#D9E2EC' };
 
 const formatNotificationTime = (iso) => {
   if (!iso) return 'Just now';

@@ -96,8 +96,8 @@ export const acceptRepairRequest = async (jobId: string, technicianUid: string, 
 
 export const fetchPlatformCategories = async (): Promise<unknown> => (await api.get('/users/platform/categories')).data;
 export const fetchAnnouncements = async (): Promise<unknown> => (await api.get('/users/platform/announcements')).data;
-export const fetchCompletedJobs = async (customerName: string): Promise<unknown> =>
-  (await api.get(`/requests/completed/${encodeURIComponent(customerName)}`)).data;
+export const fetchCompletedJobs = async (customerName: string, customerUid?: string): Promise<unknown> =>
+  (await api.get(`/requests/completed/${encodeURIComponent(customerName)}`, { params: customerUid ? { customerUid } : undefined })).data;
 export const fetchCustomerRequests = async (customerName: string, customerUid?: string): Promise<unknown> =>
   (await api.get(`/requests/customer/${encodeURIComponent(customerName)}`, { params: customerUid ? { customerUid } : undefined })).data;
 export const fetchTechnicianJobs = async (technicianUid: string): Promise<unknown> =>

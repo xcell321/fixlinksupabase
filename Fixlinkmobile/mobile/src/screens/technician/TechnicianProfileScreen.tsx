@@ -15,6 +15,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { fetchTechnicianProfile, fetchTechnicianSchedule, updateTechnicianProfile, uploadPortfolioPhotos } from '../services/api';
 import { geocodeAddressStrict } from '../services/locationIq';
 import Skeleton from '../../components/Skeleton';
+import HelpSheet from '../../components/HelpSheet';
 import { colors, fonts, shadows } from '../../theme';
 import type { TechnicianScheduleItem, TechnicianScheduleResponse } from '../../types/schedule';
 
@@ -131,6 +132,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
   const [geoStatus, setGeoStatus] = useState<GeoStatus>('idle');
   const [schedule, setSchedule] = useState<TechnicianScheduleItem[]>([]);
   const [scheduleLoading, setScheduleLoading] = useState<boolean>(false);
+  const [helpVisible, setHelpVisible] = useState<boolean>(false);
 
   useEffect(() => {
     if (!editing || !draft.address.trim()) {
@@ -700,6 +702,24 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
         )}
       </View>
 
+      {!readOnly && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Help and how it works"
+          onPress={() => setHelpVisible(true)}
+          style={({ pressed }) => [styles.helpRow, pressed && styles.pressedSoft]}
+        >
+          <View style={styles.helpIconWrap}>
+            <Ionicons name="help-circle-outline" size={18} color={colors.teal} />
+          </View>
+          <View style={styles.helpCopy}>
+            <Text style={styles.helpTitle}>Help & How It Works</Text>
+            <Text style={styles.helpSub}>Finding work, tracking, OTP and workload</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+        </Pressable>
+      )}
+
       {!readOnly && onLogout && (
         <Pressable
           accessibilityRole="button"
@@ -711,6 +731,8 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
           <Text style={styles.logoutText}>Log Out</Text>
         </Pressable>
       )}
+
+      <HelpSheet visible={helpVisible} role="technician" onClose={() => setHelpVisible(false)} />
     </ScrollView>
   );
 }
@@ -822,6 +844,11 @@ const styles = StyleSheet.create({
   // Shared buttons
   primaryButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.teal, borderRadius: 14, paddingHorizontal: 18, minHeight: 48, ...shadows.card },
   primaryButtonText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
+  helpRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 14, paddingHorizontal: 14, minHeight: 52, marginTop: 10 },
+  helpIconWrap: { width: 36, height: 36, borderRadius: 11, backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.hudBorder, alignItems: 'center', justifyContent: 'center' },
+  helpCopy: { flex: 1 },
+  helpTitle: { color: colors.ink, fontSize: 13, fontFamily: fonts.bold },
+  helpSub: { color: colors.muted, fontSize: 11, fontFamily: fonts.regular, marginTop: 2 },
   logoutButton: { minHeight: 50, borderRadius: 14, borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FFF5F5', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 10 },
   logoutText: { color: colors.error, fontSize: 14, fontFamily: fonts.bold },
 

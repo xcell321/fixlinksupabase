@@ -1360,9 +1360,17 @@ router.post('/:id/report-no-show', async (req, res) => {
 
 router.get('/completed/:customerName', async (req, res) => {
   try {
+    // Ownership gate (same pattern as GET /customer/:customerName): the
+    // customer UID must match the authenticated account. Name alone is never
+    // sufficient, otherwise any authenticated user could read another
+    // customer's completed jobs and their repair photos by name.
+    const requestedUid = String(req.query.customerUid || '').trim();
+    if (!requestedUid || requestedUid !== req.authUser.uid) return res.status(403).json({ error: 'Customer identity does not match the authenticated account.' });
+
     const { data: rows } = await supabase
       .from('jobs')
       .select('*')
+      .eq('customer_uid', requestedUid)
       .eq('customer_name', req.params.customerName)
       .eq('status', 'Completed')
       .is('review_id', null);

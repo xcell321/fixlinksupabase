@@ -19,7 +19,6 @@ import {
   declineRepairRequest,
   fetchRepairRequests,
   fetchTechnicianJobs,
-  fetchTechnicianWorkload,
   recordTechnicianArrival,
   reportNoShow,
   updateJobStatus,
@@ -142,6 +141,17 @@ const scheduleParts = (job: Job): { date: string; time: string | null } => {
   return { date: full.slice(0, sep).trim(), time: full.slice(sep + 1).trim() };
 };
 
+// Display-only mapping from the existing active-job count to a workload label.
+// Thresholds are the existing business rules (0–2 available, 3–5 busy, 6+ at_capacity)
+// and are not a new rule — they mirror backend/src/utils/workload.js#getWorkloadStatus
+// for ambient presentation only. The count itself comes from the existing
+// acceptedJobs filter (Accepted/Confirmed/Customer Ready/In Progress).
+const getWorkloadDisplayStatus = (count: number): 'available' | 'busy' | 'at_capacity' => {
+  if (count >= 6) return 'at_capacity';
+  if (count >= 3) return 'busy';
+  return 'available';
+};
+
 const statusIconName = (status: string | undefined): IconName =>
   getStatusIcon(status) as IconName;
 
@@ -150,6 +160,8 @@ export default function AvailableJobsScreen({ technician, onNavigateToMap, onNav
   const [acceptedJobs, setAcceptedJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [fetchError, setFetchError] = useState<boolean>(false);
+  const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null);
   const [acceptingJobId, setAcceptingJobId] = useState<string | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [techCoords, setTechCoords] = useState<Coords | null>(
@@ -163,6 +175,22 @@ export default function AvailableJobsScreen({ technician, onNavigateToMap, onNav
   const [selectedJobForOtp, setSelectedJobForOtp] = useState<Job | null>(null);
   const [otpCode, setOtpCode] = useState<string>('');
   const [verifyingOtp, setVerifyingOtp] = useState<boolean>(false);
+
+  // Ambient workload strip — display-only derived from existing acceptedJobs state.
+  // Count is the existing ACTIVE filter (Accepted/Confirmed/Customer Ready/In Progress)
+  // already used for acceptedJobs; status is the display-only threshold mapping
+  // (0–2 available, 3–5 busy, 6+ at_capacity) mirroring backend workload.js.
+  // No new API, no business-rule change — purely for calm, persistent presentation.
+  const workloadActiveJobs = acceptedJobs.length;
+  const workloadStatus = getWorkloadDisplayStatus(workloadActiveJobs);
+
+  const formatLastSyncTime = (date: Date): string => {
+    try {
+      return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+    } catch {
+      return date.toLocaleTimeString();
+    }
+  };
 
   const getUpdatedTechCoords = async (): Promise<Coords | null> => {
     try {
@@ -195,9 +223,13 @@ export default function AvailableJobsScreen({ technician, onNavigateToMap, onNav
           ? (assigned as Job[]).filter((job) => ['Accepted', 'Confirmed', 'Customer Ready', 'In Progress'].includes(job.status ?? ''))
           : []
       );
+      setFetchError(false);
+      setLastSyncAt(new Date());
     } catch (error) {
       console.warn('Failed to load technician jobs:', error);
-      setJobs([]);
+      // Preserve previously loaded jobs instead of wiping to empty.
+      // fetchError distinguishes this failure from a true empty result.
+      setFetchError(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -213,79 +245,54 @@ export default function AvailableJobsScreen({ technician, onNavigateToMap, onNav
     loadJobs();
   };
 
+  const handleRetry = (): void => {
+    // Reuse the existing fetch path — do not duplicate API logic.
+    // If we have never synced successfully, show the initial loading skeleton.
+    // Otherwise use the pull-to-refresh path so the existing list stays visible.
+    if (lastSyncAt === null) {
+      setLoading(true);
+      setFetchError(false);
+      loadJobs();
+    } else {
+      handleRefresh();
+    }
+  };
+
   const handleAcceptJob = async (job: Job): Promise<void> => {
     if (!technician?.uid || acceptingJobId) return;
-
-    // Fetch authoritative workload count before accepting
-    let activeJobs = acceptedJobs.length;
-    let workloadStatus: string | null = null;
+    // Ambient workload: the persistent strip already communicates Busy / At Capacity
+    // before the technician taps Accept. Do not block with an informational Alert here;
+    // the authoritative backend guard (409 TECHNICIAN_AT_CAPACITY) remains the
+    // single source of truth and is handled in the catch below.
+    setAcceptingJobId(job.id);
     try {
-      const workload = await fetchTechnicianWorkload(technician.uid) as { activeJobs?: number; workloadStatus?: string };
-      if (typeof workload?.activeJobs === 'number') activeJobs = workload.activeJobs;
-      if (workload?.workloadStatus) workloadStatus = workload.workloadStatus;
-      else if (activeJobs >= 6) workloadStatus = 'at_capacity';
-      else if (activeJobs >= 3) workloadStatus = 'busy';
-      else workloadStatus = 'available';
-    } catch {
-      if (activeJobs >= 6) workloadStatus = 'at_capacity';
-      else if (activeJobs >= 3) workloadStatus = 'busy';
-      else workloadStatus = 'available';
-    }
-
-    if (workloadStatus === 'at_capacity') {
-      Alert.alert(
-        "You're At Capacity",
-        `You currently have ${activeJobs} active repair requests that still need to be completed.\n\nYou are temporarily unavailable for new automatic assignments. Please complete some of your current jobs before accepting another request.`,
-        [{ text: 'OK' }]
-      );
-      return;
-    }
-
-    const doAccept = async (): Promise<void> => {
-      setAcceptingJobId(job.id);
-      try {
-        const accepted = await acceptRepairRequest(job.id, technician.uid, technician.name || 'Technician') as { jobId: string };
-        setJobs((currentJobs) => currentJobs.filter((currentJob) => currentJob.id !== job.id));
-        setAcceptedJobs((currentJobs) => [
-          {
-            ...job,
-            id: accepted.jobId,
-            status: 'Accepted',
-            technicianUid: technician.uid,
-            technicianName: technician.name
-          },
-          ...currentJobs
-        ]);
-        Alert.alert('Job Accepted!', 'The customer details and live route are now available in your active jobs.');
-      } catch (error) {
-        const err = error as { code?: string; error?: string; message?: string; activeJobs?: number };
-        if (err?.code === 'TECHNICIAN_AT_CAPACITY' || String(err?.error || '').toLowerCase().includes('at capacity') || String(err?.message || '').toLowerCase().includes('at capacity')) {
-          Alert.alert(
-            "You're At Capacity",
-            err?.message || `You currently have ${err?.activeJobs ?? activeJobs} active repair requests and cannot automatically accept another request.`,
-            [{ text: 'OK' }]
-          );
-        } else {
-          Alert.alert('Unable to accept job', (error as { error?: string })?.error || 'This job may already have been accepted by another technician.');
-        }
-      } finally {
-        setAcceptingJobId(null);
+      const accepted = await acceptRepairRequest(job.id, technician.uid, technician.name || 'Technician') as { jobId: string };
+      setJobs((currentJobs) => currentJobs.filter((currentJob) => currentJob.id !== job.id));
+      setAcceptedJobs((currentJobs) => [
+        {
+          ...job,
+          id: accepted.jobId,
+          status: 'Accepted',
+          technicianUid: technician.uid,
+          technicianName: technician.name
+        },
+        ...currentJobs
+      ]);
+      Alert.alert('Job Accepted!', 'The customer details and live route are now available in your active jobs.');
+    } catch (error) {
+      const err = error as { code?: string; error?: string; message?: string; activeJobs?: number };
+      if (err?.code === 'TECHNICIAN_AT_CAPACITY' || String(err?.error || '').toLowerCase().includes('at capacity') || String(err?.message || '').toLowerCase().includes('at capacity')) {
+        Alert.alert(
+          "You're At Capacity",
+          err?.message || `You currently have ${err?.activeJobs ?? workloadActiveJobs} active repair requests and cannot accept another request. New jobs are paused while you're at capacity — complete an active job to accept new work.`,
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert('Unable to accept job', (error as { error?: string })?.error || 'This job may already have been accepted by another technician.');
       }
-    };
-
-    if (workloadStatus === 'busy') {
-      Alert.alert(
-        "You're Currently Busy",
-        `You currently have ${activeJobs} active repair requests that still need to be completed.\n\nMake sure you have enough time to complete your existing jobs before accepting another request.`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Accept Anyway', onPress: () => { void doAccept(); } },
-        ]
-      );
-      return;
+    } finally {
+      setAcceptingJobId(null);
     }
-
-    await doAccept();
   };
 
   const handleDeclineJob = async (job: Job): Promise<void> => {
@@ -491,16 +498,71 @@ export default function AvailableJobsScreen({ technician, onNavigateToMap, onNav
         </View>
       </View>
 
-      <View style={styles.statusCard}>
-        <View style={styles.statusIcon}>
-          <Ionicons name="radio-outline" size={21} color={colors.teal} accessible={false} />
-        </View>
-        <View style={styles.statusCopy}>
-          <Text style={styles.statusTitle}>Availability is ON</Text>
-          <Text style={styles.statusText}>Filtered by your verified technician skills.</Text>
-        </View>
-        <View style={styles.liveDot} accessibilityLabel="Live" />
-      </View>
+      {/* Workload ambient strip — calm, persistent capacity communication.
+          Replaces the generic "Availability is ON" presentation. Manual availability
+          and workload capacity remain distinct: this strip reflects workload (derived
+          from existing acceptedJobs ACTIVE filter) not a manual toggle. */}
+      {(() => {
+        const workloadConfig = workloadStatus === 'at_capacity'
+          ? {
+              label: 'At Capacity' as const,
+              icon: 'alert-circle-outline' as IconName,
+              color: colors.danger,
+              bg: colors.danger + '15',
+              border: colors.danger + '30',
+              title: `At Capacity — ${workloadActiveJobs} active ${workloadActiveJobs === 1 ? 'job' : 'jobs'}`,
+              message: 'New jobs are paused. Complete an active job to accept new work.',
+            }
+          : workloadStatus === 'busy'
+            ? {
+                label: 'Busy' as const,
+                icon: 'time-outline' as IconName,
+                color: colors.gold,
+                bg: colors.gold + '15',
+                border: colors.gold + '30',
+                title: `Busy — ${workloadActiveJobs} active ${workloadActiveJobs === 1 ? 'job' : 'jobs'}`,
+                message: 'You have several active jobs. You can still accept new work.',
+              }
+            : {
+                label: 'Available' as const,
+                icon: 'checkmark-circle-outline' as IconName,
+                color: colors.green,
+                bg: colors.green + '15',
+                border: colors.green + '30',
+                title: `Available — ${workloadActiveJobs} active ${workloadActiveJobs === 1 ? 'job' : 'jobs'}`,
+                message: workloadActiveJobs === 0
+                  ? 'You’re ready for new requests.'
+                  : 'You’re ready for new requests.',
+              };
+        return (
+          <View
+            style={[
+              styles.workloadCard,
+              workloadStatus === 'at_capacity'
+                ? styles.workloadCardAtCapacity
+                : workloadStatus === 'busy'
+                  ? styles.workloadCardBusy
+                  : styles.workloadCardAvailable,
+            ]}
+            accessibilityRole="text"
+            accessibilityLabel={`${workloadConfig.label} — ${workloadActiveJobs} active ${workloadActiveJobs === 1 ? 'job' : 'jobs'}. ${workloadConfig.message}`}
+          >
+            <View style={[styles.workloadIcon, { backgroundColor: workloadConfig.bg, borderColor: workloadConfig.border }]}>
+              <Ionicons name={workloadConfig.icon} size={20} color={workloadConfig.color} accessible={false} />
+            </View>
+            <View style={styles.workloadCopy}>
+              <Text style={styles.workloadKicker}>WORKLOAD</Text>
+              <Text style={[styles.workloadTitle, { color: workloadConfig.color }]} numberOfLines={1}>
+                {workloadConfig.label}
+                <Text style={[styles.workloadTitle, { color: colors.muted, fontFamily: fonts.medium }]}> — </Text>
+                <Text style={[styles.workloadCount, { color: workloadConfig.color }]}>{workloadActiveJobs} active {workloadActiveJobs === 1 ? 'job' : 'jobs'}</Text>
+              </Text>
+              <Text style={styles.workloadMessage}>{workloadConfig.message}</Text>
+            </View>
+            <View style={[styles.workloadStatusDot, { backgroundColor: workloadConfig.color }]} accessible={false} />
+          </View>
+        );
+      })()}
 
       {/* ACCEPTED JOBS SECTION */}
       <View style={styles.sectionHeader}>
@@ -668,17 +730,62 @@ export default function AvailableJobsScreen({ technician, onNavigateToMap, onNav
         </Pressable>
       </View>
 
-      {jobs.length === 0 ? (
-        <View style={styles.emptyCard}>
-          <View style={styles.emptyIcon}>
-            <Ionicons name="briefcase-outline" size={28} color={colors.teal} accessible={false} />
+      {fetchError && lastSyncAt === null && !loading ? (
+        <View
+          style={styles.emptyCard}
+          accessibilityRole="alert"
+          accessibilityLabel="Unable to load jobs. Check your connection and try again."
+        >
+          <View style={[styles.emptyIcon, styles.emptyIconError]}>
+            <Ionicons name="cloud-offline-outline" size={28} color={colors.danger} accessible={false} />
           </View>
-          <Text style={styles.emptyTitle}>No matching jobs nearby</Text>
+          <Text style={styles.emptyTitle}>Unable to load jobs</Text>
           <Text style={styles.emptyText}>
-            Stay active. New repair requests matching your skills will appear here.
+            We couldn't load available repairs. Check your connection and try again.
           </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Retry loading jobs"
+            accessibilityHint="Retries the jobs request"
+            onPress={handleRetry}
+            style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}
+          >
+            <Ionicons name="refresh" size={16} color={colors.white} accessible={false} />
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </Pressable>
         </View>
       ) : (
+        <>
+          {fetchError && lastSyncAt !== null ? (
+            <View style={styles.syncErrorBanner} accessibilityRole="alert" accessibilityLiveRegion="polite">
+              <View style={styles.syncErrorLeft}>
+                <Ionicons name="cloud-offline-outline" size={16} color={colors.muted} accessible={false} />
+                <Text style={styles.syncErrorText} numberOfLines={2}>
+                  Unable to refresh — Last updated {formatLastSyncTime(lastSyncAt)}
+                </Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Retry refreshing jobs"
+                onPress={handleRefresh}
+                hitSlop={8}
+                style={({ pressed }) => [styles.syncRetryButton, pressed && styles.pressedSoft]}
+              >
+                <Text style={styles.syncRetryText}>Retry</Text>
+              </Pressable>
+            </View>
+          ) : null}
+          {jobs.length === 0 ? (
+            <View style={styles.emptyCard} accessibilityLabel="No matching jobs">
+              <View style={styles.emptyIcon}>
+                <Ionicons name="briefcase-outline" size={28} color={colors.teal} accessible={false} />
+              </View>
+              <Text style={styles.emptyTitle}>No matching jobs nearby</Text>
+              <Text style={styles.emptyText}>
+                Stay active. New repair requests matching your skills will appear here.
+              </Text>
+            </View>
+          ) : (
         jobs.map((job) => {
           const jobCoords = resolveJobCoords(job);
           const calculatedDistance = job.distanceKm != null
@@ -751,6 +858,8 @@ export default function AvailableJobsScreen({ technician, onNavigateToMap, onNav
             </View>
           );
         })
+          )}
+        </>
       )}
 
       {/* OTP COMPLETION MODAL */}
@@ -852,6 +961,38 @@ const styles = StyleSheet.create({
   statusTitle: { color: colors.ink, fontSize: 14, fontFamily: fonts.bold, marginBottom: 3 },
   statusText: { color: colors.muted, fontSize: 12, lineHeight: 17, fontFamily: fonts.medium },
   liveDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.green },
+  // Workload ambient strip — Trusted Harbor calm accountability. Tonal layered
+  // surfaces, flat-by-default, functional colors only for status (green/gold/danger).
+  // Never color-alone: icon + text + count together; strong contrast on white.
+  workloadCard: {
+    backgroundColor: colors.white,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.line,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 26,
+    gap: 12,
+  },
+  workloadCardAvailable: { borderColor: colors.line },
+  workloadCardBusy: { borderColor: '#FDE68A' },
+  workloadCardAtCapacity: { borderColor: '#FECACA' },
+  workloadIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  workloadCopy: { flex: 1, gap: 2 },
+  workloadKicker: { color: colors.teal, fontSize: 10, letterSpacing: 1.5, fontFamily: fonts.bold, lineHeight: 14 },
+  workloadTitle: { fontSize: 14, fontFamily: fonts.bold, lineHeight: 18 },
+  workloadCount: { fontSize: 14, fontFamily: fonts.bold, fontVariant: ['tabular-nums'] },
+  workloadMessage: { color: colors.muted, fontSize: 12, lineHeight: 16, fontFamily: fonts.medium },
+  workloadStatusDot: { width: 9, height: 9, borderRadius: 5, marginLeft: 4 },
   sectionHeader: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 12 },
   kicker: { color: colors.teal, fontSize: 10, letterSpacing: 1.4, fontFamily: fonts.bold, marginBottom: 3 },
   sectionTitle: { color: colors.ink, fontSize: 20, fontFamily: fonts.bold },
@@ -902,8 +1043,47 @@ const styles = StyleSheet.create({
   primaryActionText: { color: colors.white, fontSize: 13, fontFamily: fonts.bold },
   emptyCard: { backgroundColor: colors.white, borderRadius: 20, borderWidth: 1, borderColor: colors.line, padding: 30, alignItems: 'center', ...shadows.card },
   emptyIcon: { width: 54, height: 54, borderRadius: 18, backgroundColor: colors.tealLight, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  emptyIconError: { backgroundColor: '#FEE2E2' },
   emptyTitle: { color: colors.ink, fontSize: 16, fontFamily: fonts.bold, marginBottom: 5 },
   emptyText: { color: colors.muted, fontSize: 13, lineHeight: 18, textAlign: 'center', fontFamily: fonts.medium },
+  retryButton: {
+    marginTop: 18,
+    minHeight: 48,
+    minWidth: 132,
+    borderRadius: 14,
+    backgroundColor: colors.teal,
+    paddingHorizontal: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    ...shadows.card,
+  },
+  retryButtonText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold, letterSpacing: 0.1 },
+  syncErrorBanner: {
+    backgroundColor: colors.white,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.line,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 12,
+  },
+  syncErrorLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, flexShrink: 1 },
+  syncErrorText: { color: colors.muted, fontSize: 12, lineHeight: 16, fontFamily: fonts.medium, flex: 1, flexShrink: 1 },
+  syncRetryButton: {
+    minHeight: 44,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  syncRetryText: { color: colors.teal, fontSize: 13, fontFamily: fonts.bold },
   // Modal Styles
   modalOverlay: { flex: 1, backgroundColor: 'rgba(16,42,67,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
   otpModalCard: { width: '100%', maxWidth: 360, backgroundColor: colors.white, borderRadius: 24, padding: 24, alignItems: 'center', boxShadow: '0 0 20px rgba(16,42,67,0.2)', elevation: 10 },
