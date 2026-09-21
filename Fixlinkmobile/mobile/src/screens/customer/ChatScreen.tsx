@@ -7,18 +7,18 @@ import {
   TextInput,
   ScrollView,
   FlatList,
-  SafeAreaView,
   StatusBar,
   KeyboardAvoidingView,
   Platform,
   Linking,
   ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import Skeleton from '../../components/Skeleton';
 import { fetchJobMessages, fetchMessageInbox, markJobMessagesRead, sendJobMessage } from '../services/api';
-import { colors, fonts, shadows } from '../../theme';
+import { colors, fonts } from '../../theme';
 import { getStatusColor, getStatusIcon } from '../../utils/applianceIcons';
 import type { ChatMessage, Conversation } from '../../types/message';
 
@@ -76,16 +76,6 @@ const formatDayDivider = (iso: string | null | undefined): string => {
   return date.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
 };
 
-const maskPhone = (phone: string | null | undefined): string => {
-  const digits = String(phone ?? '').trim();
-  if (!digits) return '';
-  if (digits.length < 8) return digits;
-  return `${digits.slice(0, 4)}${'•'.repeat(3)}${digits.slice(-4)}`;
-};
-
-const statusIcon = (status: string | undefined): IconName =>
-  getStatusIcon(status) as IconName;
-
 const shouldShowDivider = (messages: ChatMessage[], index: number): boolean => {
   if (index === 0) return true;
   const prev = new Date(messages[index - 1]?.timestamp ?? 0).toDateString();
@@ -93,65 +83,10 @@ const shouldShowDivider = (messages: ChatMessage[], index: number): boolean => {
   return prev !== cur;
 };
 
-// Anti-slop press feedback: transform + opacity only (GPU), 120-160ms feel via native driver.
-// Shared across every ChatScreen button so radii, timing, and depth stay consistent.
-interface FilterChipProps {
-  label: string;
-  count: number;
-  active: boolean;
-  onPress: () => void;
-  testID?: string;
-}
+const statusIcon = (status: string | undefined): IconName =>
+  getStatusIcon(status) as IconName;
 
-function FilterChip({ label, count, active, onPress, testID }: FilterChipProps): React.JSX.Element {
-  return (
-    <Pressable
-      testID={testID}
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      accessibilityLabel={`${label}, ${count} conversations`}
-      accessibilityHint={`Filter conversations by ${label}`}
-      hitSlop={6}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.filterChip,
-        active && styles.filterChipActive,
-        pressed && styles.pressedSoft,
-      ]}
-    >
-      <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>{label}</Text>
-      <View style={[styles.filterCount, active && styles.filterCountActive]}>
-        <Text style={[styles.filterCountText, active && styles.filterCountTextActive]}>{count}</Text>
-      </View>
-    </Pressable>
-  );
-}
-
-interface StatCardProps {
-  label: string;
-  value: string;
-  icon: IconName;
-  onPress: () => void;
-  accessibilityLabel: string;
-}
-
-function StatCard({ label, value, icon, onPress, accessibilityLabel }: StatCardProps): React.JSX.Element {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      onPress={onPress}
-      style={({ pressed }) => [styles.statCard, pressed && styles.pressedSoft]}
-    >
-      <View style={styles.statTopRow}>
-        <Ionicons name={icon} size={15} color={colors.teal} />
-        <Text style={styles.statValue}>{value}</Text>
-      </View>
-      <Text style={styles.statLabel}>{label}</Text>
-    </Pressable>
-  );
-}
-
+// ——— Messenger row ———
 interface ConversationRowProps {
   item: Conversation;
   currentUid: string;
@@ -159,12 +94,11 @@ interface ConversationRowProps {
 }
 
 const ConversationRow = memo(function ConversationRow({ item, currentUid, onOpen }: ConversationRowProps): React.JSX.Element {
-  const color = getStatusColor(item.status);
   const isUnread = (item.unreadCount ?? 0) > 0;
   const preview = item.lastMessage
     ? `${String(item.lastMessage.senderUid ?? '') === String(currentUid) ? 'You: ' : ''}${item.lastMessage.text}`
     : 'No messages yet. Say hello!';
-  const phoneMasked = item.peerPhone ? maskPhone(item.peerPhone) : '';
+  const timeLabel = item.lastMessage?.timestamp ? formatMessageTime(item.lastMessage.timestamp) : '';
 
   return (
     <Pressable
@@ -172,53 +106,49 @@ const ConversationRow = memo(function ConversationRow({ item, currentUid, onOpen
       accessibilityLabel={`Open conversation with ${item.peerName}`}
       accessibilityHint={isUnread ? `${item.unreadCount} unread messages` : 'Open chat history'}
       onPress={onOpen}
-      style={({ pressed }) => [
-        styles.conversationItem,
-        isUnread && styles.conversationItemUnread,
-        pressed && styles.pressedCard,
-      ]}
+      style={({ pressed }) => [styles.rowPressable, pressed && styles.rowPressed]}
     >
-      <View style={[styles.avatar, isUnread && styles.avatarUnread]}>
-        <Text style={styles.avatarText}>{item.peerInitial}</Text>
-      </View>
-      <View style={styles.conversationInfo}>
-        <View style={styles.convHeaderRow}>
-          <Text style={styles.convName} numberOfLines={1}>{item.peerName}</Text>
-          {isUnread ? (
-            <View style={styles.unreadPill}>
-              <Text style={styles.unreadPillText}>{item.unreadCount > 99 ? '99+' : item.unreadCount}</Text>
-            </View>
-          ) : null}
+      <View style={styles.rowInner}>
+        {/* Avatar 44-46 */}
+        <View style={[styles.rowAvatar, isUnread && styles.rowAvatarUnread]}>
+          <Text style={styles.rowAvatarText}>{item.peerInitial}</Text>
+          {isUnread ? <View style={styles.rowAvatarDot} /> : null}
         </View>
-        <View style={styles.convMetaRow}>
-          <View style={[styles.badgePill, { backgroundColor: color + '15', borderColor: color + '40' }]}>
-            <Ionicons name={statusIcon(item.status)} size={9} color={color} />
-            <Text style={[styles.badgePillText, { color }]} numberOfLines={1}>{item.status || 'Active'}</Text>
+
+        {/* Center */}
+        <View style={styles.rowCenter}>
+          <View style={styles.rowNameRow}>
+            <Text style={[styles.rowName, isUnread && styles.rowNameUnread]} numberOfLines={1}>
+              {item.peerName}
+            </Text>
+            <Text style={[styles.rowTime, isUnread && styles.rowTimeUnread]} numberOfLines={1}>
+              {timeLabel}
+            </Text>
           </View>
-          {item.jobCode ? <Text style={styles.jobCode}>#{item.jobCode}</Text> : null}
-          {item.lastMessage?.timestamp ? (
-            <Text style={styles.convTime} numberOfLines={1}>{formatMessageTime(item.lastMessage.timestamp)}</Text>
-          ) : null}
+          <Text style={[styles.rowPreview, isUnread && styles.rowPreviewUnread]} numberOfLines={1}>
+            {preview}
+          </Text>
+          <View style={styles.rowMeta}>
+            <Text style={styles.rowMetaText} numberOfLines={1}>
+              {item.applianceType}
+              {item.jobCode ? `  ·  #${item.jobCode}` : ''}
+            </Text>
+          </View>
         </View>
-        {phoneMasked ? (
-          <View style={styles.phoneRow}>
-            <Ionicons name="call-outline" size={11} color={colors.muted} />
-            <Text style={styles.phoneMasked} numberOfLines={1}>{phoneMasked}</Text>
-            <Text style={styles.dotSeparator}>•</Text>
-            <Text style={styles.applianceInline} numberOfLines={1}>{item.applianceType}</Text>
-          </View>
-        ) : (
-          <Text style={styles.applianceInline} numberOfLines={1}>{item.applianceType}</Text>
-        )}
-        <Text style={[styles.lastMsg, isUnread && styles.lastMsgUnread]} numberOfLines={1}>{preview}</Text>
+
+        {/* Trailing unread dot */}
+        <View style={styles.rowTrailing}>
+          {isUnread ? <View style={styles.unreadDot} /> : null}
+        </View>
       </View>
-      <Ionicons name="chevron-forward" size={16} color={colors.muted} style={styles.chev} accessible={false} />
+      <View style={styles.rowDivider} />
     </Pressable>
   );
 });
 
 export default function ChatScreen({ currentUser, initialTarget = null, onActiveConversationChange }: ChatScreenProps): React.JSX.Element {
   const isTechnician = currentUser?.role === 'technician';
+  const insets = useSafeAreaInsets();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [messagesByConv, setMessagesByConv] = useState<Record<string, ChatMessage[]>>({});
@@ -284,8 +214,6 @@ export default function ChatScreen({ currentUser, initialTarget = null, onActive
     }
   }, [initialTarget, conversations, isTechnician]);
 
-  // Cache-first thread load: cached messages render instantly on tap,
-  // network refresh happens in background with a slim indicator (no blocking spinner).
   useEffect(() => {
     const jobId = selectedConversation?.jobId;
     if (!jobId) return undefined;
@@ -336,7 +264,6 @@ export default function ChatScreen({ currentUser, initialTarget = null, onActive
   }, [selectedConversation?.jobId, currentMessages.length]);
 
   const handleOpenConversation = useCallback((item: Conversation): void => {
-    // Instant: paint cached thread first, then let the loader refresh silently.
     setSelectedConversation(item);
     setSendError(null);
     setConversations((cur) => cur.map((c) => (c.jobId === item.jobId ? { ...c, unreadCount: 0 } : c)));
@@ -443,96 +370,102 @@ export default function ChatScreen({ currentUser, initialTarget = null, onActive
     unread: { title: 'You are all caught up', body: 'New unread messages will appear here.' },
   };
 
+  const inboxSubtitle = totalUnread > 0
+    ? `${totalUnread} unread  ·  ${conversations.length} conversation${conversations.length === 1 ? '' : 's'}`
+    : conversations.length > 0
+      ? `${conversations.length} conversation${conversations.length === 1 ? '' : 's'}`
+      : 'Your repair conversations will appear here.';
+
+  // ── Thread view — Messenger-style single header + context strip + bubbles + lightweight composer ──
   if (selectedConversation) {
     const s = selectedConversation;
-    const statusColor = getStatusColor(s.status);
     const peerPhone = s.peerPhone ?? null;
     const canSend = inputText.trim().length > 0 && !sending;
+    const stripColor = getStatusColor(s.status);
 
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.threadContainer} edges={['top', 'bottom']}>
         <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-        <View style={styles.navBar}>
+        {/* Single clean header: back, avatar 40, name + role, phone action */}
+        <View style={styles.threadHeader}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Back to conversations"
-            accessibilityHint="Return to the conversation list"
             hitSlop={10}
             onPress={() => setSelectedConversation(null)}
-            style={({ pressed }) => [styles.backButton, pressed && styles.pressedSoft]}
+            style={({ pressed }) => [styles.headerBack, pressed && styles.pressedSoft]}
           >
-            <Ionicons name="arrow-back" size={20} color={colors.ink} />
-            <Text style={styles.backButtonText}>Back</Text>
+            <Ionicons name="arrow-back" size={22} color={colors.ink} />
           </Pressable>
-          <Text style={styles.navTitle} numberOfLines={1}>{s.peerName}</Text>
-          <View style={[styles.navPill, { backgroundColor: statusColor + '15', borderColor: statusColor + '40' }]}>
-            <Ionicons name={statusIcon(s.status)} size={11} color={statusColor} />
-            <Text style={[styles.navPillText, { color: statusColor }]} numberOfLines={1}>{s.status || 'Active'}</Text>
-          </View>
+
+          <Pressable
+            onPress={() => peerPhone && handleCopyPhone(peerPhone)}
+            style={styles.headerAvatarWrap}
+          >
+            <View style={styles.headerAvatar}>
+              <Text style={styles.headerAvatarText}>{s.peerInitial}</Text>
+            </View>
+          </Pressable>
+
+          <Pressable style={styles.headerCenter} onPress={() => peerPhone && handleCopyPhone(peerPhone)}>
+            <Text style={styles.headerName} numberOfLines={1}>{s.peerName}</Text>
+            <View style={styles.headerSubRow}>
+              <Ionicons name="shield-checkmark" size={12} color={colors.green} style={{ marginTop: 1 }} />
+              <Text style={styles.headerSub} numberOfLines={1}>{s.roleLabel}</Text>
+            </View>
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={peerPhone ? `Call ${s.peerName}` : 'No phone number available'}
+            hitSlop={8}
+            onPress={() => handleCall(peerPhone, s.peerName)}
+            style={({ pressed }) => [styles.headerCall, pressed && styles.pressedSoft]}
+          >
+            <Ionicons name="call" size={18} color={colors.white} />
+          </Pressable>
         </View>
+
+        {/* Compact contextual strip — supports conversation, does not dominate */}
+        <Pressable
+          onPress={() => showToast(`${s.applianceType}  ·  #${s.jobCode ?? String(s.jobId).slice(0, 6).toUpperCase()}  ·  ${s.status || 'Active'}`)}
+          style={({ pressed }) => [styles.jobStrip, pressed && { opacity: 0.85 }]}
+        >
+          <View style={styles.jobStripLeft}>
+            <View style={[styles.jobStripIcon, { backgroundColor: stripColor + '14' }]}>
+              <Ionicons name={statusIcon(s.status)} size={13} color={stripColor} />
+            </View>
+            <Text style={styles.jobStripText} numberOfLines={1}>
+              {s.applianceType}
+              {s.jobCode ? `  ·  #${s.jobCode}` : `  ·  #${String(s.jobId).slice(0, 6).toUpperCase()}`}
+            </Text>
+            <Text style={styles.jobStripDot}>•</Text>
+            <Text style={[styles.jobStripStatus, { color: stripColor }]} numberOfLines={1}>{s.status || 'Active'}</Text>
+          </View>
+          <View style={styles.jobStripRight}>
+            <Text style={styles.jobStripAction}>View job</Text>
+            <Ionicons name="chevron-forward" size={12} color={colors.teal} />
+          </View>
+        </Pressable>
+
+        {threadLoading && currentMessages.length > 0 ? (
+          <View style={styles.syncRow}>
+            <ActivityIndicator size="small" color={colors.teal} />
+            <Text style={styles.syncText}>Syncing latest messages…</Text>
+          </View>
+        ) : null}
 
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={{ flex: 1 }}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
-          <View style={styles.chatHeaderCard}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{s.peerInitial}</Text>
-            </View>
-            <View style={styles.chatHeaderInfo}>
-              <Text style={styles.chatHeaderName}>{s.peerName}</Text>
-              <View style={styles.verifiedRow}>
-                <Ionicons name="shield-checkmark" size={13} color={colors.green} />
-                <Text style={styles.verifiedText}>{s.roleLabel}</Text>
-                <Text style={styles.dotSeparator}>•</Text>
-                <Text style={styles.statusSubtext} numberOfLines={1}>{s.applianceType}</Text>
-              </View>
-              <View style={styles.threadPhoneRow}>
-                <Ionicons name="call-outline" size={12} color={colors.teal} />
-                {peerPhone ? (
-                  <Text style={styles.threadPhone} selectable>{peerPhone}</Text>
-                ) : (
-                  <Text style={styles.threadPhoneMissing}>No number on file</Text>
-                )}
-                {s.jobCode ? <Text style={styles.jobCode}>#{s.jobCode}</Text> : null}
-              </View>
-            </View>
-            <View style={styles.threadActions}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={peerPhone ? `Call ${s.peerName} at ${peerPhone}` : 'No phone number available'}
-                accessibilityHint="Open the phone dialer"
-                hitSlop={8}
-                onPress={() => handleCall(peerPhone, s.peerName)}
-                style={({ pressed }) => [styles.iconAction, pressed && styles.pressedSoft]}
-              >
-                <Ionicons name="call" size={17} color={colors.white} />
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={peerPhone ? `Copy ${s.peerName} phone number` : 'No phone number to copy'}
-                accessibilityHint="Copy the registered number"
-                hitSlop={8}
-                onPress={() => handleCopyPhone(peerPhone)}
-                style={({ pressed }) => [styles.iconActionGhost, pressed && styles.pressedSoft]}
-              >
-                <Ionicons name="copy-outline" size={16} color={colors.teal} />
-              </Pressable>
-            </View>
-          </View>
-          {threadLoading && currentMessages.length > 0 ? (
-            <View style={styles.syncRow}>
-              <ActivityIndicator size="small" color={colors.teal} />
-              <Text style={styles.syncText}>Syncing latest messages…</Text>
-            </View>
-          ) : null}
-
           <ScrollView
             ref={chatScrollRef}
             contentContainerStyle={styles.chatArea}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
             onContentSizeChange={() => {
               if (currentMessages.length > 0 && inputText.length === 0) {
                 chatScrollRef.current?.scrollToEnd({ animated: false });
@@ -540,23 +473,35 @@ export default function ChatScreen({ currentUser, initialTarget = null, onActive
             }}
           >
             {threadLoading && currentMessages.length === 0 ? (
-              <View style={styles.chatEmpty}>
+              <View style={styles.chatLoading}>
                 <ActivityIndicator size="large" color={colors.teal} />
-                <Text style={styles.chatEmptyText}>Loading conversation…</Text>
+                <Text style={styles.chatLoadingText}>Loading conversation…</Text>
               </View>
             ) : currentMessages.length === 0 ? (
               <View style={styles.chatEmpty}>
-                <View style={styles.emptyIconWrap}>
+                <View style={styles.chatEmptyIcon}>
                   <Ionicons name="chatbubble-ellipses-outline" size={28} color={colors.teal} />
                 </View>
                 <Text style={styles.chatEmptyTitle}>Say hello to {s.peerName}</Text>
-                <Text style={styles.chatEmptyText}>History loads instantly here. Coordinate scheduling, access, and parts.</Text>
+                <Text style={styles.chatEmptyBody}>Coordinate scheduling, access, and parts. Your history loads instantly here.</Text>
+                {peerPhone ? (
+                  <Pressable onPress={() => handleCopyPhone(peerPhone)} style={({ pressed }) => [styles.chatEmptyPhone, pressed && styles.pressedSoft]}>
+                    <Ionicons name="call-outline" size={14} color={colors.teal} />
+                    <Text style={styles.chatEmptyPhoneText}>{peerPhone}</Text>
+                    <Text style={styles.chatEmptyPhoneHint}>tap to copy</Text>
+                  </Pressable>
+                ) : null}
               </View>
             ) : (
               currentMessages.map((msg, index) => {
                 const isMe = String(msg.senderUid) === String(currentUser.uid);
                 const isLast = index === currentMessages.length - 1;
                 const read = isMe && isLast && Array.isArray(msg.readBy) && msg.readBy.some((uid) => uid && String(uid) !== String(currentUser.uid));
+                const prevSame = index > 0 && String(currentMessages[index - 1]?.senderUid) === String(msg.senderUid);
+                const nextSame = index < currentMessages.length - 1 && String(currentMessages[index + 1]?.senderUid) === String(msg.senderUid);
+                const isFirstInGroup = !prevSame;
+                const isLastInGroup = !nextSame;
+
                 return (
                   <React.Fragment key={msg.id || `${msg.timestamp}-${index}`}>
                     {shouldShowDivider(currentMessages, index) ? (
@@ -564,13 +509,41 @@ export default function ChatScreen({ currentUser, initialTarget = null, onActive
                         <Text style={styles.dayDividerText}>{formatDayDivider(msg.timestamp)}</Text>
                       </View>
                     ) : null}
-                    <View style={[styles.msgWrapper, isMe ? styles.myMsgWrapper : styles.otherMsgWrapper]}>
-                      <View style={[styles.msgBubble, isMe ? styles.myMsg : styles.otherMsg, msg.pending && styles.msgPending]}>
-                        <Text style={[styles.msgText, isMe ? styles.myMsgText : styles.otherMsgText]} selectable>{msg.text}</Text>
-                        <Text style={[styles.msgTime, isMe ? styles.myMsgTime : styles.otherMsgTime]}>
-                          {formatMessageTime(msg.timestamp)}{isMe && read ? '  Read' : ''}{msg.pending ? '  Sending…' : ''}
+                    <View
+                      style={[
+                        styles.msgRow,
+                        isMe ? styles.msgRowMe : styles.msgRowOther,
+                        !isFirstInGroup && styles.msgRowGrouped,
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.bubble,
+                          isMe ? styles.bubbleMe : styles.bubbleOther,
+                          msg.pending && styles.bubblePending,
+                          isMe
+                            ? {
+                                borderTopRightRadius: isFirstInGroup ? 18 : 8,
+                                borderBottomRightRadius: isLastInGroup ? 4 : 8,
+                              }
+                            : {
+                                borderTopLeftRadius: isFirstInGroup ? 18 : 8,
+                                borderBottomLeftRadius: isLastInGroup ? 4 : 8,
+                              },
+                        ]}
+                      >
+                        <Text style={[styles.bubbleText, isMe ? styles.bubbleTextMe : styles.bubbleTextOther]} selectable>
+                          {msg.text}
                         </Text>
                       </View>
+                      {/* Timestamp shown only for last in group — keeps bubbles lightweight */}
+                      {isLastInGroup ? (
+                        <Text style={[styles.bubbleTime, isMe ? styles.bubbleTimeMe : styles.bubbleTimeOther]}>
+                          {formatMessageTime(msg.timestamp)}
+                          {isMe && read ? '  ·  Read' : ''}
+                          {msg.pending ? '  ·  Sending…' : ''}
+                        </Text>
+                      ) : null}
                     </View>
                   </React.Fragment>
                 );
@@ -584,12 +557,24 @@ export default function ChatScreen({ currentUser, initialTarget = null, onActive
               <Text style={styles.sendErrorText}>{sendError}</Text>
             </View>
           ) : null}
-          <View style={styles.inputArea}>
-            <View style={styles.inputContainer}>
+
+          {/* Lightweight composer anchored to bottom */}
+          <View style={[styles.composerBar, { paddingBottom: Math.max(8, insets.bottom > 0 ? insets.bottom : 10) }]}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="More options"
+              hitSlop={8}
+              onPress={() => showToast('Attachments coming soon')}
+              style={({ pressed }) => [styles.composerPlus, pressed && styles.pressedSoft]}
+            >
+              <Ionicons name="add" size={22} color={colors.teal} />
+            </Pressable>
+
+            <View style={styles.composerInputWrap}>
               <TextInput
-                style={styles.textInput}
+                style={styles.composerInput}
                 placeholder={isTechnician ? 'Message the customer…' : 'Message the technician…'}
-                placeholderTextColor={colors.muted}
+                placeholderTextColor="#8AA0B5"
                 value={inputText}
                 onChangeText={setInputText}
                 multiline
@@ -599,29 +584,30 @@ export default function ChatScreen({ currentUser, initialTarget = null, onActive
                 accessibilityLabel="Type your message"
                 accessibilityHint="Write a message to your contact"
               />
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={sending ? 'Sending message' : 'Send message'}
-                accessibilityHint="Send the typed message"
-                accessibilityState={{ disabled: !canSend }}
-                hitSlop={6}
-                onPress={handleSendMessage}
-                disabled={!canSend}
-                style={({ pressed }) => [
-                  styles.sendButton,
-                  !canSend && styles.sendButtonDisabled,
-                  pressed && canSend && styles.pressed,
-                ]}
-              >
-                {sending ? (
-                  <ActivityIndicator size="small" color={colors.white} />
-                ) : (
-                  <Ionicons name="send" size={17} color={colors.white} />
-                )}
-              </Pressable>
             </View>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={sending ? 'Sending message' : 'Send message'}
+              accessibilityState={{ disabled: !canSend }}
+              hitSlop={6}
+              onPress={handleSendMessage}
+              disabled={!canSend}
+              style={({ pressed }) => [
+                styles.composerSend,
+                !canSend && styles.composerSendDisabled,
+                pressed && canSend && styles.pressed,
+              ]}
+            >
+              {sending ? (
+                <ActivityIndicator size="small" color={colors.white} />
+              ) : (
+                <Ionicons name="send" size={16} color={colors.white} style={{ marginLeft: 1, marginTop: 1 }} />
+              )}
+            </Pressable>
           </View>
         </KeyboardAvoidingView>
+
         {toast ? (
           <View style={styles.toast}>
             <Text style={styles.toastText}>{toast}</Text>
@@ -631,104 +617,120 @@ export default function ChatScreen({ currentUser, initialTarget = null, onActive
     );
   }
 
+  // ── Inbox — Messenger conversation list ──
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.canvas} />
+    <SafeAreaView style={styles.inboxContainer} edges={['top']}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-      <FlatList
-        data={visibleConversations}
-        keyExtractor={(item) => String(item.jobId)}
-        renderItem={({ item }) => (
-          <ConversationRow item={item} currentUid={currentUser?.uid} onOpen={() => handleOpenConversation(item)} />
-        )}
-        ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-        initialNumToRender={12}
-        maxToRenderPerBatch={12}
-        windowSize={7}
-        removeClippedSubviews={Platform.OS === 'android'}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.listContent}
-        ListHeaderComponent={(
-          <View>
-            <View style={styles.sectionHeaderContainer}>
-              <View style={styles.titleRow}>
-                <View>
-                  <Text style={styles.kicker}>MESSAGES</Text>
-                  <Text style={styles.sectionTitle}>Messages</Text>
-                  <Text style={styles.sectionSub}>History opens instantly. Tap any chat to continue.</Text>
-                </View>
-                {totalUnread > 0 ? (
-                  <View style={styles.totalUnreadPill}>
-                    <Text style={styles.totalUnreadText}>{totalUnread > 99 ? '99+' : totalUnread} new</Text>
-                  </View>
-                ) : null}
-              </View>
-            </View>
-
-            <View style={styles.statRow}>
-              <StatCard label="Total chats" value={String(conversations.length)} icon="chatbubbles-outline" onPress={() => setStatusFilter('all')} accessibilityLabel={`Show all ${conversations.length} chats`} />
-              <StatCard label="Active" value={String(activeConversations.length)} icon="pulse-outline" onPress={() => setStatusFilter('active')} accessibilityLabel={`Show ${activeConversations.length} active chats`} />
-              <StatCard label="Unread" value={String(totalUnread)} icon="mail-unread-outline" onPress={() => setStatusFilter('unread')} accessibilityLabel={`Show ${unreadConversations.length} unread chats`} />
-            </View>
-
-            <View style={styles.filterRow}>
-              {filters.map((f) => (
-                <FilterChip
-                  key={f.key}
-                  testID={`filter-${f.key}`}
-                  label={f.label}
-                  count={f.count}
-                  active={statusFilter === f.key}
-                  onPress={() => setStatusFilter(f.key)}
-                />
-              ))}
-            </View>
-
-            {inboxError ? (
-              <View style={styles.errorCard}>
-                <Ionicons name="cloud-offline-outline" size={22} color={colors.error} />
-                <Text style={styles.errorTitle}>Could not load chats</Text>
-                <Text style={styles.errorText}>{inboxError}</Text>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Retry loading conversations"
-                  onPress={() => loadInbox(false)}
-                  style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}
-                >
-                  <Ionicons name="refresh-outline" size={15} color={colors.white} />
-                  <Text style={styles.retryText}>Retry</Text>
-                </Pressable>
-              </View>
-            ) : null}
-
-            {loading ? (
-              <View style={styles.skeletonList}>
-                {[1, 2, 3, 4].map((item) => (
-                  <View key={item} style={styles.conversationItem}>
-                    <Skeleton style={styles.skeletonAvatar} />
-                    <View style={styles.skeletonConversationInfo}>
-                      <View style={styles.skeletonConversationHeader}>
-                        <Skeleton style={{ width: '42%', height: 15 }} />
-                        <Skeleton style={{ width: 54, height: 19, borderRadius: 8 }} />
-                      </View>
-                      <Skeleton style={{ width: '68%', height: 12 }} />
-                    </View>
-                  </View>
-                ))}
-              </View>
-            ) : null}
-          </View>
-        )}
-        ListEmptyComponent={!loading && !inboxError ? (
-          <View style={styles.emptyCard}>
-            <View style={styles.emptyIconWrap}>
-              <Ionicons name="chatbubbles-outline" size={30} color={colors.teal} />
-            </View>
-            <Text style={styles.emptyTitle}>{emptyCopy[statusFilter].title}</Text>
-            <Text style={styles.emptyText}>{emptyCopy[statusFilter].body}</Text>
+      {/* Clean header: Messages + supporting count */}
+      <View style={styles.inboxHeader}>
+        <View style={styles.inboxHeaderLeft}>
+          <Text style={styles.inboxTitle}>Messages</Text>
+          <Text style={styles.inboxSubtitle}>{inboxSubtitle}</Text>
+        </View>
+        {totalUnread > 0 ? (
+          <View style={styles.headerUnreadBadge}>
+            <Text style={styles.headerUnreadText}>{totalUnread > 99 ? '99+' : totalUnread} new</Text>
           </View>
         ) : null}
-      />
+      </View>
+
+      {/* Compact filter — segmented / scrollable */}
+      <View style={styles.filterBar}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterScroll}
+          keyboardShouldPersistTaps="handled"
+        >
+          {filters.map((f) => {
+            const active = statusFilter === f.key;
+            return (
+              <Pressable
+                key={f.key}
+                testID={`filter-${f.key}`}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={`${f.label}, ${f.count} conversations`}
+                hitSlop={6}
+                onPress={() => setStatusFilter(f.key)}
+                style={({ pressed }) => [
+                  styles.filterPill,
+                  active ? styles.filterPillActive : styles.filterPillIdle,
+                  pressed && styles.pressedSoft,
+                ]}
+              >
+                <Text style={[styles.filterLabel, active ? styles.filterLabelActive : styles.filterLabelIdle]}>
+                  {f.label}
+                </Text>
+                <View style={[styles.filterCount, active ? styles.filterCountActive : styles.filterCountIdle]}>
+                  <Text style={[styles.filterCountText, active ? styles.filterCountTextActive : styles.filterCountTextIdle]}>
+                    {f.count}
+                  </Text>
+                </View>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {inboxError ? (
+        <View style={styles.inlineError}>
+          <View style={styles.inlineErrorLeft}>
+            <Ionicons name="cloud-offline-outline" size={18} color={colors.error} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.inlineErrorTitle}>Could not load chats</Text>
+              <Text style={styles.inlineErrorBody}>{inboxError}</Text>
+            </View>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => loadInbox(false)}
+            style={({ pressed }) => [styles.inlineRetry, pressed && styles.pressed]}
+          >
+            <Ionicons name="refresh-outline" size={14} color={colors.white} />
+            <Text style={styles.inlineRetryText}>Retry</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      {loading ? (
+        <View style={styles.skeletonList}>
+          {[1, 2, 3, 4, 5].map((k) => (
+            <View key={k} style={styles.skeletonRow}>
+              <Skeleton style={styles.skeletonAvatar} />
+              <View style={styles.skeletonCol}>
+                <View style={styles.skeletonLineRow}>
+                  <Skeleton style={{ width: '46%', height: 14, borderRadius: 6 }} />
+                  <Skeleton style={{ width: 36, height: 11, borderRadius: 6 }} />
+                </View>
+                <Skeleton style={{ width: '78%', height: 12, borderRadius: 6 }} />
+                <Skeleton style={{ width: '52%', height: 11, borderRadius: 6 }} />
+              </View>
+            </View>
+          ))}
+        </View>
+      ) : (
+        <FlatList
+          data={visibleConversations}
+          keyExtractor={(item) => String(item.jobId)}
+          renderItem={({ item }) => (
+            <ConversationRow item={item} currentUid={currentUser?.uid} onOpen={() => handleOpenConversation(item)} />
+          )}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            <View style={styles.emptyWrap}>
+              <View style={styles.emptyIcon}>
+                <Ionicons name="chatbubbles-outline" size={28} color={colors.teal} />
+              </View>
+              <Text style={styles.emptyTitle}>{emptyCopy[statusFilter].title}</Text>
+              <Text style={styles.emptyBody}>{emptyCopy[statusFilter].body}</Text>
+            </View>
+          }
+        />
+      )}
+
       {toast ? (
         <View style={styles.toast}>
           <Text style={styles.toastText}>{toast}</Text>
@@ -738,130 +740,345 @@ export default function ChatScreen({ currentUser, initialTarget = null, onActive
   );
 }
 
+// Helper for bubble radius type
+type ViewStyleWithRadius = { borderTopRightRadius?: number; borderBottomRightRadius?: number; borderTopLeftRadius?: number; borderBottomLeftRadius?: number };
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.canvas },
-  listContent: { flexGrow: 1, padding: 20, paddingBottom: 28 },
-
-  // Shared anti-slop press states: transform + opacity only (GPU path).
+  // Shared press
   pressed: { transform: [{ scale: 0.97 }], opacity: 0.96 },
-  pressedSoft: { transform: [{ scale: 0.97 }], opacity: 0.94 },
-  pressedCard: { transform: [{ scale: 0.98 }], opacity: 0.97 },
+  pressedSoft: { transform: [{ scale: 0.98 }], opacity: 0.92 },
 
-  // Thread nav
-  navBar: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.line, backgroundColor: colors.white },
-  backButton: { flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 44, minWidth: 44, paddingHorizontal: 8, borderRadius: 12, justifyContent: 'center' },
-  backButtonText: { color: colors.ink, fontSize: 14, fontFamily: fonts.semiBold },
-  navTitle: { flex: 1, textAlign: 'center', color: colors.ink, fontSize: 15, fontFamily: fonts.bold },
-  navPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 999, borderWidth: 1, maxWidth: 110, minHeight: 32 },
-  navPillText: { fontSize: 10, fontFamily: fonts.bold, flexShrink: 1 },
+  // ── Inbox ──
+  inboxContainer: { flex: 1, backgroundColor: colors.white },
+  inboxHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 12,
+    backgroundColor: colors.white,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E6EAF0',
+    gap: 12,
+  },
+  inboxHeaderLeft: { flex: 1 },
+  inboxTitle: { fontSize: 26, fontFamily: fonts.bold, color: colors.ink, letterSpacing: -0.6, lineHeight: 28 },
+  inboxSubtitle: { fontSize: 13, fontFamily: fonts.regular, color: colors.muted, marginTop: 3, lineHeight: 18 },
+  headerUnreadBadge: {
+    backgroundColor: colors.teal,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    minHeight: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerUnreadText: { color: colors.white, fontSize: 11, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
 
-  // List header
-  sectionHeaderContainer: { marginBottom: 14 },
-  titleRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
-  kicker: { color: colors.teal, fontSize: 10, letterSpacing: 1.5, fontFamily: fonts.bold, marginBottom: 2 },
-  sectionTitle: { fontSize: 22, fontFamily: fonts.bold, color: colors.ink },
-  sectionSub: { fontSize: 12, fontFamily: fonts.medium, color: colors.muted, marginTop: 2 },
-  totalUnreadPill: { backgroundColor: colors.error, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, minHeight: 28, justifyContent: 'center' },
-  totalUnreadText: { color: colors.white, fontSize: 11, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
-
-  statRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
-  statCard: { flex: 1, backgroundColor: colors.white, borderRadius: 20, borderWidth: 1, borderColor: colors.line, paddingHorizontal: 14, paddingVertical: 12, ...shadows.card },
-  statTopRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  statValue: { fontSize: 20, fontFamily: fonts.extraBold, color: colors.ink, fontVariant: ['tabular-nums'] },
-  statLabel: { fontSize: 11, fontFamily: fonts.semiBold, color: colors.muted, marginTop: 2 },
-
-  filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
-  filterChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, minHeight: 40, borderRadius: 999, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line },
-  filterChipActive: { backgroundColor: colors.teal, borderColor: colors.tealDark },
-  filterChipText: { color: colors.muted, fontSize: 12, fontFamily: fonts.semiBold },
-  filterChipTextActive: { color: colors.white },
-  filterCount: { minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 6, backgroundColor: colors.tealLight, alignItems: 'center', justifyContent: 'center' },
+  filterBar: {
+    backgroundColor: colors.white,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E6EAF0',
+    paddingVertical: 10,
+  },
+  filterScroll: { paddingHorizontal: 16, gap: 8, alignItems: 'center' },
+  filterPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingHorizontal: 14,
+    minHeight: 36,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  filterPillIdle: { backgroundColor: colors.white, borderColor: colors.line },
+  filterPillActive: { backgroundColor: colors.teal, borderColor: colors.tealDark },
+  filterLabel: { fontSize: 13, fontFamily: fonts.semiBold },
+  filterLabelIdle: { color: colors.muted },
+  filterLabelActive: { color: colors.white },
+  filterCount: { minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' },
+  filterCountIdle: { backgroundColor: '#EDF2F7' },
   filterCountActive: { backgroundColor: 'rgba(255,255,255,0.22)' },
-  filterCountText: { color: colors.tealDark, fontSize: 11, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
+  filterCountText: { fontSize: 11, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
+  filterCountTextIdle: { color: colors.muted },
   filterCountTextActive: { color: colors.white },
 
-  // Conversation rows
-  conversationItem: { flexDirection: 'row', padding: 14, backgroundColor: colors.white, borderRadius: 20, alignItems: 'center', borderWidth: 1, borderColor: colors.line, ...shadows.card },
-  conversationItemUnread: { borderColor: colors.teal, borderWidth: 1.5 },
-  avatar: { width: 48, height: 48, borderRadius: 16, backgroundColor: colors.teal, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  avatarUnread: { backgroundColor: colors.tealDark },
-  avatarText: { color: colors.white, fontFamily: fonts.extraBold, fontSize: 17 },
-  conversationInfo: { flex: 1 },
-  convHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, gap: 8 },
-  convName: { fontFamily: fonts.bold, fontSize: 15, color: colors.ink, flexShrink: 1, flex: 1 },
-  unreadPill: { minWidth: 22, height: 22, borderRadius: 11, backgroundColor: colors.error, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6, marginLeft: 8 },
-  unreadPillText: { color: colors.white, fontSize: 10, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
-  convMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
-  badgePill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, borderWidth: 1 },
-  badgePillText: { fontSize: 10, fontFamily: fonts.bold },
-  jobCode: { color: colors.tealDark, fontSize: 10, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'], backgroundColor: colors.tealLight, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, overflow: 'hidden' },
-  convTime: { color: colors.muted, fontSize: 10, fontFamily: fonts.medium, fontVariant: ['tabular-nums'], flexShrink: 1, marginLeft: 'auto' },
-  phoneRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 3 },
-  phoneMasked: { color: colors.tealDark, fontSize: 12, fontFamily: fonts.semiBold, fontVariant: ['tabular-nums'] },
-  applianceInline: { color: colors.muted, fontSize: 11, fontFamily: fonts.medium, flexShrink: 1 },
-  lastMsg: { color: colors.muted, fontSize: 12, fontFamily: fonts.medium },
-  lastMsgUnread: { color: colors.ink, fontFamily: fonts.semiBold },
-  chev: { marginLeft: 8 },
+  inlineError: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    backgroundColor: '#FFF5F5',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 14,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  inlineErrorLeft: { flexDirection: 'row', gap: 10, flex: 1, alignItems: 'center' },
+  inlineErrorTitle: { color: colors.error, fontSize: 13, fontFamily: fonts.bold },
+  inlineErrorBody: { color: colors.ink, fontSize: 12, fontFamily: fonts.regular, marginTop: 2, lineHeight: 16 },
+  inlineRetry: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.teal,
+    paddingHorizontal: 14,
+    minHeight: 36,
+    borderRadius: 999,
+    justifyContent: 'center',
+  },
+  inlineRetryText: { color: colors.white, fontSize: 12, fontFamily: fonts.bold },
 
-  // Thread header
-  chatHeaderCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.line, gap: 10 },
-  chatHeaderInfo: { flex: 1 },
-  chatHeaderName: { fontSize: 16, fontFamily: fonts.bold, color: colors.ink },
-  verifiedRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
-  verifiedText: { color: colors.green, fontSize: 12, fontFamily: fonts.semiBold },
-  dotSeparator: { color: colors.muted, fontSize: 10, fontFamily: fonts.regular },
-  statusSubtext: { color: colors.muted, fontSize: 11, fontFamily: fonts.medium, flexShrink: 1 },
-  threadPhoneRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 5 },
-  threadPhone: { color: colors.tealDark, fontSize: 13, fontFamily: fonts.bold, fontVariant: ['tabular-nums'] },
-  threadPhoneMissing: { color: colors.muted, fontSize: 12, fontFamily: fonts.medium, fontStyle: 'italic' },
-  threadActions: { flexDirection: 'row', gap: 8 },
-  iconAction: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.teal, justifyContent: 'center', alignItems: 'center', ...shadows.card },
-  iconActionGhost: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.line, justifyContent: 'center', alignItems: 'center' },
-  syncRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 8, backgroundColor: colors.tealLight, borderBottomWidth: 1, borderBottomColor: colors.line },
-  syncText: { color: colors.tealDark, fontSize: 11, fontFamily: fonts.semiBold },
+  rowPressable: { backgroundColor: colors.white },
+  rowPressed: { backgroundColor: '#F8FAFC' },
+  rowInner: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 12 },
+  rowAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: colors.teal,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rowAvatarUnread: { backgroundColor: colors.tealDark },
+  rowAvatarText: { color: colors.white, fontFamily: fonts.extraBold, fontSize: 16 },
+  rowAvatarDot: { position: 'absolute', right: -1, bottom: -1, width: 12, height: 12, borderRadius: 6, backgroundColor: colors.teal, borderWidth: 2, borderColor: colors.white },
+  rowCenter: { flex: 1, gap: 2 },
+  rowNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  rowName: { flex: 1, fontSize: 15, fontFamily: fonts.bold, color: colors.ink, lineHeight: 20 },
+  rowNameUnread: { fontFamily: fonts.extraBold, color: colors.ink },
+  rowTime: { fontSize: 11, fontFamily: fonts.medium, color: colors.muted, fontVariant: ['tabular-nums'], flexShrink: 0 },
+  rowTimeUnread: { color: colors.tealDark, fontFamily: fonts.semiBold },
+  rowPreview: { fontSize: 13, fontFamily: fonts.regular, color: colors.muted, lineHeight: 18 },
+  rowPreviewUnread: { color: colors.ink, fontFamily: fonts.semiBold },
+  rowMeta: { flexDirection: 'row', alignItems: 'center' },
+  rowMetaText: { fontSize: 11, fontFamily: fonts.medium, color: '#8AA0B5' },
+  rowTrailing: { width: 12, alignItems: 'center', justifyContent: 'center' },
+  unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.teal },
+  rowDivider: { height: StyleSheet.hairlineWidth, backgroundColor: '#EEF2F7', marginLeft: 74 },
 
-  // Thread body
-  chatArea: { padding: 16, flexGrow: 1, paddingBottom: 20 },
-  chatEmpty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 48 },
-  emptyIconWrap: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.tealLight, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line },
-  chatEmptyTitle: { color: colors.ink, fontSize: 15, fontFamily: fonts.bold, textAlign: 'center' },
-  chatEmptyText: { color: colors.muted, fontSize: 13, fontFamily: fonts.medium, textAlign: 'center', paddingHorizontal: 24, lineHeight: 18 },
-  dayDivider: { alignSelf: 'center', backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4, marginVertical: 10 },
-  dayDividerText: { color: colors.muted, fontSize: 10, fontFamily: fonts.semiBold },
-  msgWrapper: { width: '100%', marginVertical: 3 },
-  myMsgWrapper: { alignItems: 'flex-end' },
-  otherMsgWrapper: { alignItems: 'flex-start' },
-  msgBubble: { maxWidth: '78%', paddingHorizontal: 15, paddingVertical: 10, borderRadius: 18, ...shadows.card },
-  myMsg: { backgroundColor: colors.teal, borderBottomRightRadius: 4 },
-  otherMsg: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderBottomLeftRadius: 4 },
-  msgPending: { opacity: 0.75 },
-  msgText: { fontSize: 14, fontFamily: fonts.medium, lineHeight: 20 },
-  myMsgText: { color: colors.white },
-  otherMsgText: { color: colors.ink },
-  msgTime: { fontSize: 10, marginTop: 4, alignSelf: 'flex-end', fontFamily: fonts.regular, fontVariant: ['tabular-nums'] },
-  myMsgTime: { color: 'rgba(255,255,255,0.75)' },
-  otherMsgTime: { color: colors.muted },
+  skeletonList: { paddingHorizontal: 16, paddingTop: 12, gap: 16 },
+  skeletonRow: { flexDirection: 'row', gap: 12, alignItems: 'center' },
+  skeletonAvatar: { width: 46, height: 46, borderRadius: 23 },
+  skeletonCol: { flex: 1, gap: 7 },
+  skeletonLineRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
 
-  sendErrorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#FDECEC', borderTopWidth: 1, borderTopColor: '#F5C6C6' },
-  sendErrorText: { color: colors.error, fontSize: 12, fontFamily: fonts.semiBold, flex: 1 },
-  inputArea: { padding: 12, backgroundColor: colors.white, borderTopWidth: 1, borderTopColor: colors.line },
-  inputContainer: { flexDirection: 'row', alignItems: 'flex-end', backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, borderRadius: 24, paddingLeft: 16, paddingRight: 6, paddingVertical: 6, gap: 8 },
-  textInput: { flex: 1, color: colors.ink, fontSize: 14, fontFamily: fonts.medium, maxHeight: 96, minHeight: 36, paddingVertical: 8 },
-  sendButton: { backgroundColor: colors.teal, width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', ...shadows.card },
-  sendButtonDisabled: { backgroundColor: colors.muted, opacity: 0.55, elevation: 0 },
+  listContent: { paddingBottom: 24, flexGrow: 1, backgroundColor: colors.white },
+  emptyWrap: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingTop: 64, paddingBottom: 32, gap: 10 },
+  emptyIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.tealLight,
+    borderWidth: 1,
+    borderColor: colors.line,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyTitle: { fontSize: 16, fontFamily: fonts.bold, color: colors.ink, textAlign: 'center', marginTop: 4 },
+  emptyBody: { fontSize: 13, fontFamily: fonts.regular, color: colors.muted, textAlign: 'center', lineHeight: 19, paddingHorizontal: 8 },
 
-  skeletonList: { gap: 12, marginTop: 4 },
-  skeletonAvatar: { width: 48, height: 48, borderRadius: 16, marginRight: 12 },
-  skeletonConversationInfo: { flex: 1, gap: 8 },
-  skeletonConversationHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  emptyCard: { backgroundColor: colors.white, borderRadius: 20, padding: 32, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line, gap: 10, ...shadows.card },
-  emptyTitle: { color: colors.ink, fontSize: 16, fontFamily: fonts.bold, textAlign: 'center' },
-  emptyText: { color: colors.muted, fontSize: 13, fontFamily: fonts.regular, textAlign: 'center', lineHeight: 18, paddingHorizontal: 12 },
-  errorCard: { backgroundColor: '#FFF5F5', borderRadius: 20, padding: 20, alignItems: 'center', borderWidth: 1, borderColor: '#F5C6C6', gap: 8, marginBottom: 4 },
-  errorTitle: { color: colors.error, fontSize: 14, fontFamily: fonts.bold },
-  errorText: { color: colors.ink, fontSize: 12, fontFamily: fonts.medium, textAlign: 'center' },
-  retryButton: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.teal, borderRadius: 999, paddingHorizontal: 18, minHeight: 44, justifyContent: 'center', marginTop: 4 },
-  retryText: { color: colors.white, fontSize: 13, fontFamily: fonts.bold },
-  toast: { position: 'absolute', bottom: 28, left: 20, right: 20, backgroundColor: colors.ink, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 12, alignItems: 'center', ...shadows.cardStrong },
+  // ── Thread ──
+  threadContainer: { flex: 1, backgroundColor: colors.canvas },
+  threadHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    backgroundColor: colors.white,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.line,
+    minHeight: 60,
+  },
+  headerBack: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerAvatarWrap: { padding: 2 },
+  headerAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.teal,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerAvatarText: { color: colors.white, fontFamily: fonts.extraBold, fontSize: 15 },
+  headerCenter: { flex: 1, gap: 2, paddingRight: 4 },
+  headerName: { fontSize: 15, fontFamily: fonts.bold, color: colors.ink, lineHeight: 18 },
+  headerSubRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  headerSub: { fontSize: 12, fontFamily: fonts.semiBold, color: colors.green, flexShrink: 1 },
+  headerCall: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.teal,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  jobStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    backgroundColor: colors.white,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.line,
+  },
+  jobStripLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
+  jobStripIcon: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  jobStripText: { fontSize: 12, fontFamily: fonts.bold, color: colors.ink, flexShrink: 1 },
+  jobStripDot: { fontSize: 10, color: colors.muted, fontFamily: fonts.regular },
+  jobStripStatus: { fontSize: 11, fontFamily: fonts.bold, flexShrink: 1 },
+  jobStripRight: { flexDirection: 'row', alignItems: 'center', gap: 3, flexShrink: 0 },
+  jobStripAction: { fontSize: 12, fontFamily: fonts.semiBold, color: colors.teal },
+
+  syncRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 7,
+    backgroundColor: '#F0FDFA',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.line,
+  },
+  syncText: { fontSize: 11, fontFamily: fonts.semiBold, color: colors.tealDark },
+
+  chatArea: { padding: 14, paddingTop: 10, flexGrow: 1, paddingBottom: 16 },
+  chatLoading: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 64, gap: 12 },
+  chatLoadingText: { fontSize: 13, fontFamily: fonts.medium, color: colors.muted },
+  chatEmpty: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48, gap: 10, paddingHorizontal: 24 },
+  chatEmptyIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.tealLight,
+    borderWidth: 1,
+    borderColor: colors.line,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chatEmptyTitle: { fontSize: 15, fontFamily: fonts.bold, color: colors.ink, textAlign: 'center' },
+  chatEmptyBody: { fontSize: 13, fontFamily: fonts.regular, color: colors.muted, textAlign: 'center', lineHeight: 18 },
+  chatEmptyPhone: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 6,
+    paddingHorizontal: 12,
+    minHeight: 36,
+    borderRadius: 999,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
+  chatEmptyPhoneText: { fontSize: 12, fontFamily: fonts.bold, color: colors.tealDark, fontVariant: ['tabular-nums'] },
+  chatEmptyPhoneHint: { fontSize: 11, fontFamily: fonts.medium, color: colors.muted },
+
+  dayDivider: {
+    alignSelf: 'center',
+    backgroundColor: colors.white,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.line,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    marginVertical: 12,
+  },
+  dayDividerText: { fontSize: 11, fontFamily: fonts.semiBold, color: colors.muted },
+
+  msgRow: { width: '100%', marginVertical: 2 },
+  msgRowMe: { alignItems: 'flex-end' },
+  msgRowOther: { alignItems: 'flex-start' },
+  msgRowGrouped: { marginTop: 1 },
+
+  bubble: { maxWidth: '76%', paddingHorizontal: 14, paddingVertical: 9, borderRadius: 18 },
+  bubbleMe: { backgroundColor: colors.teal },
+  bubbleOther: { backgroundColor: colors.white, borderWidth: StyleSheet.hairlineWidth, borderColor: '#E3ECF2' },
+  bubblePending: { opacity: 0.78 },
+  bubbleText: { fontSize: 14, fontFamily: fonts.medium, lineHeight: 19 },
+  bubbleTextMe: { color: colors.white },
+  bubbleTextOther: { color: colors.ink },
+  bubbleTime: { fontSize: 10.5, fontFamily: fonts.regular, marginTop: 4, fontVariant: ['tabular-nums'], paddingHorizontal: 2 },
+  bubbleTimeMe: { color: '#6B8A9A', alignSelf: 'flex-end' },
+  bubbleTimeOther: { color: '#8AA0B5', alignSelf: 'flex-start' },
+
+  sendErrorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: '#FEF2F2',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#FECACA',
+  },
+  sendErrorText: { flex: 1, fontSize: 12, fontFamily: fonts.semiBold, color: colors.error },
+
+  composerBar: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingTop: 8,
+    backgroundColor: colors.white,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.line,
+  },
+  composerPlus: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.tealLight,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.line,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  composerInputWrap: {
+    flex: 1,
+    minHeight: 44,
+    maxHeight: 110,
+    backgroundColor: '#F1F5F9',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E2E8F0',
+    borderRadius: 22,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    justifyContent: 'center',
+  },
+  composerInput: { flex: 1, fontSize: 15, fontFamily: fonts.medium, color: colors.ink, paddingVertical: 8, lineHeight: 20, maxHeight: 96 },
+  composerSend: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.teal,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  composerSendDisabled: { backgroundColor: '#94A3B8', opacity: 0.55 },
+
+  toast: {
+    position: 'absolute',
+    bottom: 88,
+    left: 16,
+    right: 16,
+    backgroundColor: colors.ink,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
   toastText: { color: colors.white, fontSize: 13, fontFamily: fonts.semiBold, textAlign: 'center' },
 });

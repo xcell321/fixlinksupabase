@@ -1,7 +1,8 @@
 ﻿// @ts-nocheck - migrated from .js, preserve working state; types to be refined incrementally
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, SafeAreaView, StatusBar, Alert, ActivityIndicator, Image } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, SafeAreaView, StatusBar, Alert, ActivityIndicator, Image, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import { confirmRepairRequest, fetchTechnicianProfile, markCustomerReady } from '../services/api';
 import { PhotoLightbox } from '../../components/RequestPhoto';
 import { colors, fonts } from '../../theme';
@@ -296,12 +297,27 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
               </View>
             )}
 
-            {/* Completion code */}
+            {/* Completion code — tap to copy for easy pasting/sharing on device */}
             {(isConfirmed || isReady || isInProgress) && request.verificationCode && (
-              <View style={styles.codeCard}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Completion code ${request.verificationCode}, tap to copy`}
+                accessibilityHint="Copies the 4-digit code to clipboard"
+                onPress={async () => {
+                  try {
+                    await Clipboard.setStringAsync(String(request.verificationCode));
+                    Alert.alert('Copied', 'Completion code copied to clipboard.');
+                  } catch {}
+                }}
+                style={({ pressed }) => [styles.codeCard, pressed && { opacity: 0.92 }]}
+              >
                 <View style={styles.codeCardHeader}>
                   <Ionicons name="key-outline" size={18} color={colors.teal} />
                   <Text style={styles.codeCardTitle}>Job Completion Code</Text>
+                  <View style={styles.copyPill}>
+                    <Ionicons name="copy-outline" size={12} color={colors.teal} />
+                    <Text style={styles.copyPillText}>Tap to copy</Text>
+                  </View>
                 </View>
                 <View style={styles.codeDigitsRow}>
                   {String(request.verificationCode).split('').map((digit, idx) => (
@@ -313,7 +329,7 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
                 <Text style={styles.codeCardSub}>
                   Provide this 4-digit code to the technician ONLY after they finish repairing your device.
                 </Text>
-              </View>
+              </Pressable>
             )}
 
             {/* Confirm / Ready action buttons */}
@@ -411,7 +427,7 @@ const styles = StyleSheet.create({
   guidanceBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 16, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 14, borderWidth: 1, backgroundColor: colors.canvas },
   guidanceIcon: { marginTop: 1 },
   guidanceCopy: { flex: 1 },
-  guidanceKicker: { fontSize: 9, letterSpacing: 1.3, fontFamily: fonts.bold, marginBottom: 3 },
+  guidanceKicker: { fontSize: 11, letterSpacing: 1.1, fontFamily: fonts.bold, marginBottom: 3 },
   guidanceTitle: { color: colors.ink, fontSize: 14, fontFamily: fonts.bold, marginBottom: 3 },
   guidanceBody: { color: colors.muted, fontSize: 12, lineHeight: 17, fontFamily: fonts.regular },
   cancelledText: { color: '#B91C1C', fontSize: 13, fontFamily: fonts.semiBold },
@@ -427,7 +443,7 @@ const styles = StyleSheet.create({
   dotTextActive: { color: colors.white },
   link: { flex: 1, height: 2, backgroundColor: colors.line, marginHorizontal: 4 },
   linkDone: { backgroundColor: colors.green },
-  stepLabel: { marginTop: 6, fontSize: 9, color: colors.muted, fontFamily: fonts.semiBold },
+  stepLabel: { marginTop: 6, fontSize: 11, color: colors.muted, fontFamily: fonts.semiBold },
   stepLabelActive: { color: colors.teal },
 
   activityCard: { backgroundColor: colors.white, borderRadius: 18, paddingHorizontal: 16, paddingVertical: 6, borderWidth: 1, borderColor: colors.line, marginBottom: 14 },
@@ -440,7 +456,7 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 22, fontFamily: fonts.bold, color: colors.ink },
   cardSub: { color: colors.muted, fontSize: 13, fontFamily: fonts.medium, marginTop: 2 },
   divider: { height: 1, backgroundColor: colors.line, marginVertical: 16 },
-  fieldLabel: { color: colors.muted, fontSize: 10, letterSpacing: 1.2, fontFamily: fonts.bold, marginBottom: 6 },
+  fieldLabel: { color: colors.muted, fontSize: 11, letterSpacing: 1.1, fontFamily: fonts.bold, marginBottom: 6 },
   fieldText: { color: colors.ink, fontSize: 14, fontFamily: fonts.medium, lineHeight: 21 },
 
   photoWrap: { marginTop: 8, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, borderRadius: 14, padding: 8 },
@@ -481,8 +497,10 @@ const styles = StyleSheet.create({
   noReviewText: { color: colors.muted, fontSize: 13, fontFamily: fonts.semiBold },
 
   codeCard: { backgroundColor: '#F0FDF4', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#BBF7D0', alignItems: 'center', gap: 10, marginBottom: 14 },
-  codeCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  codeCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'center' },
   codeCardTitle: { fontSize: 13, fontFamily: fonts.bold, color: colors.green, letterSpacing: 0.5 },
+  copyPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.white, borderWidth: 1, borderColor: '#BBF7D0', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3, marginLeft: 6 },
+  copyPillText: { fontSize: 10, fontFamily: fonts.bold, color: colors.teal, letterSpacing: 0.2 },
   codeDigitsRow: { flexDirection: 'row', gap: 10 },
   codeDigitBox: { width: 44, height: 48, borderRadius: 12, backgroundColor: colors.white, borderWidth: 2, borderColor: colors.green, justifyContent: 'center', alignItems: 'center' },
   codeDigitText: { fontSize: 24, fontFamily: fonts.extraBold, color: colors.ink },

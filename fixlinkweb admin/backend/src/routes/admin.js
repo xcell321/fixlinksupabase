@@ -146,7 +146,17 @@ router.get('/technicians/:uid', async (req, res) => {
     if (error) throw error;
     if (!data || data.role !== 'technician') return res.status(404).json({ error: 'Technician profile not found' });
     const { password, passwordHash, resetToken, ...safe } = data;
-    res.json({ uid: data.id, ...safe, status: data.status || data.verification_status || 'active', createdAt: data.created_at || null });
+    // Provide camelCase aliases for the technician-review frontend (which expects governmentIdFileUrl etc.)
+    // while keeping snake_case for backwards compatibility.
+    const camelAliases = {
+      governmentIdNumber: data.government_id_number ?? null,
+      governmentIdFileUrl: data.government_id_file_url ?? null,
+      certificateFileUrl: data.certificate_file_url ?? null,
+      yearsExperience: data.years_experience ?? null,
+      verificationStatus: data.verification_status ?? null,
+      rejectionReason: data.rejection_reason ?? null,
+    };
+    res.json({ uid: data.id, ...safe, ...camelAliases, status: data.status || data.verification_status || 'active', createdAt: data.created_at || null });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -182,7 +192,6 @@ router.patch('/technicians/:uid/decision', async (req, res) => {
         status,
         verification_status: status === 'active' ? 'verified' : 'rejected',
         rejection_reason: reason || null,
-        is_verified: status === 'active',
       })
       .eq('id', req.params.uid);
     if (error) throw error;

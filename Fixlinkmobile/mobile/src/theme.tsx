@@ -13,7 +13,7 @@ export const colors = {
   tealLight: '#E6F6F3',
   canvas: '#F5F8FA',
   white: '#FFFFFF',
-  muted: '#5A7A91',
+  muted: '#3F5A6E',
   line: '#D9E2EC',
   lineSoft: '#E3ECF2',
   error: '#E53935',
@@ -67,6 +67,10 @@ export const spacing = {
 } as const;
 
 export const shadows = {
+  subtle: {
+    boxShadow: '0 2px 8px rgba(16,42,67,0.06)',
+    elevation: 2,
+  },
   card: {
     boxShadow: '0 6px 14px rgba(16,42,67,0.06)',
     elevation: 3,

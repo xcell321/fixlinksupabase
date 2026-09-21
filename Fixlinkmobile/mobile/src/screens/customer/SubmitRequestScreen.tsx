@@ -443,10 +443,6 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
     if (currentStep === 1) {
       return (
         <View style={styles.stepBody}>
-          <View style={styles.stepIntroBlock}>
-            <Text style={styles.stepIntroTitle}>Which appliance needs attention?</Text>
-            <Text style={styles.stepIntroCopy}>Pick a category, then the specific device. This helps us match a verified technician with the right skill.</Text>
-          </View>
 
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
@@ -487,9 +483,6 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
               </View>
             )}
             {!!stepErrors.category && <Text style={styles.errorText} accessibilityLiveRegion="polite">{stepErrors.category}</Text>}
-            {!stepErrors.category && !selectedCategoryName && (
-              <Text style={styles.helperText}>Tap to browse {applianceOptions.length} categories — you can change this before submitting.</Text>
-            )}
           </View>
 
           {/* Scannable helper: show 3 quick category chips to reduce overwhelm; full list lives in the sheet */}
@@ -531,10 +524,6 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
     if (currentStep === 2) {
       return (
         <View style={styles.stepBody}>
-          <View style={styles.stepIntroBlock}>
-            <Text style={styles.stepIntroTitle}>What’s the problem?</Text>
-            <Text style={styles.stepIntroCopy}>Describe the symptom in your own words. A photo helps the technician triage and bring the right tools.</Text>
-          </View>
 
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
@@ -559,10 +548,8 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
               />
             </View>
             <View style={styles.charRow}>
-              {!!stepErrors.description ? (
+              {!!stepErrors.description && (
                 <Text style={styles.errorText} accessibilityLiveRegion="polite">{stepErrors.description}</Text>
-              ) : (
-                <Text style={styles.helperText}>Be specific — what stopped working and when?</Text>
               )}
               <Text style={styles.charCount}>{description.length}/600</Text>
             </View>
@@ -586,7 +573,6 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
                     <Ionicons name="checkmark-circle" size={15} color={colors.green} />
                     <Text style={styles.photoReadyText}>Photo ready</Text>
                   </View>
-                  <Text style={styles.photoHint}>The technician will see this before accepting.</Text>
                   <View style={styles.photoPreviewActions}>
                     <TouchableOpacity style={styles.photoSecondaryButton} onPress={handlePhotoAction} activeOpacity={0.7} disabled={photoBusy} accessibilityRole="button" accessibilityLabel="Replace photo" hitSlop={6}>
                       <Ionicons name="refresh-outline" size={14} color={colors.teal} />
@@ -625,10 +611,6 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
     if (currentStep === 3) {
       return (
         <View style={styles.stepBody}>
-          <View style={styles.stepIntroBlock}>
-            <Text style={styles.stepIntroTitle}>When should we come?</Text>
-            <Text style={styles.stepIntroCopy}>Choose the date you’re home. We’ll match your preferred window and confirm the exact arrival.</Text>
-          </View>
 
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Preferred date<Text style={styles.requiredMark}> *</Text></Text>
@@ -650,10 +632,8 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
               </View>
               <Ionicons name="chevron-down" size={16} color={colors.muted} />
             </TouchableOpacity>
-            {!!stepErrors.date ? (
+            {!!stepErrors.date && (
               <Text style={styles.errorText}>{stepErrors.date}</Text>
-            ) : (
-              <Text style={styles.helperText}>Earliest is today. You can reschedule after a technician is matched.</Text>
             )}
           </View>
 
@@ -699,10 +679,6 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
                 </View>
               </TouchableOpacity>
             </View>
-            <View style={styles.timeHintRow}>
-              <Ionicons name="information-circle-outline" size={13} color={colors.muted} />
-              <Text style={styles.timeHintText}>We’ll confirm the exact arrival once a technician accepts.</Text>
-            </View>
           </View>
 
           {showDatePicker && (
@@ -723,11 +699,6 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
     // Step 4
     return (
       <View style={styles.stepBody}>
-        <View style={styles.stepIntroBlock}>
-          <Text style={styles.stepIntroTitle}>Where is the service?</Text>
-          <Text style={styles.stepIntroCopy}>Pin the exact address. Use Locate Me for GPS or type a barangay, street, or landmark.</Text>
-        </View>
-
         <View style={styles.inputGroup}>
           <View style={styles.labelRow}>
             <Text style={styles.inputLabel}>Service location</Text>
@@ -817,25 +788,20 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
             </View>
           )}
         </View>
-
-        <View style={styles.privacyNote}>
-          <Ionicons name="lock-closed-outline" size={14} color={colors.muted} />
-          <Text style={styles.privacyNoteText}>We mask your exact address from the job feed — technicians see it only after they commit to your request.</Text>
-        </View>
       </View>
     );
   };
 
   return (
     <ScrollView ref={scrollRef} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <View style={styles.centerWrap}>
       <View style={styles.sectionHeaderContainer}>
         <Text style={styles.kicker}>NEW SERVICE</Text>
         <Text style={styles.sectionTitle}>Submit Repair Request</Text>
-        <Text style={styles.sectionSubtitle}>A guided 4-step flow — we’ll collect only what’s needed at each stage.</Text>
       </View>
 
       <View style={styles.card}>
-        {/* Stepper header */}
+        {/* Stepper header — distilled: ONE clear track (dots + labels). Kicker keeps step context; badge + segmented bar removed as duplicate signals. */}
         <View style={styles.stepperHeader}>
           <View style={styles.stepperTopRow}>
             <View style={{ flex: 1 }}>
@@ -843,30 +809,9 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
               <Text style={styles.stepTitle}>{STEPS[currentStep - 1].title}</Text>
               <Text style={styles.stepSubtitle}>{STEPS[currentStep - 1].subtitle}</Text>
             </View>
-            <View style={styles.stepCountBadge} accessibilityLabel={`Step ${currentStep} of ${TOTAL_STEPS}`}>
-              <Text style={styles.stepCountText}>{currentStep}/{TOTAL_STEPS}</Text>
-            </View>
           </View>
 
-          <View style={styles.progressTrack} accessibilityRole="progressbar" accessibilityValue={{ now: currentStep, min: 1, max: TOTAL_STEPS }}>
-            {STEPS.map((s, idx) => {
-              const stepNum = idx + 1;
-              const isCompleted = stepNum < currentStep;
-              const isActive = stepNum === currentStep;
-              return (
-                <View
-                  key={s.key}
-                  style={[
-                    styles.progressSegment,
-                    isCompleted && styles.progressSegmentCompleted,
-                    isActive && styles.progressSegmentActive,
-                  ]}
-                />
-              );
-            })}
-          </View>
-
-          <View style={styles.stepDotsRow}>
+          <View style={styles.stepDotsRow} accessibilityRole="progressbar" accessibilityValue={{ now: currentStep, min: 1, max: TOTAL_STEPS }}>
             {STEPS.map((s, idx) => {
               const stepNum = idx + 1;
               const isCompleted = stepNum < currentStep;
@@ -917,13 +862,15 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
             <TouchableOpacity
               style={[styles.primaryButton, styles.primaryButtonFlex, !canContinueForStep(currentStep) && styles.primaryButtonMuted]}
               onPress={handleContinue}
+              disabled={!canContinueForStep(currentStep)}
               activeOpacity={0.8}
               accessibilityRole="button"
               accessibilityLabel="Continue to next step"
+              accessibilityState={{ disabled: !canContinueForStep(currentStep) }}
               hitSlop={8}
             >
-              <Text style={styles.primaryButtonText}>Continue</Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.white} />
+              <Text style={[styles.primaryButtonText, !canContinueForStep(currentStep) && styles.primaryButtonTextMuted]}>Continue</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.white} style={!canContinueForStep(currentStep) && { opacity: 0.55 }} />
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
@@ -1101,47 +1048,49 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
         subtitle="Preview before submitting"
         onClose={() => setPhotoViewerVisible(false)}
       />
+      </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  scrollContent: { flexGrow: 1, padding: 20, backgroundColor: colors.canvas, paddingBottom: 36 },
-  sectionHeaderContainer: { marginBottom: 14, marginTop: 8 },
-  kicker: { color: colors.teal, fontSize: 10, letterSpacing: 1.4, fontFamily: fonts.extraBold, marginBottom: 4, textTransform: 'uppercase' as const },
-  sectionTitle: { fontSize: 20, fontFamily: fonts.extraBold, color: colors.ink, letterSpacing: -0.4 },
-  sectionSubtitle: { fontSize: 13, fontFamily: fonts.regular, color: colors.muted, lineHeight: 18, marginTop: 6 },
+  scrollContent: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 36, backgroundColor: colors.canvas, alignItems: 'center' as const },
+  centerWrap: { width: '100%' as const, maxWidth: 480, alignSelf: 'center' as const },
+  sectionHeaderContainer: { marginBottom: 16, marginTop: 4, gap: 2 },
+  kicker: { color: colors.teal, fontSize: 10, letterSpacing: 1.4, fontFamily: fonts.extraBold, marginBottom: 2, textTransform: 'uppercase' as const },
+  sectionTitle: { fontSize: 22, fontFamily: fonts.extraBold, color: colors.ink, letterSpacing: -0.5, lineHeight: 26 },
+  sectionSubtitle: { fontSize: 13, fontFamily: fonts.regular, color: colors.muted, lineHeight: 18, marginTop: 4 },
 
-  card: { backgroundColor: colors.white, borderRadius: 24, padding: 16, borderWidth: 1, borderColor: colors.line, boxShadow: '0 8px 16px rgba(16,42,67,0.07)', elevation: 4 },
+  card: { backgroundColor: colors.white, borderRadius: 24, padding: 16, borderWidth: 1, borderColor: colors.line, boxShadow: '0 8px 16px rgba(16,42,67,0.07)', elevation: 4, gap: 0 },
 
-  // Stepper
-  stepperHeader: { gap: 14, paddingBottom: 2 },
+  // Stepper — tight within, generous separation between sections (spacing thesis)
+  stepperHeader: { gap: 14, paddingBottom: 4 },
   stepperTopRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
   stepKicker: { color: colors.teal, fontSize: 10, letterSpacing: 1.2, fontFamily: fonts.extraBold, textTransform: 'uppercase' as const },
   stepTitle: { fontSize: 18, fontFamily: fonts.extraBold, color: colors.ink, letterSpacing: -0.3, marginTop: 4, lineHeight: 22 },
-  stepSubtitle: { fontSize: 13, fontFamily: fonts.regular, color: colors.muted, lineHeight: 18, marginTop: 4 },
+  stepSubtitle: { fontSize: 13, fontFamily: fonts.regular, color: colors.muted, lineHeight: 18, marginTop: 2 },
   stepCountBadge: { minWidth: 44, height: 28, borderRadius: 14, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
   stepCountText: { fontSize: 12, fontFamily: fonts.bold, color: colors.ink, fontVariant: ['tabular-nums'] as const },
   progressTrack: { flexDirection: 'row', gap: 6, marginTop: 2 },
   progressSegment: { flex: 1, height: 6, borderRadius: 999, backgroundColor: colors.lineSoft, borderWidth: 1, borderColor: colors.line },
   progressSegmentActive: { backgroundColor: colors.teal, borderColor: colors.teal },
   progressSegmentCompleted: { backgroundColor: colors.teal, borderColor: colors.teal, opacity: 0.85 },
-  stepDotsRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 0, marginTop: 2 },
-  dotCell: { flex: 1, alignItems: 'center', position: 'relative' as const, gap: 6 },
-  dot: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
+  stepDotsRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 0, marginTop: 6, paddingHorizontal: 4, overflow: 'visible' as const },
+  dotCell: { flex: 1, alignItems: 'center', position: 'relative' as const, gap: 6, minWidth: 0, overflow: 'visible' as const },
+  dot: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.line, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
   dotActive: { backgroundColor: colors.teal, borderColor: colors.teal, boxShadow: '0 4px 8px rgba(15,118,110,0.22)', elevation: 3 },
   dotCompleted: { backgroundColor: colors.teal, borderColor: colors.teal },
   dotUpcoming: { backgroundColor: colors.white, borderColor: colors.line },
   dotText: { fontSize: 12, fontFamily: fonts.bold, color: colors.muted, fontVariant: ['tabular-nums'] as const },
   dotTextActive: { color: colors.white },
   dotTextUpcoming: { color: colors.muted },
-  dotLabel: { fontSize: 10, fontFamily: fonts.semiBold, color: colors.muted, letterSpacing: 0.2, textAlign: 'center' as const },
+  dotLabel: { fontSize: 9, fontFamily: fonts.semiBold, color: colors.muted, letterSpacing: 0.3, textAlign: 'center' as const, lineHeight: 12, marginTop: 1 },
   dotLabelActive: { color: colors.teal, fontFamily: fonts.bold },
-  dotConnector: { position: 'absolute' as const, top: 14, left: '55%', right: '-45%', height: 1.5, backgroundColor: colors.line },
+  dotConnector: { position: 'absolute' as const, top: 14, left: '62%', right: '-38%', height: 2, backgroundColor: colors.line, zIndex: 0 },
   dotConnectorCompleted: { backgroundColor: colors.teal, opacity: 0.9 },
-  divider: { height: 1, backgroundColor: colors.line, marginVertical: 16 },
+  divider: { height: 1, backgroundColor: colors.lineSoft, marginTop: 16, marginBottom: 16 },
 
-  stepBody: { gap: 16 },
+  stepBody: { gap: 16, marginTop: 2 },
   stepIntroBlock: { backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, borderRadius: 14, padding: 12, gap: 4 },
   stepIntroTitle: { fontSize: 15, fontFamily: fonts.bold, color: colors.ink, letterSpacing: -0.2 },
   stepIntroCopy: { fontSize: 12.5, fontFamily: fonts.regular, color: colors.muted, lineHeight: 17 },
@@ -1158,11 +1107,11 @@ const styles = StyleSheet.create({
   inputIconTile: { width: 28, height: 28, borderRadius: 9, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
   inputIconTileActive: { backgroundColor: '#E6F6F3', borderColor: colors.hudBorder },
 
-  // quick picks
-  quickPickWrap: { backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, borderRadius: 14, padding: 12, gap: 10 },
+  // quick picks — grouped tight (8) within, generous (16) from next input
+  quickPickWrap: { backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, borderRadius: 14, padding: 12, gap: 10, marginTop: 4 },
   quickPickLabel: { fontSize: 10, fontFamily: fonts.extraBold, color: colors.muted, letterSpacing: 1, textTransform: 'uppercase' as const },
-  quickChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  quickChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 11, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, maxWidth: '48%' },
+  quickChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'flex-start' },
+  quickChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 11, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, maxWidth: '48%', minHeight: 38 },
   quickChipActive: { backgroundColor: '#E6F6F3', borderColor: colors.teal },
   quickChipText: { fontSize: 12, fontFamily: fonts.semiBold, color: colors.muted, flexShrink: 1 },
   quickChipTextActive: { color: colors.teal },
@@ -1233,14 +1182,15 @@ const styles = StyleSheet.create({
   privacyNote: { flexDirection: 'row', gap: 8, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, borderRadius: 12, padding: 10, alignItems: 'flex-start' },
   privacyNoteText: { flex: 1, fontSize: 11, fontFamily: fonts.regular, color: colors.muted, lineHeight: 15 },
 
-  navRow: { flexDirection: 'row', gap: 12, marginTop: 18, alignItems: 'center' },
-  secondaryButton: { flex: 1, height: 48, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  navRow: { flexDirection: 'row', gap: 12, marginTop: 20, alignItems: 'center', flexWrap: 'wrap' as const },
+  secondaryButton: { flex: 1, minWidth: 110, height: 48, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   secondaryButtonText: { color: colors.ink, fontSize: 14, fontFamily: fonts.bold, letterSpacing: 0.2 },
   primaryButton: { backgroundColor: colors.teal, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, boxShadow: '0 6px 12px rgba(15,118,110,0.22)', elevation: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 18 },
-  primaryButtonFlex: { flex: 1.5 },
+  primaryButtonFlex: { flex: 1.5, minWidth: 140 },
   primaryButtonMuted: { opacity: 0.55 },
   primaryButtonText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold, letterSpacing: 0.4 },
-  navHint: { fontSize: 11, fontFamily: fonts.medium, color: colors.muted, textAlign: 'center', marginTop: 8 },
+  primaryButtonTextMuted: { opacity: 0.85 },
+  navHint: { fontSize: 11, fontFamily: fonts.medium, color: colors.muted, textAlign: 'center', marginTop: 8, lineHeight: 14 },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(16, 42, 67, 0.4)', justifyContent: 'flex-end' },
   modalView: { backgroundColor: colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 20, maxHeight: '80%', boxShadow: '0 -4px 12px rgba(0,0,0,0.1)', elevation: 10 },

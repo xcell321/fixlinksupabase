@@ -3,10 +3,8 @@ import React, { useState } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView, TextInput, Alert, ActivityIndicator, Image, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { colors as themeColors, fonts } from '../../theme';
+import { colors, fonts } from '../../theme';
 import HelpSheet from '../../components/HelpSheet';
-
-const colors = { ink: '#102A43', teal: '#0F766E', canvas: '#F5F8FA', white: '#FFFFFF', muted: '#5A7A91', line: '#D9E2EC', error: '#E53935' };
 
 export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -183,13 +181,13 @@ export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile 
                 style={({ pressed }) => [styles.helpRow, pressed && styles.pressedSoft]}
               >
                 <View style={styles.helpIconWrap}>
-                  <Ionicons name="help-circle-outline" size={18} color={themeColors.teal} />
+                  <Ionicons name="help-circle-outline" size={18} color={colors.teal} />
                 </View>
                 <View style={styles.helpCopy}>
                   <Text style={styles.helpTitle}>Help & How It Works</Text>
                   <Text style={styles.helpSub}>Workflow, tracking, OTP and reviews</Text>
                 </View>
-                <Ionicons name="chevron-forward" size={16} color={themeColors.muted} />
+                <Ionicons name="chevron-forward" size={16} color={colors.muted} />
               </Pressable>
               <TouchableOpacity style={styles.logoutButton} onPress={onLogout}>
                 <Ionicons name="log-out-outline" size={18} color="#DC2626" />
@@ -240,7 +238,7 @@ const styles = StyleSheet.create({
   primaryButtonText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold, letterSpacing: 0.5 },
   pressedSoft: { transform: [{ scale: 0.97 }], opacity: 0.94 },
   helpRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 14, paddingHorizontal: 14, minHeight: 52, marginTop: 12 },
-  helpIconWrap: { width: 36, height: 36, borderRadius: 11, backgroundColor: themeColors.tealLight, borderWidth: 1, borderColor: themeColors.hudBorder, alignItems: 'center', justifyContent: 'center' },
+  helpIconWrap: { width: 36, height: 36, borderRadius: 11, backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.hudBorder, alignItems: 'center', justifyContent: 'center' },
   helpCopy: { flex: 1 },
   helpTitle: { color: colors.ink, fontSize: 13, fontFamily: fonts.bold },
   helpSub: { color: colors.muted, fontSize: 11, fontFamily: fonts.regular, marginTop: 2 },

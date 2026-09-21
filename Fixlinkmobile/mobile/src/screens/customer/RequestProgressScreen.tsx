@@ -108,6 +108,8 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
   const [reviewComments, setReviewComments] = useState<Record<string, string>>({});
   const [reviewSubmitting, setReviewSubmitting] = useState<string | null>(null);
   const [expandedReviewId, setExpandedReviewId] = useState<string | null>(null);
+  const [expandedAiId, setExpandedAiId] = useState<string | null>(null);
+  const [showCancelledHistory, setShowCancelledHistory] = useState<boolean>(false);
   const [recommendations, setRecommendations] = useState<Record<string, RecommendationData>>({});
   const [recommendationsRefresh, setRecommendationsRefresh] = useState<{ run?: number }>({});
   const [recStates, setRecStates] = useState<Record<string, RecState>>({});
@@ -175,6 +177,10 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
 
   const pendingRequests = trackedRequests.filter((r) => (r.status || '').toLowerCase() === 'pending');
   const activeRequests = trackedRequests.filter((r) => ACTIVE_STATUSES.includes((r.status || '').toLowerCase()));
+  const terminalHistoryRequests = trackedRequests.filter((r) => {
+    const k = String(r.status || '').toLowerCase();
+    return k === 'cancelled' || k === 'no-show' || k === 'no show';
+  });
   const totalCount = trackedRequests.length + completedJobs.length;
 
   // Fetch AI recommendations once per pending job (cache by request id so the
@@ -264,6 +270,7 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
     </View>
   );
 
+  // De-emphasized progress history — small, muted, supporting element. Never competes with status.
   const renderProgressRail = (status: string | undefined): React.JSX.Element | null => {
     const current = progressIndexOf(status);
     if (current < 0) return null;
@@ -274,7 +281,8 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
         accessibilityLabel={`Request progress: step ${current + 1} of ${PROGRESS_STEPS.length}, ${PROGRESS_STEPS[current]}`}
       >
         <View style={styles.railHeader}>
-          <Text style={styles.railKicker}>PROGRESS HISTORY</Text>
+          <Text style={styles.railKicker}>PROGRESS</Text>
+          <Text style={styles.railStepLabel}>{PROGRESS_STEPS[current]} · step {current + 1} of {PROGRESS_STEPS.length}</Text>
         </View>
         <View style={styles.railBody}>
           {PROGRESS_STEPS.map((step, i) => {
@@ -286,7 +294,7 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
                 <View style={styles.railTrack}>
                   {i > 0 && <View style={[styles.railLine, (done || isCurrent) && styles.railLineDone, isUpcoming && styles.railLineUpcoming]} />}
                   <View style={[styles.railDot, done && styles.railDotDone, isCurrent && styles.railDotCurrent, isUpcoming && styles.railDotUpcoming]}>
-                    {done && <Ionicons name="checkmark" size={8} color={colors.white} accessible={false} />}
+                    {done && <Ionicons name="checkmark" size={7} color={colors.white} accessible={false} />}
                     {isUpcoming && <View style={styles.railDotInner} />}
                   </View>
                   {i < PROGRESS_STEPS.length - 1 && <View style={[styles.railLine, i < current && styles.railLineDone, isUpcoming && styles.railLineUpcoming]} />}
@@ -352,10 +360,12 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
     const isAccepted = statusKey === 'accepted';
     const isConfirmed = statusKey === 'confirmed';
     const isReady = statusKey === 'customer ready';
+    const isCancelled = statusKey === 'cancelled';
+    const isNoShow = statusKey === 'no-show' || statusKey === 'no show';
+    const isTerminalHistory = isCancelled || isNoShow;
     const isActive = isAccepted || isConfirmed || isReady || statusKey === 'in progress';
     const statusColor = getStatusColor(req.status);
     const guidance = getStatusGuidance(req.status);
-    const showWaitingInfo = isPending || (statusKey === 'in progress' && !isAccepted && !isConfirmed && !isReady);
     const cancelMessage = isPending
       ? 'This can only be done before a technician accepts the request.'
       : isReady
@@ -382,7 +392,6 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
                   : 'Matching you with a technician'}
             </Text>
           </View>
-          {renderStatusPill(req.status)}
         </View>
 
         <View style={[styles.statusHero, { backgroundColor: statusColor + '10', borderColor: statusColor + '22' }]}>
@@ -496,14 +505,7 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
             )}
           </View>
         )}
-        {showWaitingInfo && isPending && (
-          <View style={styles.nextActionBlock}>
-            <View style={styles.calmingInfo}>
-              <Ionicons name="time-outline" size={15} color={colors.muted} accessible={false} />
-              <Text style={styles.calmingInfoText}>Waiting for a technician to accept — we&apos;ll notify you the moment someone does.</Text>
-            </View>
-          </View>
-        )}
+
 
         {/* Completion code is only relevant when it is the next step — show it right after next action */}
         {isActive && req.verificationCode && !isConfirmed && (
@@ -547,18 +549,42 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
         {/* 4 — PROGRESS HISTORY: de-emphasized, below facts */}
         {isActive && renderProgressRail(req.status)}
 
-        {/* 5 — SECONDARY: AI support (when pending) */}
-        {isPending && (
-          <View style={styles.aiPanel}>
-            <View style={styles.aiPanelHeader}>
-              <Ionicons name="sparkles" size={15} color={colors.teal} accessible={false} />
-              <Text style={styles.aiPanelTitle}>AI Recommended Technicians</Text>
+        {/* 5 — SECONDARY: AI support (collapsed by default — never competes with status) */}
+        {isPending && (() => {
+          const isExpanded = expandedAiId === req.id;
+          const data = recommendations[req.id];
+          const recs = Array.isArray(data?.recommendations) ? data!.recommendations! : [];
+          const state = recStateOf(req.id);
+          const countLabel = state === 'loading' ? '…' : recs.length ? `${recs.length}` : state === 'empty' ? '—' : '!';
+          return (
+            <View style={[styles.aiPanel, isExpanded && styles.aiPanelExpanded]}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={isExpanded ? 'Hide AI recommended technicians' : 'Show AI recommended technicians'}
+                accessibilityState={{ expanded: isExpanded }}
+                onPress={() => setExpandedAiId(isExpanded ? null : req.id)}
+                style={({ pressed }) => [styles.aiPanelToggle, pressed && styles.pressedSoft]}
+              >
+                <View style={styles.aiPanelToggleLeft}>
+                  <View style={styles.aiPanelIcon}>
+                    <Ionicons name="sparkles" size={12} color={colors.teal} accessible={false} />
+                  </View>
+                  <Text style={styles.aiPanelTitle}>AI Recommended</Text>
+                  <View style={styles.aiCountPill}>
+                    <Text style={styles.aiCountText}>{countLabel}</Text>
+                  </View>
+                </View>
+                <View style={styles.aiPanelToggleRight}>
+                  <Text style={styles.aiPanelToggleHint}>{isExpanded ? 'Hide' : 'View'}</Text>
+                  <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={14} color={colors.muted} accessible={false} />
+                </View>
+              </Pressable>
+              {isExpanded && <View style={styles.aiPanelBody}>{renderAiPanelBody(req)}</View>}
             </View>
-            {renderAiPanelBody(req)}
-          </View>
-        )}
+          );
+        })()}
 
-        {(isActive || isPending) && (
+        {(isActive || isPending || isTerminalHistory) && (
           <View style={styles.secondaryActionsRow}>
             <Pressable
               accessibilityRole="button"
@@ -740,15 +766,8 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
 
     if (recs.length > 0) {
       return (
-        <View>
-          <Text style={styles.aiPanelHint}>
-            {data?.ai === 'ai'
-              ? 'Ranked from real ratings, reviews, experience, and proximity.'
-              : 'Best available matches for this request.'}
-          </Text>
-          <View style={styles.techList}>
-            {recs.map((tech, i) => renderTechCard(req, tech, i + 1, i === 0))}
-          </View>
+        <View style={styles.techList}>
+          {recs.map((tech, i) => renderTechCard(req, tech, i + 1, i === 0))}
         </View>
       );
     }
@@ -921,10 +940,10 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.teal} colors={[colors.teal]} />}
     >
+      <View style={styles.centerWrap}>
       <View style={styles.sectionHeaderContainer}>
         <Text style={styles.kicker}>MY REQUESTS</Text>
         <Text style={styles.sectionTitle}>{acceptedOnly ? 'Active Requests' : 'Service Requests'}</Text>
-        <Text style={styles.subtitle}>Track your repairs and rate completed work.</Text>
       </View>
 
       <View style={styles.segmentRow}>
@@ -980,7 +999,7 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
         <View>
           {showPending && (
             <View>
-              {renderSectionHeader('AWAITING MATCH', 'Pending Requests', pendingRequests.length, colors.gold, "We'll notify you the moment a technician accepts.")}
+              {renderSectionHeader('AWAITING MATCH', 'Pending Requests', pendingRequests.length, colors.gold)}
               {pendingRequests.length === 0 ? (
                 <View style={styles.sectionEmpty}>
                   <Ionicons name="time-outline" size={20} color={colors.muted} accessible={false} />
@@ -992,7 +1011,7 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
 
           {showActive && (
             <View>
-              {renderSectionHeader('ONGOING', 'Active Jobs', activeRequests.length, colors.accentBlue, "Follow them live on the map and keep your phone close.")}
+              {renderSectionHeader('ONGOING', 'Active Jobs', activeRequests.length, colors.accentBlue)}
               {activeRequests.length === 0 ? (
                 <View style={styles.sectionEmpty}>
                   <Ionicons name="hand-left-outline" size={20} color={colors.muted} accessible={false} />
@@ -1004,7 +1023,7 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
 
           {showCompleted && (
             <View>
-              {renderSectionHeader('FINISHED', 'Completed Repairs', completedJobs.length, colors.green, "Great job seeing it through — a quick review helps your technician.")}
+              {renderSectionHeader('FINISHED', 'Completed Repairs', completedJobs.length, colors.green)}
               {completedJobs.length === 0 ? (
                 <View style={styles.sectionEmpty}>
                   <Ionicons name="checkmark-done-outline" size={20} color={colors.muted} accessible={false} />
@@ -1013,46 +1032,80 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
               ) : completedJobs.map(renderCompletedCard)}
             </View>
           )}
+
+          {terminalHistoryRequests.length > 0 && (
+            <View style={styles.terminalSection}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={showCancelledHistory ? 'Hide cancelled and no-show history' : 'Show cancelled and no-show history'}
+                accessibilityState={{ expanded: showCancelledHistory }}
+                onPress={() => setShowCancelledHistory((v) => !v)}
+                style={({ pressed }) => [styles.sectionHeader, styles.terminalHeader, pressed && { opacity: 0.85 }]}
+              >
+                <View style={styles.sectionHeaderCopy}>
+                  <Text style={[styles.sectionKicker, { color: colors.muted }]}>HISTORY</Text>
+                  <Text style={styles.sectionTitle}>Cancelled / No-Show</Text>
+                  <Text style={styles.sectionHint}>Terminal requests kept for your records — not counted as active.</Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                  <View style={[styles.countBadge, { backgroundColor: colors.muted + '15' }]}>
+                    <Text style={[styles.countBadgeText, { color: colors.muted }]}>{terminalHistoryRequests.length}</Text>
+                  </View>
+                  <Ionicons name={showCancelledHistory ? 'chevron-up' : 'chevron-down'} size={16} color={colors.muted} />
+                </View>
+              </Pressable>
+              {showCancelledHistory ? (
+                terminalHistoryRequests.map(renderRequestCard)
+              ) : (
+                <View style={styles.sectionEmpty}>
+                  <Ionicons name="archive-outline" size={20} color={colors.muted} accessible={false} />
+                  <Text style={styles.sectionEmptyText}>{terminalHistoryRequests.length} terminal request{terminalHistoryRequests.length === 1 ? '' : 's'} hidden — tap to show</Text>
+                </View>
+              )}
+            </View>
+          )}
         </View>
       )}
+      </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  scrollContent: { padding: 20, paddingBottom: 32, backgroundColor: colors.canvas, flexGrow: 1 },
-  sectionHeaderContainer: { marginBottom: 14 },
-  kicker: { color: colors.teal, fontSize: 10, letterSpacing: 1.5, fontFamily: fonts.bold, marginBottom: 3 },
-  sectionTitle: { fontSize: 22, fontFamily: fonts.bold, color: colors.ink },
+  scrollContent: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 32, backgroundColor: colors.canvas, flexGrow: 1, alignItems: 'center' as const },
+  centerWrap: { width: '100%' as const, maxWidth: 480, alignSelf: 'center' as const },
+  sectionHeaderContainer: { marginBottom: 16, gap: 2 },
+  kicker: { color: colors.teal, fontSize: 10, letterSpacing: 1.4, fontFamily: fonts.bold, marginBottom: 2, textTransform: 'uppercase' as const },
+  sectionTitle: { fontSize: 22, fontFamily: fonts.bold, color: colors.ink, lineHeight: 26, letterSpacing: -0.4 },
   subtitle: { color: colors.muted, fontSize: 12, fontFamily: fonts.medium, marginTop: 4 },
 
   // Shared anti-slop press states: transform + opacity only (GPU path).
   pressed: { transform: [{ scale: 0.97 }], opacity: 0.96 },
   pressedSoft: { transform: [{ scale: 0.97 }], opacity: 0.94 },
 
-  // Filters
-  segmentRow: { flexDirection: 'row', gap: 6, marginBottom: 18 },
-  segment: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, minHeight: 44, paddingHorizontal: 4, borderRadius: 12, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line },
+  // Filters — tight within (6), generous below (18), touch-safe 44
+  segmentRow: { flexDirection: 'row', gap: 6, marginBottom: 20, flexWrap: 'wrap' as const },
+  segment: { flex: 1, minWidth: 72, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, minHeight: 44, paddingHorizontal: 6, borderRadius: 12, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line },
   segmentActive: { backgroundColor: colors.teal, borderColor: colors.tealDark },
   segmentText: { color: colors.muted, fontSize: 11, fontFamily: fonts.semiBold, flexShrink: 1 },
   segmentTextActive: { color: colors.white },
   segmentCount: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center' },
   segmentCountActive: { backgroundColor: 'rgba(255,255,255,0.25)' },
-  segmentCountText: { color: colors.muted, fontSize: 10, fontFamily: fonts.bold, fontVariant: ['tabular-nums'] },
+  segmentCountText: { color: colors.muted, fontSize: 11, fontFamily: fonts.bold, fontVariant: ['tabular-nums'] },
   segmentCountTextActive: { color: colors.white },
 
-  // Section headers
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, marginTop: 4 },
-  sectionHeaderCopy: { flex: 1, marginRight: 10 },
-  sectionKicker: { fontSize: 9, letterSpacing: 1.4, fontFamily: fonts.bold, marginBottom: 2 },
+  // Section headers — more space above than below (rhythm)
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, marginTop: 20, gap: 12 },
+  sectionHeaderCopy: { flex: 1, marginRight: 10, gap: 2 },
+  sectionKicker: { fontSize: 10, letterSpacing: 1.2, fontFamily: fonts.bold, marginBottom: 1, textTransform: 'uppercase' as const },
   countBadge: { minWidth: 28, height: 28, borderRadius: 14, paddingHorizontal: 9, alignItems: 'center', justifyContent: 'center' },
   countBadgeText: { fontSize: 12, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
 
-  // Cards
-  card: { backgroundColor: colors.white, borderRadius: 20, padding: 18, marginBottom: 14, borderWidth: 1, borderColor: colors.line, ...shadows.card },
+  // Cards — generous inner (18), systematic gap rhythm
+  card: { backgroundColor: colors.white, borderRadius: 20, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: colors.line, gap: 0, ...shadows.card },
   cardFocused: { borderColor: colors.teal, borderWidth: 2, ...shadows.cardStrong },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  iconChip: { width: 44, height: 44, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 12 },
+  iconChip: { width: 44, height: 44, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   iconChipAmber: { backgroundColor: '#FFF8E7' },
   iconChipBlue: { backgroundColor: '#EBF2FF' },
   iconChipGreen: { backgroundColor: '#ECFDF5' },
@@ -1074,40 +1127,41 @@ const styles = StyleSheet.create({
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1 },
   metaText: { color: colors.muted, fontSize: 12, fontFamily: fonts.medium, flex: 1 },
 
-  // Current status hero (strongest visual, still compact)
-  statusHero: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, borderWidth: 1, marginBottom: 12 },
-  statusHeroIcon: { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center', borderWidth: 1, marginTop: 1 },
+  // Current status hero — STRONGEST visual on card (distilled: larger, bolder, quiet surroundings)
+  statusHero: { flexDirection: 'row', alignItems: 'flex-start', gap: 11, paddingHorizontal: 13, paddingVertical: 13, borderRadius: 14, borderWidth: 1, marginBottom: 12 },
+  statusHeroIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, marginTop: 1 },
   statusHeroCopy: { flex: 1 },
-  statusHeroKicker: { color: colors.muted, fontSize: 9, letterSpacing: 1.1, fontFamily: fonts.bold, marginBottom: 2 },
-  statusHeroStatus: { fontSize: 9, fontFamily: fonts.extraBold },
-  statusHeroTitle: { color: colors.ink, fontSize: 13, fontFamily: fonts.bold, marginBottom: 2 },
-  statusHeroBody: { color: colors.muted, fontSize: 12, lineHeight: 16, fontFamily: fonts.regular },
+  statusHeroKicker: { color: colors.muted, fontSize: 11, letterSpacing: 1.1, fontFamily: fonts.bold, marginBottom: 2 },
+  statusHeroStatus: { fontSize: 11, fontFamily: fonts.extraBold },
+  statusHeroTitle: { color: colors.ink, fontSize: 15, fontFamily: fonts.extraBold, marginBottom: 3, lineHeight: 18, letterSpacing: -0.2 },
+  statusHeroBody: { color: colors.muted, fontSize: 11.5, lineHeight: 15.5, fontFamily: fonts.regular },
 
-  // Next action — visually dominant, directly below status
-  nextActionBlock: { gap: 8, marginBottom: 12 },
-  nextActionKicker: { color: colors.teal, fontSize: 9, letterSpacing: 1.2, fontFamily: fonts.bold },
-  nextActionPrimary: { flex: 1.35 },
-  secondaryAction: { flex: 1, minHeight: 48, borderRadius: 14, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
-  secondaryActionText: { color: colors.teal, fontFamily: fonts.bold, fontSize: 13 },
-  calmingInfo: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.tealLight, borderRadius: 12, borderWidth: 1, borderColor: colors.hudBorder, paddingHorizontal: 12, paddingVertical: 10 },
-  calmingInfoText: { flex: 1, color: colors.ink, fontSize: 12, lineHeight: 16, fontFamily: fonts.medium },
+  // Next action — ONE primary dominates, secondary is ghost. Calm hierarchy.
+  nextActionBlock: { gap: 8, marginBottom: 11 },
+  nextActionKicker: { color: colors.teal, fontSize: 11, letterSpacing: 1.1, fontFamily: fonts.bold },
+  nextActionPrimary: { flex: 1.6 },
+  secondaryAction: { minWidth: 92, minHeight: 44, paddingHorizontal: 12, borderRadius: 12, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.lineSoft, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  secondaryActionText: { color: colors.muted, fontFamily: fonts.semiBold, fontSize: 12 },
+  calmingInfo: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.canvas, borderRadius: 10, borderWidth: 1, borderColor: colors.lineSoft, paddingHorizontal: 11, paddingVertical: 9 },
+  calmingInfoText: { flex: 1, color: colors.muted, fontSize: 11.5, lineHeight: 15, fontFamily: fonts.medium },
 
-  // De-emphasized progress history — supports, does not compete
-  rail: { marginBottom: 12, paddingVertical: 8, paddingHorizontal: 6, backgroundColor: colors.canvas, borderRadius: 12, borderWidth: 1, borderColor: colors.lineSoft, opacity: 0.97 },
-  railHeader: { marginBottom: 6, paddingHorizontal: 2 },
-  railKicker: { color: colors.muted, fontSize: 8, letterSpacing: 1.2, fontFamily: fonts.bold },
+  // De-emphasized progress history — muted, compact, never competes with statusHero
+  rail: { marginBottom: 11, paddingVertical: 7, paddingHorizontal: 8, backgroundColor: 'transparent', borderRadius: 10, borderWidth: 1, borderColor: colors.lineSoft, opacity: 0.88 },
+  railHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 5, paddingHorizontal: 1 },
+  railKicker: { color: colors.muted, fontSize: 10, letterSpacing: 1.1, fontFamily: fonts.bold, opacity: 0.9 },
+  railStepLabel: { color: colors.muted, fontSize: 11, fontFamily: fonts.semiBold },
   railBody: { flexDirection: 'row' },
   railStep: { flex: 1, alignItems: 'center' },
   railTrack: { flexDirection: 'row', alignItems: 'center', width: '100%' },
   railLine: { flex: 1, height: 1.5, backgroundColor: colors.line },
   railLineDone: { backgroundColor: colors.teal },
   railLineUpcoming: { backgroundColor: colors.lineSoft },
-  railDot: { width: 16, height: 16, borderRadius: 8, backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
+  railDot: { width: 14, height: 14, borderRadius: 7, backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
   railDotDone: { backgroundColor: colors.teal, borderColor: colors.teal },
-  railDotCurrent: { borderColor: colors.tealDark, borderWidth: 2.5 },
+  railDotCurrent: { borderColor: colors.tealDark, borderWidth: 2 },
   railDotUpcoming: { backgroundColor: colors.white, borderColor: colors.lineSoft },
-  railDotInner: { width: 5, height: 5, borderRadius: 3, backgroundColor: colors.lineSoft },
-  railLabel: { color: colors.muted, fontSize: 8, fontFamily: fonts.semiBold, marginTop: 4, textAlign: 'center' },
+  railDotInner: { width: 4, height: 4, borderRadius: 2, backgroundColor: colors.lineSoft },
+  railLabel: { color: colors.muted, fontSize: 10, fontFamily: fonts.semiBold, marginTop: 3, textAlign: 'center' },
   railLabelCurrent: { color: colors.tealDark, fontFamily: fonts.bold },
   railLabelUpcoming: { color: '#94A3B8', fontFamily: fonts.medium },
 
@@ -1153,18 +1207,29 @@ const styles = StyleSheet.create({
   emptyText: { color: colors.muted, fontSize: 13, fontFamily: fonts.medium, textAlign: 'center', lineHeight: 19 },
   sectionEmpty: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.white, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: colors.line, marginBottom: 14 },
   sectionEmptyText: { color: colors.muted, fontSize: 12, fontFamily: fonts.medium },
+  terminalSection: { marginTop: 8 },
+  terminalHeader: { marginTop: 12, backgroundColor: colors.white, borderRadius: 16, padding: 12, borderWidth: 1, borderColor: colors.line },
   errorCard: { backgroundColor: colors.white, borderRadius: 20, padding: 32, alignItems: 'center', borderWidth: 1, borderColor: colors.line, gap: 10, ...shadows.card },
   retryButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.teal, borderRadius: 14, paddingHorizontal: 22, minHeight: 48, marginTop: 6, ...shadows.card },
   retryButtonText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
 
-  // AI recommendations
-  aiPanel: { backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, borderRadius: 14, padding: 12, marginBottom: 12 },
+  // AI recommendations — SECONDARY disclosure, collapsed by default. Never competes with status.
+  aiPanel: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.lineSoft, borderRadius: 12, marginBottom: 11, overflow: 'hidden' as const },
+  aiPanelExpanded: { borderColor: colors.hudBorder, backgroundColor: colors.canvas },
+  aiPanelToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 10, minHeight: 44, gap: 8 },
+  aiPanelToggleLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
+  aiPanelIcon: { width: 26, height: 26, borderRadius: 8, backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.hudBorder, alignItems: 'center', justifyContent: 'center' },
+  aiPanelTitle: { color: colors.ink, fontSize: 12, fontFamily: fonts.semiBold },
+  aiCountPill: { minWidth: 20, height: 20, borderRadius: 10, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.lineSoft, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
+  aiCountText: { color: colors.muted, fontSize: 11, fontFamily: fonts.bold, fontVariant: ['tabular-nums'] },
+  aiPanelToggleRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  aiPanelToggleHint: { color: colors.teal, fontSize: 11, fontFamily: fonts.bold },
+  aiPanelBody: { paddingHorizontal: 12, paddingBottom: 12, paddingTop: 2, borderTopWidth: 1, borderTopColor: colors.lineSoft },
   aiPanelHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 },
-  aiPanelTitle: { color: colors.teal, fontSize: 13, fontFamily: fonts.bold },
   aiPanelHint: { color: colors.muted, fontSize: 11, fontFamily: fonts.regular, marginBottom: 8, lineHeight: 15 },
   aiLoading: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10 },
   aiLoadingText: { color: colors.muted, fontSize: 11, fontFamily: fonts.medium },
-  aiMessageRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.white, borderRadius: 12, padding: 10, borderWidth: 1, borderColor: colors.line },
+  aiMessageRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.white, borderRadius: 10, padding: 10, borderWidth: 1, borderColor: colors.line },
   aiMessageText: { flex: 1, color: colors.muted, fontSize: 11, fontFamily: fonts.medium, lineHeight: 15 },
   techList: { gap: 0 },
   techRow: { flexDirection: 'row', paddingVertical: 12, borderTopWidth: 1, borderTopColor: colors.line, gap: 10 },
@@ -1177,14 +1242,14 @@ const styles = StyleSheet.create({
   techNameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   techName: { color: colors.ink, fontSize: 14, fontFamily: fonts.bold, flex: 1 },
   matchValue: { color: colors.teal, fontSize: 12, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
-  techConfidence: { color: colors.teal, fontSize: 10, fontFamily: fonts.bold },
+  techConfidence: { color: colors.teal, fontSize: 11, fontFamily: fonts.bold },
   techReason: { color: colors.ink, fontSize: 11, fontFamily: fonts.medium, lineHeight: 15 },
   techMetaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, alignItems: 'center' },
   techMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   techMetaText: { color: colors.muted, fontSize: 11, fontFamily: fonts.medium, fontVariant: ['tabular-nums'] },
   techSkillsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   techSkillChip: { backgroundColor: colors.tealLight, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, maxWidth: '100%' },
-  techSkillText: { color: colors.tealDark, fontSize: 10, fontFamily: fonts.bold },
+  techSkillText: { color: colors.tealDark, fontSize: 11, fontFamily: fonts.bold },
   availRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
   availOkText: { color: colors.green, fontSize: 12, fontFamily: fonts.bold },
   availBusyText: { color: colors.gold, fontSize: 12, fontFamily: fonts.bold },

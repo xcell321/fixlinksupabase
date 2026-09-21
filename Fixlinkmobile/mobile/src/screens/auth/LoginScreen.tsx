@@ -3,9 +3,7 @@ import React, { useState } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import api, { setAuthToken } from '../services/api';
-import { fonts } from '../../theme';
-
-const colors = { ink: '#102A43', muted: '#5A7A91', teal: '#0F766E', tealDark: '#075E59', canvas: '#F5F8FA', white: '#FFFFFF', line: '#D9E2EC', danger: '#C53030' };
+import { colors, fonts } from '../../theme';
 
 export default function LoginScreen({ onLoginSuccess, switchToRegister, switchToForgotPassword }) {
   const [email, setEmail] = useState('');

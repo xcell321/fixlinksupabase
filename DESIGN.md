@@ -8,7 +8,7 @@ colors:
   teal-mist: "#E6F6F3"
   canvas: "#F5F8FA"
   white: "#FFFFFF"
-  slate-muted: "#5A7A91"
+  slate-muted: "#3F5A6E"
   harbor-line: "#D9E2EC"
   line-soft: "#E3ECF2"
   sunken: "#FBFDFE"
@@ -123,7 +123,7 @@ One confident harbor accent on a cool ink-and-canvas field; functional status hu
 - **Harbor Canvas** (#F5F8FA): App ground for every ScrollView screen and auth container; thumbnail and close-button wells.
 - **White** (#FFFFFF): Card, sheet, input-panel, and bottom-nav surfaces layered over canvas.
 - **Sunken Field** (#FBFDFE): Inset input fill that reads as writable against white cards.
-- **Slate Muted** (#5A7A91): Secondary copy, meta lines, inactive tab labels, and placeholder icons. Body text targets WCAG AA on white/canvas.
+- **Slate Muted** (#3F5A6E): Secondary copy, meta lines, inactive tab labels, and placeholder icons. Body text targets WCAG AA on white/canvas.
 - **Harbor Line** (#D9E2EC): The 1px structural border for cards, inputs, nav top-rule, and dividers.
 - **Soft Line** (#E3ECF2): Recessed dividers and skeleton-adjacent thumbnail grounds.
 - **HUD Border** (#CBE7E1): Teal-tinted edge for accepted/highlighted cards, distance pills, and avatar rings.

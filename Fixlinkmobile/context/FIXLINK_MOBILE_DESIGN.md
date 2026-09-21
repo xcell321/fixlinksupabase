@@ -46,7 +46,7 @@ This split keeps a single design language (same tokens, components, spacing) whi
 | `tealLight` | `#E6F6F3` | Active tab bg, selected chip, `detailCard` bg, `checkmark` row |
 | `canvas` | `#F5F8FA` | App ground across all screens (`screenContainer`) |
 | `white` | `#FFFFFF` | Card, modal, header `white` surfaces |
-| `muted` | `#5A7A91` | Secondary text, placeholder, inactive tab, `techMetaText` |
+| `muted` | `#3F5A6E` | Secondary text, placeholder, inactive tab, `techMetaText` |
 | `line` | `#D9E2EC` | Card border, `borderTopColor`, divider |
 | `lineSoft` | `#E3ECF2` | `rail` border |
 | `error` | `#E53935` | Error text, `errorCard` icon |

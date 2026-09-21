@@ -113,8 +113,11 @@ router.put('/:id/location', async (req, res) => {
   res.json({ latitude, longitude });
 });
 
-router.post('/:id/portfolio', portfolioUpload.array('photos', 6), async (req, res) => {
+router.post('/:id/portfolio', requireAuth, portfolioUpload.array('photos', 6), async (req, res) => {
   try {
+    if (String(req.authUser.uid) !== String(req.params.id)) {
+      return res.status(403).json({ error: 'You can only update your own portfolio.' });
+    }
     const { data: profile } = await supabase.from('users').select('portfolio, role').eq('id', req.params.id).maybeSingle();
     if (!profile || profile.role !== 'technician') {
       return res.status(404).json({ error: 'Technician profile not found' });
