@@ -5,6 +5,7 @@ import {
   Alert,
   Linking,
   Platform,
+  Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -334,80 +335,48 @@ export default function MapTrackerScreen({ currentUser, selectedJob: initialJob,
         />
       </View>
 
-      <View style={styles.detailsPanel}>
-        <View style={styles.metricsCard}>
-          <View style={styles.metric}>
-            <Ionicons name="car-outline" size={20} color={colors.teal} />
-            <Text style={styles.metricValue}>
-              {distanceKm != null ? `${distanceKm} km` : '--'}
-            </Text>
-            <Text style={styles.metricLabel}>Distance</Text>
+      <View style={styles.bottomPanel}>
+        <View style={styles.tripRow}>
+          <View style={styles.tripCell}>
+            <View style={styles.tripIconWrap}><Ionicons name="navigate-outline" size={14} color={colors.teal} /></View>
+            <Text style={styles.tripLabel}>DISTANCE</Text>
+            <Text style={styles.tripValue}>{distanceKm != null ? `${distanceKm} km` : '--'}</Text>
           </View>
-          <View style={styles.metricDivider} />
-          <View style={styles.metric}>
-            <Ionicons name="time-outline" size={20} color={colors.teal} />
-            <Text style={styles.metricValue}>
-              {travelMinutes != null ? `${travelMinutes} min` : (routeCoordinates.length ? 'In app' : '--')}
-            </Text>
-            <Text style={styles.metricLabel}>Est. Travel Time</Text>
+          <View style={styles.tripDivider} />
+          <View style={styles.tripCell}>
+            <View style={styles.tripIconWrap}><Ionicons name="time-outline" size={14} color={colors.teal} /></View>
+            <Text style={styles.tripLabel}>ETA</Text>
+            <Text style={styles.tripValue}>{travelMinutes != null ? `${travelMinutes} min` : (routeCoordinates.length ? 'In app' : '--')}</Text>
           </View>
-          <View style={styles.metricDivider} />
-          <View style={styles.metric}>
-            <Ionicons name="shield-checkmark-outline" size={21} color={colors.teal} />
-            <Text style={styles.metricValue}>
-              {isAccepted ? (technicianCoords?.latitude != null ? 'Active' : 'Locating…') : 'Locked'}
-            </Text>
-            <Text style={styles.metricLabel}>Live GPS</Text>
+          <View style={styles.tripDivider} />
+          <View style={styles.tripCell}>
+            <View style={[styles.tripIconWrap, isAccepted && technicianCoords?.latitude != null && styles.tripIconWrapActive]}><Ionicons name={isAccepted && technicianCoords?.latitude != null ? "locate-outline" : "radio-outline"} size={14} color={isAccepted && technicianCoords?.latitude != null ? colors.white : colors.muted} /></View>
+            <Text style={styles.tripLabel}>TRACKING</Text>
+            <Text style={[styles.tripValue, isAccepted && technicianCoords?.latitude != null && styles.tripValueActive]}>{isAccepted ? (technicianCoords?.latitude != null ? 'Active' : 'Locating…') : 'Locked'}</Text>
           </View>
         </View>
 
-        <View style={styles.customerCard}>
-          <View style={styles.customerIcon}>
-            <Ionicons name="person" size={21} color={colors.teal} />
-          </View>
-          <View style={styles.customerCopy}>
-            <Text style={styles.customerKicker}>SERVICE DESTINATION</Text>
-            <Text style={styles.customerName}>{customerCoords.name}</Text>
-            <Text style={styles.customerMeta} numberOfLines={1}>
-              {activeJob?.applianceType || 'Repair request'} •{' '}
-              {customerCoords.latitude != null ? customerCoords.address : 'Resolving location…'}
-            </Text>
+        <View style={styles.destinationRow}>
+          <View style={styles.personIconWrap}><Ionicons name="person-outline" size={18} color={colors.teal} /></View>
+          <View style={styles.destinationCopy}>
+            <Text style={styles.destinationKicker}>SERVICE DESTINATION</Text>
+            <Text style={styles.destinationName} numberOfLines={1}>{customerCoords.name}</Text>
+            <Text style={styles.destinationMeta} numberOfLines={1}>{activeJob?.applianceType || 'Repair request'} • {customerCoords.latitude != null ? customerCoords.address : 'Resolving location…'}</Text>
           </View>
         </View>
 
-        {/* Dynamic Action Buttons */}
-        <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={styles.googleMapsButton}
-            onPress={handleOpenGoogleMapsNavigation}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="navigate" size={18} color={colors.white} />
-            <Text style={styles.googleMapsText} numberOfLines={1}>Navigate in Google Maps GPS</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.inAppButton}
-            onPress={handleRefreshInAppRoute}
-            disabled={isRouting}
-            activeOpacity={0.85}
-          >
-            {isRouting ? (
-              <ActivityIndicator color={colors.teal} size="small" />
-            ) : (
-              <>
-                <Ionicons name="locate-outline" size={18} color={colors.teal} />
-                <Text style={styles.inAppText}>Center Map</Text>
-              </>
-            )}
-          </TouchableOpacity>
-
-          {onBack && (
-            <TouchableOpacity style={styles.backButton} onPress={onBack}>
-              <Text style={styles.backText}>Back to requests</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        <Pressable style={styles.primaryCta} onPress={handleOpenGoogleMapsNavigation} accessibilityRole="button">
+          <Text style={styles.primaryCtaText} numberOfLines={1}>Navigate in Google Maps GPS</Text>
+        </Pressable>
+        <Pressable style={styles.secondaryCta} onPress={handleRefreshInAppRoute} disabled={isRouting} accessibilityRole="button">
+          {isRouting ? <ActivityIndicator color={colors.teal} size="small" /> : <Text style={styles.secondaryCtaText}>Center Route</Text>}
+        </Pressable>
+        {onBack && (
+          <Pressable style={styles.quietCta} onPress={onBack} accessibilityRole="button">
+            <Ionicons name="arrow-back-outline" size={16} color={colors.muted} />
+            <Text style={styles.quietCtaText}>Back to Requests</Text>
+          </Pressable>
+        )}
       </View>
     </View>
   );
@@ -430,25 +399,30 @@ const styles = StyleSheet.create({
   jobChipTextActive: { color: colors.white },
   mapArea: { flex: 1, minHeight: 250, position: 'relative' },
   map: { flex: 1 },
-  detailsPanel: { backgroundColor: colors.white, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 16, borderTopLeftRadius: 26, borderTopRightRadius: 26, boxShadow: '0 -5px 16px rgba(16,42,67,0.12)', elevation: 8 },
-  metricsCard: { backgroundColor: '#F4F8FA', borderRadius: 16, minHeight: 84, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', marginBottom: 14 },
-  metric: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  metricDivider: { height: 40, width: 1, backgroundColor: colors.line },
-  metricValue: { color: colors.ink, fontSize: 15, fontFamily: fonts.bold, marginTop: 3 },
-  metricLabel: { color: colors.muted, fontSize: 11, marginTop: 2, textAlign: 'center', fontFamily: fonts.semiBold },
-  customerCard: { minHeight: 74, borderWidth: 1, borderColor: colors.line, borderRadius: 16, padding: 12, flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
-  customerIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#E6F6F3', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
-  customerCopy: { flex: 1 },
-  customerKicker: { color: colors.teal, fontSize: 11, letterSpacing: 1.1, fontFamily: fonts.bold, marginBottom: 2 },
-  customerName: { color: colors.ink, fontSize: 15, fontFamily: fonts.bold },
-  customerMeta: { color: colors.muted, fontSize: 11, marginTop: 2, fontFamily: fonts.regular },
-  actionButtons: { gap: 10 },
-  googleMapsButton: { width: '100%', height: 48, borderRadius: 14, backgroundColor: colors.ink, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
-  googleMapsText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
-  inAppButton: { width: '100%', height: 48, borderRadius: 14, borderWidth: 1.5, borderColor: colors.teal, backgroundColor: '#E6F6F3', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
-  inAppText: { color: colors.teal, fontSize: 13, fontFamily: fonts.bold },
-  backButton: { height: 44, borderRadius: 14, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  backText: { color: colors.teal, fontSize: 13, fontFamily: fonts.bold },
+  bottomPanel: { backgroundColor: colors.white, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16, borderTopLeftRadius: 20, borderTopRightRadius: 20, gap: 14, borderTopWidth: 1, borderTopColor: colors.lineSoft, boxShadow: '0 -4px 16px rgba(16,42,67,0.08)', elevation: 8 },
+  tripRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFB', borderRadius: 12, borderWidth: 1, borderColor: colors.lineSoft, paddingVertical: 10, paddingHorizontal: 8, gap: 0 },
+  tripCell: { flex: 1, alignItems: 'center', gap: 4 },
+  tripIconWrap: { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.lineSoft, alignItems: 'center', justifyContent: 'center' },
+  tripIconWrapActive: { backgroundColor: colors.teal, borderColor: colors.teal },
+  tripLabel: { color: colors.muted, fontSize: 10, fontFamily: fonts.bold, letterSpacing: 0.7, textTransform: 'uppercase' as const },
+  tripValue: { color: colors.ink, fontSize: 13, fontFamily: fonts.bold, fontVariant: ['tabular-nums'] as const },
+  tripValueActive: { color: colors.teal },
+  tripDivider: { width: 1, height: 36, backgroundColor: colors.lineSoft },
+  trackingValueRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.muted, opacity: 0.6 },
+  liveDotActive: { backgroundColor: colors.teal, opacity: 1 },
+  destinationRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 14, borderWidth: 1, borderColor: colors.lineSoft, backgroundColor: colors.surfaceSunken },
+  personIconWrap: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.hudBorder, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  destinationCopy: { flex: 1, minWidth: 0 },
+  destinationKicker: { color: colors.teal, fontSize: 10, letterSpacing: 1.0, fontFamily: fonts.bold, marginBottom: 2, textTransform: 'uppercase' as const },
+  destinationName: { color: colors.ink, fontSize: 15, fontFamily: fonts.bold, lineHeight: 18 },
+  destinationMeta: { color: colors.muted, fontSize: 11, fontFamily: fonts.regular, lineHeight: 15, marginTop: 2 },
+  primaryCta: { height: 54, borderRadius: 13, backgroundColor: colors.teal, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 16, boxShadow: '0 4px 10px rgba(15,118,110,0.18)', elevation: 3 },
+  primaryCtaText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold, letterSpacing: 0.1 },
+  secondaryCta: { height: 46, borderRadius: 12, backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.teal, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 16 },
+  secondaryCtaText: { color: colors.teal, fontSize: 13, fontFamily: fonts.bold },
+  quietCta: { height: 44, borderRadius: 12, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 16 },
+  quietCtaText: { color: colors.muted, fontSize: 13, fontFamily: fonts.semiBold },
   // Empty State Styles
   emptyContainer: { flex: 1, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center', padding: 32 },
   emptyIconWrap: { width: 80, height: 80, borderRadius: 26, backgroundColor: '#E6F6F3', alignItems: 'center', justifyContent: 'center', marginBottom: 18 },

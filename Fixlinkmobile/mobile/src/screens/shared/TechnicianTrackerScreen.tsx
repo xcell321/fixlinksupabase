@@ -5,6 +5,7 @@ import {
   Alert,
   Linking,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -20,6 +21,7 @@ import {
 } from '../services/api';
 import { geocodeAddress, getDrivingRoute } from '../services/locationIq';
 import { colors, fonts } from '../../theme';
+import { getApplianceIcon } from '../../utils/applianceIcons';
 
 // The customer/destination pin comes ONLY from the selected job (or the
 // live-tracking customer field). It never falls back to the technician's own
@@ -61,7 +63,7 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
   const [activeJob, setActiveJob] = useState(initialJob);
   const [acceptedJobsList, setAcceptedJobsList] = useState([]);
   const [loadingActiveJob, setLoadingActiveJob] = useState(false);
-  const [jobsExpanded, setJobsExpanded] = useState(true);
+  const [jobsExpanded, setJobsExpanded] = useState(false);
 
   // Load the technician's active jobs so they can switch between customers.
   useEffect(() => {
@@ -345,19 +347,28 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
     setActiveJob(job);
     setCustomerCoords(deriveCustomerCoords(job));
     routeDrawnRef.current = false;
+    setJobsExpanded(false);
+  };
+
+  const formatSchedule = (job) => {
+    if (job?.scheduledDate) return job.scheduledDate;
+    if (job?.preferredDate && job?.preferredTime) return `${job.preferredDate} • ${job.preferredTime}`;
+    if (job?.preferredDate) return job.preferredDate;
+    if (job?.preferredTime) return job.preferredTime;
+    return job?.status || 'Scheduled';
   };
 
   if (!activeJob && !loadingActiveJob) {
     return (
       <View style={styles.emptyContainer}>
         <View style={styles.emptyIconWrap}>
-          <Ionicons name="map-outline" size={48} color={colors.teal} />
+          <Ionicons name="map-outline" size={42} color={colors.teal} />
         </View>
         <Text style={styles.emptyTitle}>No Active Job Selected</Text>
         <Text style={styles.emptySubtitle}>
           Select an accepted repair from your Jobs feed to start turn-by-turn navigation to the customer's home.
         </Text>
-        <TouchableOpacity style={styles.emptyButton} onPress={onNavigateToJobs || onBack}>
+        <TouchableOpacity style={styles.emptyButton} onPress={onNavigateToJobs || onBack} activeOpacity={0.88}>
           <Ionicons name="briefcase-outline" size={18} color={colors.white} />
           <Text style={styles.emptyButtonText}>Go to My Jobs</Text>
         </TouchableOpacity>
@@ -367,6 +378,7 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
 
   return (
     <View style={styles.container}>
+      {/* MAP HERO — largest visual area, hero treatment */}
       <View style={styles.mapArea}>
         <LocationIQMap
           key={activeJob?.id || 'tech-job'}
@@ -377,103 +389,187 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
           isAccepted={isAccepted}
           style={styles.map}
         />
-        {acceptedJobsList.length > 1 && (
-          <View style={styles.selectorBar}>
-            {jobsExpanded ? (
-              <>
-                <View style={styles.selectorHeader}>
-                  <Text style={styles.selectorKicker}>ACTIVE ({acceptedJobsList.length})</Text>
-                  <TouchableOpacity onPress={() => setJobsExpanded(false)} style={styles.collapseBtn}>
-                    <Ionicons name="chevron-down" size={16} color={colors.muted} />
-                  </TouchableOpacity>
+
+        {/* Unified map control family — white surface, subtle border/shadow, 44px min touch */}
+        {acceptedJobsList.length > 1 && !jobsExpanded && (
+          <View style={styles.mapControlsGroup} pointerEvents="box-none">
+            <TouchableOpacity
+              style={styles.activeJobsControl}
+              onPress={() => setJobsExpanded(true)}
+              activeOpacity={0.84}
+              accessibilityRole="button"
+              accessibilityLabel="Show active jobs"
+            >
+              <View style={styles.activeJobsControlLeft}>
+                <View style={styles.activeJobsIconWrap}>
+                  <Ionicons name="briefcase-outline" size={16} color={colors.teal} />
                 </View>
-                <View style={styles.chipRow}>
-                  {acceptedJobsList.map((job) => {
-                    const isSelected = activeJob?.id === job.id;
-                    return (
-                      <TouchableOpacity
-                        key={job.id}
-                        style={[styles.jobChip, isSelected && styles.jobChipActive]}
-                        onPress={() => handleSwitchJob(job)}
-                        activeOpacity={0.8}
-                      >
-                        <View style={[styles.jobChipDot, isSelected && styles.jobChipDotActive]} />
-                        <Text style={[styles.jobChipText, isSelected && styles.jobChipTextActive]} numberOfLines={1}>
-                          {job.applianceType} ({job.customerName?.split(' ')[0] || 'Cust'})
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
+                <Text style={styles.activeJobsLabel}>Active</Text>
+                <View style={[styles.activeJobsBadge, acceptedJobsList.length >= 6 && { backgroundColor: colors.danger, borderWidth: 1, borderColor: colors.danger }]}>
+                  <Text style={styles.activeJobsBadgeText}>{acceptedJobsList.length}</Text>
                 </View>
-              </>
-            ) : (
-              <TouchableOpacity style={styles.expandBtn} onPress={() => setJobsExpanded(true)} activeOpacity={0.8}>
-                <Ionicons name="chevron-up" size={16} color={colors.white} />
-                <Text style={styles.expandBtnText}>{acceptedJobsList.length}</Text>
-              </TouchableOpacity>
-            )}
+              </View>
+              <Ionicons name="chevron-down-outline" size={16} color={colors.muted} />
+            </TouchableOpacity>
           </View>
         )}
       </View>
 
-      <View style={styles.detailsPanel}>
-        <View style={styles.metricsCard}>
-          <View style={styles.metric}>
-            <Ionicons name="car-outline" size={20} color={colors.teal} />
-            <Text style={styles.metricValue}>{distanceKm != null ? `${distanceKm} km` : '--'}</Text>
-            <Text style={styles.metricLabel}>Distance</Text>
+      {/* BOTTOM NAVIGATION PANEL — single coherent dispatch workspace */}
+      <View style={styles.bottomPanel}>
+        {/* ACTIVE JOBS — expanded utility (when toggled) */}
+        {acceptedJobsList.length > 1 && jobsExpanded && (
+          <View style={styles.activeJobsExpanded}>
+            <TouchableOpacity
+              style={styles.activeJobsExpandedHeader}
+              onPress={() => setJobsExpanded(false)}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+            >
+              <View style={styles.activeJobsExpandedHeaderLeft}>
+                <Ionicons name="briefcase-outline" size={15} color={colors.teal} />
+                <Text style={styles.activeJobsExpandedTitle}>Active jobs</Text>
+                <View style={[styles.activeJobsBadge, acceptedJobsList.length >= 6 && { backgroundColor: colors.danger, borderWidth: 1, borderColor: colors.danger }]}>
+                  <Text style={styles.activeJobsBadgeText}>{acceptedJobsList.length}</Text>
+                </View>
+              </View>
+              <View style={styles.collapseBtn}>
+                <Ionicons name="chevron-up-outline" size={16} color={colors.muted} />
+              </View>
+            </TouchableOpacity>
+
+            <View style={styles.jobsList}>
+              {acceptedJobsList.map((job) => {
+                const isSelected = activeJob?.id === job.id;
+                const iconName = getApplianceIcon(job.applianceType) as any;
+                return (
+                  <TouchableOpacity
+                    key={job.id}
+                    style={[styles.jobRow, isSelected && styles.jobRowSelected]}
+                    onPress={() => handleSwitchJob(job)}
+                    activeOpacity={0.78}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isSelected }}
+                  >
+                    <View style={[styles.jobIconWrap, isSelected && styles.jobIconWrapSelected]}>
+                      <Ionicons
+                        name={iconName}
+                        size={16}
+                        color={isSelected ? colors.white : colors.teal}
+                      />
+                    </View>
+                    <View style={styles.jobCopy}>
+                      <Text
+                        style={[styles.jobName, isSelected && styles.jobNameSelected]}
+                        numberOfLines={1}
+                      >
+                        {job.applianceType || 'Repair request'}
+                      </Text>
+                      <Text
+                        style={[styles.jobCustomer, isSelected && styles.jobCustomerSelected]}
+                        numberOfLines={1}
+                      >
+                        {job.customerName || 'Customer'} • {formatSchedule(job)}
+                      </Text>
+                    </View>
+                    {isSelected ? (
+                      <View style={styles.selectedCheck}>
+                        <Ionicons name="checkmark" size={14} color={colors.teal} />
+                      </View>
+                    ) : (
+                      <Ionicons name="chevron-forward-outline" size={14} color={colors.muted} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
-          <View style={styles.metricDivider} />
-          <View style={styles.metric}>
-            <Ionicons name="time-outline" size={20} color={colors.teal} />
-            <Text style={styles.metricValue}>
-              {travelMinutes != null ? `${travelMinutes} min` : (routeCoordinates.length ? 'In app' : '--')}
+        )}
+
+        {/* When collapsed but has jobs, show inline compact bar at top of panel alternative position — only if not overlaying map? We keep map overlay for collapsed to save panel space. */}
+
+        {/* TRIP SUMMARY — single coherent navigation summary — white circular icons like customer */}
+        <View style={styles.tripSummary}>
+          <View style={styles.tripCell}>
+            <View style={styles.tripIconWrap}><Ionicons name="navigate-outline" size={14} color={colors.teal} /></View>
+            <Text style={styles.tripLabel}>DISTANCE</Text>
+            <Text style={styles.tripValue} numberOfLines={1}>
+              {distanceKm != null ? `${distanceKm} km` : '--'}
             </Text>
-            <Text style={styles.metricLabel}>Est. Travel Time</Text>
           </View>
-          <View style={styles.metricDivider} />
-          <View style={styles.metric}>
-            <Ionicons name="shield-checkmark-outline" size={21} color={colors.teal} />
-            <Text style={[styles.metricValue, arrived && { color: colors.teal }]}>
-              {isAccepted ? (arrived ? 'Arrived' : ownCoords?.latitude != null ? 'Active' : 'Locating…') : 'Locked'}
+
+          <View style={styles.tripDivider} />
+
+          <View style={styles.tripCell}>
+            <View style={styles.tripIconWrap}><Ionicons name="time-outline" size={14} color={colors.teal} /></View>
+            <Text style={styles.tripLabel}>ETA</Text>
+            <Text style={styles.tripValue} numberOfLines={1}>
+              {travelMinutes != null ? `${travelMinutes} min` : routeCoordinates.length ? 'Live' : '--'}
             </Text>
-            <Text style={styles.metricLabel}>Live GPS</Text>
+          </View>
+
+          <View style={styles.tripDivider} />
+
+          <View style={styles.tripCell}>
+            <View style={[styles.tripIconWrap, isAccepted && ownCoords?.latitude != null && !arrived && styles.tripIconWrapActive]}><Ionicons name={isAccepted && ownCoords?.latitude != null && !arrived ? "locate-outline" : "radio-outline"} size={14} color={isAccepted && ownCoords?.latitude != null && !arrived ? colors.white : colors.muted} /></View>
+            <Text style={styles.tripLabel}>TRACKING</Text>
+            <Text style={[styles.tripValue, isAccepted && ownCoords?.latitude != null && !arrived && styles.tripValueActive]} numberOfLines={1}>{isAccepted ? (arrived ? 'Arrived' : ownCoords?.latitude != null ? 'Active' : 'Locating…') : 'Locked'}</Text>
           </View>
         </View>
 
-        <View style={styles.customerCard}>
-          <View style={styles.customerIcon}>
-            <Ionicons name="person" size={21} color={colors.teal} />
+        <View style={styles.sectionDivider} />
+
+        {/* SERVICE DESTINATION — matches Customer Map alignment */}
+        <View style={styles.destinationRow}>
+          <View style={styles.personIconWrap}>
+            <Ionicons name="person-outline" size={18} color={colors.teal} />
           </View>
-          <View style={styles.customerCopy}>
-            <Text style={styles.customerKicker}>SERVICE DESTINATION</Text>
-            <Text style={styles.customerName}>{customerCoords.name}</Text>
-            <Text style={styles.customerMeta} numberOfLines={1}>
-              {activeJob?.applianceType || 'Repair request'} •{' '}
-              {customerCoords.latitude != null ? customerCoords.address : 'Resolving location…'}
-            </Text>
+          <View style={styles.destinationCopy}>
+            <Text style={styles.destinationKicker}>SERVICE DESTINATION</Text>
+            <Text style={styles.destinationName} numberOfLines={1}>{customerCoords.name}</Text>
+            <Text style={styles.destinationMeta} numberOfLines={1}>{activeJob?.applianceType || 'Repair request'} • {customerCoords.latitude != null ? customerCoords.address : 'Resolving location…'}</Text>
           </View>
         </View>
 
-        <View style={styles.actionButtons}>
-          <TouchableOpacity style={styles.googleMapsButton} onPress={handleOpenGoogleMapsNavigation} activeOpacity={0.85}>
-            <Ionicons name="navigate" size={18} color={colors.white} />
-            <Text style={styles.googleMapsText} numberOfLines={1}>Navigate in Google Maps GPS</Text>
-          </TouchableOpacity>
+        <View style={styles.sectionDivider} />
 
-          <TouchableOpacity style={styles.inAppButton} onPress={handleCenterRoute} disabled={isRouting} activeOpacity={0.85}>
+        {/* PRIMARY NAVIGATION — strongest action */}
+        <TouchableOpacity
+          style={styles.primaryCta}
+          onPress={handleOpenGoogleMapsNavigation}
+          activeOpacity={0.88}
+          accessibilityRole="button"
+          accessibilityLabel="Navigate in Google Maps"
+        >
+          <Text style={styles.primaryCtaText}>Navigate in Google Maps GPS</Text>
+        </TouchableOpacity>
+
+        {/* SECONDARY ACTIONS — subordinate to primary */}
+        <View style={styles.secondaryGroup}>
+          <TouchableOpacity
+            style={styles.secondaryBtn}
+            onPress={handleCenterRoute}
+            disabled={isRouting}
+            activeOpacity={0.84}
+            accessibilityRole="button"
+            accessibilityLabel="Center route"
+          >
             {isRouting ? (
               <ActivityIndicator color={colors.teal} size="small" />
             ) : (
-              <>
-                <Ionicons name="locate-outline" size={18} color={colors.teal} />
-                <Text style={styles.inAppText}>Center Route</Text>
-              </>
+              <Text style={styles.secondaryBtnText}>Center Route</Text>
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.backButton} onPress={onBack || onNavigateToJobs}>
-            <Text style={styles.backText}>Back to jobs</Text>
+          <TouchableOpacity
+            style={styles.quietBtn}
+            onPress={onBack || onNavigateToJobs}
+            activeOpacity={0.84}
+            accessibilityRole="button"
+            accessibilityLabel="Back to jobs"
+          >
+            <Ionicons name="arrow-back-outline" size={16} color={colors.muted} />
+            <Text style={styles.quietBtnText}>Back to jobs</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -483,44 +579,242 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.canvas },
-  selectorBar: { position: 'absolute', right: 12, top: 12, zIndex: 10, backgroundColor: 'rgba(255,255,255,0.92)', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 8, boxShadow: '0 3px 8px rgba(16,42,67,0.15)', elevation: 6 },
-  selectorHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
-  selectorKicker: { fontSize: 11, fontFamily: fonts.bold, color: colors.muted, letterSpacing: 0.6 },
-  collapseBtn: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#F0F4F8', alignItems: 'center', justifyContent: 'center' },
-  expandBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.teal, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 },
-  expandBtnText: { color: colors.white, fontSize: 11, fontFamily: fonts.bold },
-  chipRow: { flexDirection: 'column', gap: 5 },
-  jobChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 16, paddingHorizontal: 10, paddingVertical: 5 },
-  jobChipActive: { backgroundColor: colors.teal, borderColor: colors.teal },
-  jobChipDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.muted, marginRight: 6 },
-  jobChipDotActive: { backgroundColor: colors.white },
-  jobChipText: { fontSize: 12, fontFamily: fonts.semiBold, color: colors.ink },
-  jobChipTextActive: { color: colors.white },
-  mapArea: { flex: 1, minHeight: 250, position: 'relative' },
+
+  // Map hero — dominant
+  mapArea: { flex: 1, minHeight: 280, position: 'relative', backgroundColor: '#EEF2F5' },
   map: { flex: 1 },
-  detailsPanel: { backgroundColor: colors.white, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 16, borderTopLeftRadius: 26, borderTopRightRadius: 26, boxShadow: '0 -5px 16px rgba(16,42,67,0.12)', elevation: 8 },
-  metricsCard: { backgroundColor: '#F4F8FA', borderRadius: 16, minHeight: 84, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', marginBottom: 14 },
-  metric: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  metricDivider: { height: 40, width: 1, backgroundColor: colors.line },
-  metricValue: { color: colors.ink, fontSize: 15, fontFamily: fonts.bold, marginTop: 3 },
-  metricLabel: { color: colors.muted, fontSize: 11, marginTop: 2, textAlign: 'center', fontFamily: fonts.semiBold },
-  customerCard: { minHeight: 74, borderWidth: 1, borderColor: colors.line, borderRadius: 16, padding: 12, flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
-  customerIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#E6F6F3', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
-  customerCopy: { flex: 1 },
-  customerKicker: { color: colors.teal, fontSize: 11, letterSpacing: 1.1, fontFamily: fonts.bold, marginBottom: 2 },
-  customerName: { color: colors.ink, fontSize: 15, fontFamily: fonts.bold },
-  customerMeta: { color: colors.muted, fontSize: 11, marginTop: 2, fontFamily: fonts.regular },
-  actionButtons: { gap: 10 },
-  googleMapsButton: { width: '100%', height: 48, borderRadius: 14, backgroundColor: colors.ink, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
-  googleMapsText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
-  inAppButton: { width: '100%', height: 48, borderRadius: 14, borderWidth: 1.5, borderColor: colors.teal, backgroundColor: '#E6F6F3', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
-  inAppText: { color: colors.teal, fontSize: 13, fontFamily: fonts.bold },
-  backButton: { height: 44, borderRadius: 14, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  backText: { color: colors.teal, fontSize: 13, fontFamily: fonts.bold },
-  emptyContainer: { flex: 1, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center', padding: 32 },
-  emptyIconWrap: { width: 80, height: 80, borderRadius: 26, backgroundColor: '#E6F6F3', alignItems: 'center', justifyContent: 'center', marginBottom: 18 },
-  emptyTitle: { color: colors.ink, fontSize: 21, fontFamily: fonts.bold, marginBottom: 8 },
-  emptySubtitle: { color: colors.muted, fontSize: 13, textAlign: 'center', lineHeight: 19, marginBottom: 24, fontFamily: fonts.medium },
-  emptyButton: { height: 48, borderRadius: 14, backgroundColor: colors.teal, paddingHorizontal: 22, flexDirection: 'row', alignItems: 'center', gap: 8 },
+
+  // Map controls — native navigation family
+  mapControlsGroup: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    right: 12,
+    zIndex: 10,
+    alignItems: 'flex-start',
+  },
+  activeJobsControl: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    minHeight: 44,
+    minWidth: 168,
+    maxWidth: 240,
+    // subtle shadow, not excessive
+    boxShadow: '0 2px 8px rgba(16,42,67,0.08)',
+    elevation: 4,
+    gap: 12,
+  },
+  activeJobsControlLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
+  activeJobsIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: '#E6F6F3',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activeJobsLabel: { color: colors.ink, fontSize: 13, fontFamily: fonts.semiBold },
+  activeJobsBadge: {
+    backgroundColor: colors.ink,
+    borderRadius: 99,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    minWidth: 22,
+    alignItems: 'center',
+  },
+  activeJobsBadgeText: { color: colors.white, fontSize: 11, fontFamily: fonts.bold, textAlign: 'center' },
+
+  // Bottom panel — ONE coherent navigation workspace
+  bottomPanel: {
+    backgroundColor: colors.white,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 16,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    boxShadow: '0 -4px 16px rgba(16,42,67,0.08)',
+    elevation: 6,
+    gap: 14,
+  },
+
+  // Active jobs expanded inside panel
+  activeJobsExpanded: {
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  activeJobsExpandedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#F8FAFC',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.lineSoft,
+    minHeight: 44,
+  },
+  activeJobsExpandedHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  activeJobsExpandedTitle: { color: colors.ink, fontSize: 12, fontFamily: fonts.bold, letterSpacing: 0.3, textTransform: 'uppercase' },
+  collapseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.line,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  jobsList: { padding: 6, gap: 6 },
+  jobRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    minHeight: 56,
+    gap: 10,
+  },
+  jobRowSelected: {
+    backgroundColor: colors.teal,
+    borderColor: colors.teal,
+  },
+  jobIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#E6F6F3',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#CBE7E1',
+  },
+  jobIconWrapSelected: {
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderColor: 'rgba(255,255,255,0.28)',
+  },
+  jobCopy: { flex: 1, minWidth: 0 },
+  jobName: { color: colors.ink, fontSize: 13, fontFamily: fonts.bold, lineHeight: 16 },
+  jobNameSelected: { color: colors.white },
+  jobCustomer: { color: colors.muted, fontSize: 11, fontFamily: fonts.medium, marginTop: 2, lineHeight: 14 },
+  jobCustomerSelected: { color: 'rgba(255,255,255,0.9)' },
+  selectedCheck: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Trip summary — ONE compact surface — white circular icon backgrounds like customer
+  tripSummary: {
+    backgroundColor: '#F4F8FA',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.lineSoft,
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    minHeight: 72,
+  },
+  tripCell: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6, gap: 4 },
+  tripIconWrap: { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.lineSoft, alignItems: 'center', justifyContent: 'center' },
+  tripIconWrapActive: { backgroundColor: colors.teal, borderColor: colors.teal },
+  tripCellHeader: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  tripLabel: { color: colors.muted, fontSize: 10, fontFamily: fonts.bold, letterSpacing: 0.7, textTransform: 'uppercase' as const },
+  tripValue: { color: colors.ink, fontSize: 13, fontFamily: fonts.bold, fontVariant: ['tabular-nums'] as const, textAlign: 'center', marginTop: 2, lineHeight: 18 },
+  tripValueActive: { color: colors.teal },
+  trackingValueRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  liveDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: colors.muted, opacity: 0.6 },
+  liveDotActive: { backgroundColor: colors.teal, opacity: 1 },
+  tripDivider: { width: 1, backgroundColor: colors.line, alignSelf: 'stretch', marginVertical: 4, opacity: 0.9 },
+
+  sectionDivider: { height: 1, backgroundColor: colors.lineSoft, marginHorizontal: 2 },
+
+  // Service destination — hierarchy without card
+  destinationSection: { gap: 8, paddingVertical: 2 },
+  destinationKicker: { color: colors.teal, fontSize: 10, letterSpacing: 1.0, fontFamily: fonts.bold, marginBottom: 2, textTransform: 'uppercase' as const },
+  destinationRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 14, borderWidth: 1, borderColor: colors.lineSoft, backgroundColor: colors.surfaceSunken },
+  personIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: colors.tealLight,
+    borderWidth: 1,
+    borderColor: colors.hudBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  destinationCopy: { flex: 1, minWidth: 0 },
+  destinationName: { color: colors.ink, fontSize: 15, fontFamily: fonts.bold, lineHeight: 18 },
+  destinationMeta: { color: colors.muted, fontSize: 11, fontFamily: fonts.regular, lineHeight: 15, marginTop: 2 },
+
+  // Primary CTA — strongest
+  primaryCta: {
+    width: '100%',
+    height: 54,
+    borderRadius: 14,
+    backgroundColor: colors.teal,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+  },
+  primaryCtaText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold, letterSpacing: 0.1 },
+
+  // Secondary group — subordinate
+  secondaryGroup: { flexDirection: 'column', gap: 8 },
+  secondaryBtn: {
+    width: '100%',
+    height: 46,
+    borderRadius: 12,
+    backgroundColor: colors.white,
+    borderWidth: 1.5,
+    borderColor: colors.teal,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+  },
+  secondaryBtnText: { color: colors.teal, fontSize: 13, fontFamily: fonts.bold },
+  quietBtn: {
+    width: '100%',
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: colors.canvas,
+    borderWidth: 1,
+    borderColor: colors.line,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+  },
+  quietBtnText: { color: colors.muted, fontSize: 13, fontFamily: fonts.semiBold },
+
+  // Empty state
+  emptyContainer: { flex: 1, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  emptyIconWrap: { width: 72, height: 72, borderRadius: 18, backgroundColor: '#E6F6F3', borderWidth: 1, borderColor: '#CBE7E1', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  emptyTitle: { color: colors.ink, fontSize: 18, fontFamily: fonts.bold, marginBottom: 8, textAlign: 'center' },
+  emptySubtitle: { color: colors.muted, fontSize: 13, textAlign: 'center', lineHeight: 19, marginBottom: 20, fontFamily: fonts.regular, paddingHorizontal: 12 },
+  emptyButton: { height: 48, borderRadius: 12, backgroundColor: colors.teal, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 160, justifyContent: 'center' },
   emptyButtonText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
 });

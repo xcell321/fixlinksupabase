@@ -67,6 +67,10 @@ export const spacing = {
 } as const;
 
 export const shadows = {
+  subtle: {
+    boxShadow: '0 2px 8px rgba(16,42,67,0.06)',
+    elevation: 2,
+  },
   card: {
     boxShadow: '0 6px 14px rgba(16,42,67,0.06)',
     elevation: 3,

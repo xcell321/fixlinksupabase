@@ -118,9 +118,13 @@ export default function LocationIQMap({
           html, body, #map { width: 100%; height: 100%; overflow: hidden; background: #eef2f5; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
           .pulse-wrapper { position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
           .pulse-ring { position: absolute; width: 44px; height: 44px; border-radius: 50%; background: rgba(15, 118, 110, 0.35); animation: pulse-animation 1.8s infinite ease-out; }
-          .pulse-dot { position: relative; z-index: 2; width: 32px; height: 32px; border-radius: 50%; background: #0F766E; border: 3px solid #ffffff; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: #ffffff; font-size: 14px; font-weight: bold; }
+          .pulse-dot { position: relative; z-index: 2; width: 32px; height: 32px; border-radius: 50%; background: #0F766E; border: 3px solid #ffffff; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; }
+          .pulse-dot svg { width: 16px; height: 16px; display: block; }
+          .pulse-inner { width: 10px; height: 10px; border-radius: 50%; background: #ffffff; opacity: 0.95; }
           .customer-pin-wrapper { position: relative; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; }
-          .customer-pin { width: 34px; height: 34px; border-radius: 50%; background: #D97706; border: 3px solid #ffffff; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: #ffffff; font-size: 15px; }
+          .customer-pin { width: 34px; height: 34px; border-radius: 50%; background: #D97706; border: 3px solid #ffffff; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; }
+          .customer-pin svg { width: 16px; height: 16px; display: block; }
+          .customer-pin-dot { width: 10px; height: 10px; border-radius: 50%; background: #ffffff; opacity: 0.98; }
           @keyframes pulse-animation { 0% { transform: scale(0.6); opacity: 0.9; } 100% { transform: scale(1.6); opacity: 0; } }
           .leaflet-popup-content-wrapper { border-radius: 12px; padding: 4px; box-shadow: 0 6px 16px rgba(0,0,0,0.18); }
           .custom-popup { font-size: 13px; color: #102A43; line-height: 1.4; }
@@ -139,8 +143,8 @@ export default function LocationIQMap({
           L.tileLayer('${tileUrl}', { maxZoom: 19, subdomains: 'abc' }).addTo(map);
           L.control.zoom({ position: 'bottomleft' }).addTo(map);
           let techMarker = null; let custMarker = null; let routePolyline = null;
-          const techIcon = L.divIcon({ className: 'custom-div-icon', html: '<div class="pulse-wrapper"><div class="pulse-ring"></div><div class="pulse-dot">🔧</div></div>', iconSize: [44, 44], iconAnchor: [22, 22] });
-          const custIcon = L.divIcon({ className: 'custom-div-icon', html: '<div class="customer-pin-wrapper"><div class="customer-pin">📍</div></div>', iconSize: [42, 42], iconAnchor: [21, 21] });
+          const techIcon = L.divIcon({ className: 'custom-div-icon', html: '<div class="pulse-wrapper"><div class="pulse-ring"></div><div class="pulse-dot"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/><path d="M5 21l1.5-4.5"/><path d="M9 14l1 1"/></svg></div></div>', iconSize: [44, 44], iconAnchor: [22, 22] });
+          const custIcon = L.divIcon({ className: 'custom-div-icon', html: '<div class="customer-pin-wrapper"><div class="customer-pin"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg></div></div>', iconSize: [42, 42], iconAnchor: [21, 21] });
           const isAccepted = ${canLocateOther ? 'true' : 'false'}; const isCurrentUserTech = ${isTech ? 'true' : 'false'};
           const techCoords = ${techLat && techLng ? `[${techLat}, ${techLng}]` : 'null'}; const custCoords = ${custLat && custLng ? `[${custLat}, ${custLng}]` : 'null'}; const rawRoute = ${routeJson};
           if (techCoords && (isCurrentUserTech || isAccepted)) { techMarker = L.marker(techCoords, { icon: techIcon }).addTo(map); const label = isCurrentUserTech ? "You (Technician)" : ("Technician: " + ${techName}); techMarker.bindPopup('<div class="custom-popup"><strong>' + label + '</strong><span class="subtext">Live Location</span></div>'); }
