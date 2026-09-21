@@ -58,7 +58,7 @@ export default function ForgotPasswordScreen({ switchToLogin }) {
         <TextInput 
           style={styles.input} 
           placeholder="name@example.com" 
-          placeholderTextColor="#5A7A91" 
+          placeholderTextColor={colors.muted} 
           value={email} 
           onChangeText={setEmail} 
           keyboardType="email-address"
@@ -83,12 +83,12 @@ const styles = StyleSheet.create({
   brandAccent: { color: colors.teal, fontFamily: fonts.extraBold },
   card: { backgroundColor: '#fff', padding: 24, borderRadius: 20, boxShadow: '0 2px 10px rgba(0,0,0,0.1)', elevation: 5, alignItems: 'center' },
   title: { fontSize: 22, fontFamily: fonts.bold, color: '#102A43', marginBottom: 8, textAlign: 'center' },
-  subTitle: { fontSize: 14, color: '#5A7A91', textAlign: 'center', marginBottom: 20, fontFamily: fonts.regular },
+  subTitle: { fontSize: 14, color: colors.muted, textAlign: 'center', marginBottom: 20, fontFamily: fonts.regular },
   label: { alignSelf: 'flex-start', fontSize: 14, fontFamily: fonts.medium, color: '#102A43', marginBottom: 8 },
   input: { width: '100%', backgroundColor: '#fff', padding: 15, marginBottom: 15, borderRadius: 12, borderWidth: 1, borderColor: '#D9E2EC', color: '#102A43', fontFamily: fonts.medium },
   btn: { width: '100%', marginTop: 10 },
   backLink: { marginTop: 20, alignItems: 'center' },
-  backLinkTxt: { fontSize: 14, color: '#5A7A91', fontFamily: fonts.medium },
+  backLinkTxt: { fontSize: 14, color: colors.muted, fontFamily: fonts.medium },
   linkAccent: { color: '#0F766E', fontFamily: fonts.bold }
 });
 

@@ -51,6 +51,7 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.teal} />} showsVerticalScrollIndicator={false}>
+      <View style={styles.centerWrap}>
       <View style={styles.topBar}>
         <View>
           <Text style={styles.brand}>FIX<Text style={styles.brandAccent}>LINK</Text></Text>
@@ -158,39 +159,41 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
           </TouchableOpacity>
         </View>
       )}
+      </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.canvas },
-  content: { padding: 20, paddingBottom: 32 },
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 22 },
+  content: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 32, alignItems: 'center' },
+  centerWrap: { width: '100%', maxWidth: 480, alignSelf: 'center' },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
   brand: { color: colors.ink, fontSize: 18, fontFamily: fonts.extraBold, letterSpacing: -0.3 },
   brandAccent: { color: colors.teal, fontFamily: fonts.extraBold },
-  role: { color: colors.muted, fontSize: 9, letterSpacing: 1.5, fontFamily: fonts.bold, marginTop: 3 },
+  role: { color: colors.muted, fontSize: 11, letterSpacing: 1.3, fontFamily: fonts.bold, marginTop: 3 },
   notification: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, boxShadow: '0 4px 10px rgba(16,42,67,0.06)', elevation: 2 },
   dot: { position: 'absolute', top: 4, right: 4, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: colors.error, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, borderWidth: 2, borderColor: colors.white },
-  dotText: { color: colors.white, fontSize: 9, fontFamily: fonts.extraBold },
+  dotText: { color: colors.white, fontSize: 11, fontFamily: fonts.extraBold },
 
-  heroRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
-  heroCopyWrap: { flex: 1, paddingRight: 8 },
-  eyebrow: { color: colors.teal, fontSize: 10, letterSpacing: 1.4, fontFamily: fonts.extraBold, marginBottom: 6, textTransform: 'uppercase' },
+  heroRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, gap: 12 },
+  heroCopyWrap: { flex: 1, paddingRight: 8, gap: 2 },
+  eyebrow: { color: colors.teal, fontSize: 10, letterSpacing: 1.4, fontFamily: fonts.extraBold, marginBottom: 4, textTransform: 'uppercase' },
   greeting: { color: colors.ink, fontSize: 26, fontFamily: fonts.extraBold, letterSpacing: -0.7, lineHeight: 30 },
-  heroCopy: { color: colors.muted, fontSize: 13.5, marginTop: 4, fontFamily: fonts.regular, lineHeight: 19 },
+  heroCopy: { color: colors.muted, fontSize: 13, marginTop: 2, fontFamily: fonts.regular, lineHeight: 18 },
   avatar: { width: 48, height: 48, borderRadius: 16, backgroundColor: colors.tealLight, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#CBE7E1' },
   avatarText: { color: colors.tealDark, fontSize: 18, fontFamily: fonts.bold },
 
   statsRow: { flexDirection: 'row', gap: 10, marginBottom: 28 },
-  statCard: { flex: 1, backgroundColor: colors.white, borderRadius: 20, borderWidth: 1, borderColor: colors.line, padding: 14, alignItems: 'center', boxShadow: '0 6px 12px rgba(16,42,67,0.06)', elevation: 2 },
-  statIcon: { width: 32, height: 32, borderRadius: 11, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
-  statValue: { color: colors.ink, fontSize: 22, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] as const },
-  statLabel: { color: colors.muted, fontSize: 10, fontFamily: fonts.semiBold, marginTop: 2, letterSpacing: 0.2 },
+  statCard: { flex: 1, backgroundColor: colors.white, borderRadius: 20, borderWidth: 1, borderColor: colors.line, paddingVertical: 14, paddingHorizontal: 10, alignItems: 'center', boxShadow: '0 6px 12px rgba(16,42,67,0.06)', elevation: 2, gap: 2 },
+  statIcon: { width: 32, height: 32, borderRadius: 11, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
+  statValue: { color: colors.ink, fontSize: 22, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] as const, lineHeight: 24 },
+  statLabel: { color: colors.muted, fontSize: 10, fontFamily: fonts.semiBold, marginTop: 1, letterSpacing: 0.4, textTransform: 'uppercase' as const },
 
-  sectionTitle: { color: colors.ink, fontSize: 18, fontFamily: fonts.bold, letterSpacing: -0.3, marginBottom: 12 },
-  actionsRow: { flexDirection: 'row', gap: 12, marginBottom: 28 },
-  primaryAction: { flex: 1, minHeight: 172, backgroundColor: colors.teal, borderRadius: 22, padding: 16, overflow: 'hidden', boxShadow: '0 8px 16px rgba(15,118,110,0.22)', elevation: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
-  secondaryAction: { flex: 1, minHeight: 172, backgroundColor: colors.white, borderRadius: 22, padding: 16, borderWidth: 1, borderColor: colors.line, overflow: 'hidden', boxShadow: '0 6px 12px rgba(16,42,67,0.06)', elevation: 2 },
+  sectionTitle: { color: colors.ink, fontSize: 18, fontFamily: fonts.bold, letterSpacing: -0.3, marginBottom: 10 },
+  actionsRow: { flexDirection: 'row', gap: 12, marginBottom: 28, flexWrap: 'wrap' as const },
+  primaryAction: { flex: 1, minWidth: 148, minHeight: 168, backgroundColor: colors.teal, borderRadius: 22, padding: 16, overflow: 'hidden', boxShadow: '0 8px 16px rgba(15,118,110,0.22)', elevation: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
+  secondaryAction: { flex: 1, minWidth: 148, minHeight: 168, backgroundColor: colors.white, borderRadius: 22, padding: 16, borderWidth: 1, borderColor: colors.line, overflow: 'hidden', boxShadow: '0 6px 12px rgba(16,42,67,0.06)', elevation: 2 },
   actionIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center', marginBottom: 22, borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
   secondaryIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: colors.tealLight, alignItems: 'center', justifyContent: 'center', marginBottom: 22, borderWidth: 1, borderColor: '#CBE7E1' },
   primaryActionTitle: { color: colors.white, fontSize: 16, fontFamily: fonts.bold, marginBottom: 4, letterSpacing: -0.2 },
@@ -199,25 +202,25 @@ const styles = StyleSheet.create({
   secondaryActionCopy: { color: colors.muted, fontSize: 12, lineHeight: 17, fontFamily: fonts.regular },
   actionArrow: { position: 'absolute', right: 16, bottom: 16 },
 
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  viewAll: { color: colors.teal, fontFamily: fonts.bold, fontSize: 13, marginBottom: 12 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4, gap: 12 },
+  viewAll: { color: colors.teal, fontFamily: fonts.bold, fontSize: 13, marginBottom: 10, minHeight: 28, textAlignVertical: 'center' as const, paddingVertical: 6 },
   loadingBox: { backgroundColor: colors.white, borderRadius: 20, borderWidth: 1, borderColor: colors.line, paddingVertical: 34, alignItems: 'center', marginBottom: 14 },
-  reqCard: { backgroundColor: colors.white, borderRadius: 20, borderWidth: 1, borderColor: colors.line, padding: 15, flexDirection: 'row', alignItems: 'center', marginBottom: 10, boxShadow: '0 4px 10px rgba(16,42,67,0.05)', elevation: 1 },
-  reqIcon: { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginRight: 13 },
-  reqCopy: { flex: 1 },
-  reqTitle: { color: colors.ink, fontSize: 15, fontFamily: fonts.bold, marginBottom: 6, letterSpacing: -0.15 },
-  reqMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  pill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 9, borderWidth: 1 },
-  pillText: { fontSize: 10, fontFamily: fonts.semiBold, letterSpacing: 0.2 },
-  reqDate: { color: colors.muted, fontSize: 11, fontFamily: fonts.medium, flexShrink: 1 },
-  emptyCard: { backgroundColor: colors.white, borderRadius: 20, borderWidth: 1, borderColor: colors.line, padding: 16, flexDirection: 'row', alignItems: 'center', marginBottom: 14, boxShadow: '0 4px 10px rgba(16,42,67,0.05)', elevation: 1 },
-  emptyIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: colors.tealLight, alignItems: 'center', justifyContent: 'center', marginRight: 12, borderWidth: 1, borderColor: '#CBE7E1' },
-  emptyText: { flex: 1 },
-  emptyTitle: { color: colors.ink, fontSize: 14, fontFamily: fonts.bold, marginBottom: 3 },
+  reqCard: { backgroundColor: colors.white, borderRadius: 20, borderWidth: 1, borderColor: colors.line, paddingVertical: 14, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', marginBottom: 10, boxShadow: '0 4px 10px rgba(16,42,67,0.05)', elevation: 1, gap: 12 },
+  reqIcon: { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  reqCopy: { flex: 1, gap: 6 },
+  reqTitle: { color: colors.ink, fontSize: 15, fontFamily: fonts.bold, letterSpacing: -0.15, lineHeight: 18 },
+  reqMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' as const },
+  pill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, borderWidth: 1, maxWidth: '65%' },
+  pillText: { fontSize: 10, fontFamily: fonts.bold, letterSpacing: 0.2, textTransform: 'capitalize' as const },
+  reqDate: { color: colors.muted, fontSize: 11, fontFamily: fonts.medium, flexShrink: 1, fontVariant: ['tabular-nums'] as const },
+  emptyCard: { backgroundColor: colors.white, borderRadius: 20, borderWidth: 1, borderColor: colors.line, padding: 16, flexDirection: 'row', alignItems: 'center', marginBottom: 14, boxShadow: '0 4px 10px rgba(16,42,67,0.05)', elevation: 1, gap: 12 },
+  emptyIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: colors.tealLight, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#CBE7E1' },
+  emptyText: { flex: 1, gap: 2 },
+  emptyTitle: { color: colors.ink, fontSize: 14, fontFamily: fonts.bold, marginBottom: 2, lineHeight: 18 },
   emptyCopy: { color: colors.muted, fontSize: 12, fontFamily: fonts.regular, lineHeight: 16 },
 
-  tipCard: { backgroundColor: '#FFF8E7', borderRadius: 18, padding: 14, flexDirection: 'row', gap: 12, alignItems: 'flex-start', borderWidth: 1, borderColor: '#FDE68A' },
-  tipTitle: { color: '#8A5B00', fontFamily: fonts.bold, fontSize: 13, marginBottom: 3 },
+  tipCard: { backgroundColor: '#FFF8E7', borderRadius: 18, padding: 14, flexDirection: 'row', gap: 12, alignItems: 'flex-start', borderWidth: 1, borderColor: '#FDE68A', marginTop: 6 },
+  tipTitle: { color: '#8A5B00', fontFamily: fonts.bold, fontSize: 13, marginBottom: 2, lineHeight: 16 },
   tipCopy: { color: '#9A711E', fontSize: 12, lineHeight: 17, fontFamily: fonts.regular },
-  tipDismiss: { width: 28, height: 28, borderRadius: 10, backgroundColor: colors.white, borderWidth: 1, borderColor: '#FDE68A', alignItems: 'center', justifyContent: 'center' },
+  tipDismiss: { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.white, borderWidth: 1, borderColor: '#FDE68A', alignItems: 'center', justifyContent: 'center', marginLeft: 2 },
 });

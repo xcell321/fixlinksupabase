@@ -13,7 +13,7 @@ export const colors = {
   tealLight: '#E6F6F3',
   canvas: '#F5F8FA',
   white: '#FFFFFF',
-  muted: '#5A7A91',
+  muted: '#3F5A6E',
   line: '#D9E2EC',
   lineSoft: '#E3ECF2',
   error: '#E53935',

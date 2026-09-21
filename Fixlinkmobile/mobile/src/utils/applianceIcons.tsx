@@ -33,7 +33,7 @@ export const getStatusColor = (status: unknown): string => {
     case 'cancelled':
       return '#E53935';
     default:
-      return '#5A7A91';
+      return '#3F5A6E';
   }
 };
 

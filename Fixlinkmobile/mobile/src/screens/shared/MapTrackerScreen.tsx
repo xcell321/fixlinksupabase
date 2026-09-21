@@ -18,19 +18,7 @@ import {
   updateCustomerLocation
 } from '../services/api';
 import { geocodeAddress, getDrivingRoute } from '../services/locationIq';
-import { fonts } from '../../theme';
-
-const colors = {
-  ink: '#102A43',
-  teal: '#0F766E',
-  tealDark: '#075E59',
-  canvas: '#F5F8FA',
-  white: '#FFFFFF',
-  muted: '#5A7A91',
-  line: '#D9E2EC',
-  navy: '#102A43',
-  gold: '#D97706',
-};
+import { colors, fonts } from '../../theme';
 
 // Derive the customer/destination marker strictly from the selected job.
 // Never fabricates coordinates: if the job has no real lat/lng yet, the pin is
@@ -429,7 +417,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.canvas },
   selectorBar: { position: 'absolute', right: 12, top: 12, zIndex: 10, backgroundColor: 'rgba(255,255,255,0.92)', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 8, boxShadow: '0 3px 8px rgba(16,42,67,0.15)', elevation: 6 },
   selectorHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
-  selectorKicker: { fontSize: 9, fontFamily: fonts.bold, color: colors.muted, letterSpacing: 0.6 },
+  selectorKicker: { fontSize: 11, fontFamily: fonts.bold, color: colors.muted, letterSpacing: 0.6 },
   collapseBtn: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#F0F4F8', alignItems: 'center', justifyContent: 'center' },
   expandBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.teal, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 },
   expandBtnText: { color: colors.white, fontSize: 11, fontFamily: fonts.bold },
@@ -447,15 +435,15 @@ const styles = StyleSheet.create({
   metric: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   metricDivider: { height: 40, width: 1, backgroundColor: colors.line },
   metricValue: { color: colors.ink, fontSize: 15, fontFamily: fonts.bold, marginTop: 3 },
-  metricLabel: { color: colors.muted, fontSize: 10, marginTop: 2, textAlign: 'center', fontFamily: fonts.semiBold },
+  metricLabel: { color: colors.muted, fontSize: 11, marginTop: 2, textAlign: 'center', fontFamily: fonts.semiBold },
   customerCard: { minHeight: 74, borderWidth: 1, borderColor: colors.line, borderRadius: 16, padding: 12, flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
   customerIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#E6F6F3', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
   customerCopy: { flex: 1 },
-  customerKicker: { color: colors.teal, fontSize: 9, letterSpacing: 1.2, fontFamily: fonts.bold, marginBottom: 2 },
+  customerKicker: { color: colors.teal, fontSize: 11, letterSpacing: 1.1, fontFamily: fonts.bold, marginBottom: 2 },
   customerName: { color: colors.ink, fontSize: 15, fontFamily: fonts.bold },
   customerMeta: { color: colors.muted, fontSize: 11, marginTop: 2, fontFamily: fonts.regular },
   actionButtons: { gap: 10 },
-  googleMapsButton: { width: '100%', height: 48, borderRadius: 14, backgroundColor: colors.navy, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  googleMapsButton: { width: '100%', height: 48, borderRadius: 14, backgroundColor: colors.ink, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
   googleMapsText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
   inAppButton: { width: '100%', height: 48, borderRadius: 14, borderWidth: 1.5, borderColor: colors.teal, backgroundColor: '#E6F6F3', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
   inAppText: { color: colors.teal, fontSize: 13, fontFamily: fonts.bold },

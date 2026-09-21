@@ -125,7 +125,7 @@ export default function LocationIQMap({
           .leaflet-popup-content-wrapper { border-radius: 12px; padding: 4px; box-shadow: 0 6px 16px rgba(0,0,0,0.18); }
           .custom-popup { font-size: 13px; color: #102A43; line-height: 1.4; }
           .custom-popup strong { display: block; font-size: 14px; margin-bottom: 3px; }
-          .custom-popup .subtext { color: #5A7A91; font-size: 11px; }
+          .custom-popup .subtext { color: #3F5A6E; font-size: 11px; }
           .map-watermark { position: absolute; bottom: 8px; right: 8px; background: rgba(255,255,255,0.85); padding: 3px 7px; border-radius: 6px; font-size: 10px; font-weight: 700; color: #486581; z-index: 1000; pointer-events: none; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
         </style>
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

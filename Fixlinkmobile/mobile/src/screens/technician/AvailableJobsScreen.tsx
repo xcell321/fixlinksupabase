@@ -85,6 +85,8 @@ const BOGO_LANDMARKS: Record<string, Coords> = {
   'la paz': { latitude: 11.0720, longitude: 124.0010 }
 };
 
+const NEARBY_QUEUE_RADIUS_KM = 10;
+
 const resolveJobCoords = (job: Job): Coords | null => {
   const lat = Number(job?.latitude);
   const lon = Number(job?.longitude);
@@ -184,6 +186,26 @@ export default function AvailableJobsScreen({ technician, onNavigateToMap, onNav
   const workloadActiveJobs = acceptedJobs.length;
   const workloadStatus = getWorkloadDisplayStatus(workloadActiveJobs);
 
+  // NEARBY QUEUE radius — uses existing distanceKm (Haversine already calculated).
+  // 10 km discovery filter: presentation layer only, active jobs unaffected,
+  // authoritative Accept still via backend 409. Highlighted job exempt so deep-link never breaks.
+  const nearbyJobs = jobs.filter((job) => {
+    if (highlightedJobId && String(job.id) === String(highlightedJobId)) return true;
+    if (job.distanceKm == null) return true;
+    return Number(job.distanceKm) <= NEARBY_QUEUE_RADIUS_KM;
+  });
+
+  // Ledger tabs — never both feeds on one scroll (Cowan 4). Presentation only.
+  const [feedTab, setFeedTab] = useState<'active' | 'queue'>('active');
+
+  useEffect(() => {
+    if (!highlightedJobId) return;
+    const hid = String(highlightedJobId);
+    if (acceptedJobs.some((j) => String(j.id) === hid)) setFeedTab('active');
+    else if (jobs.some((j) => String(j.id) === hid)) setFeedTab('queue');
+    else if (nearbyJobs.some((j) => String(j.id) === hid)) setFeedTab('queue');
+  }, [highlightedJobId, acceptedJobs, jobs, nearbyJobs]);
+
   const formatLastSyncTime = (date: Date): string => {
     try {
       return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
@@ -258,41 +280,49 @@ export default function AvailableJobsScreen({ technician, onNavigateToMap, onNav
     }
   };
 
-  const handleAcceptJob = async (job: Job): Promise<void> => {
+  const handleAcceptJob = (job: Job): void => {
     if (!technician?.uid || acceptingJobId) return;
-    // Ambient workload: the persistent strip already communicates Busy / At Capacity
-    // before the technician taps Accept. Do not block with an informational Alert here;
-    // the authoritative backend guard (409 TECHNICIAN_AT_CAPACITY) remains the
-    // single source of truth and is handled in the catch below.
-    setAcceptingJobId(job.id);
-    try {
-      const accepted = await acceptRepairRequest(job.id, technician.uid, technician.name || 'Technician') as { jobId: string };
-      setJobs((currentJobs) => currentJobs.filter((currentJob) => currentJob.id !== job.id));
-      setAcceptedJobs((currentJobs) => [
+    Alert.alert(
+      'Accept this job?',
+      `${job.applianceType || 'Repair request'}${job.location ? ` — ${job.location}` : ''}\n\nThe customer will be notified and the job will move to your active list.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
         {
-          ...job,
-          id: accepted.jobId,
-          status: 'Accepted',
-          technicianUid: technician.uid,
-          technicianName: technician.name
+          text: 'Accept',
+          onPress: async () => {
+            setAcceptingJobId(job.id);
+            try {
+              const accepted = await acceptRepairRequest(job.id, technician.uid, technician.name || 'Technician') as { jobId: string };
+              setJobs((currentJobs) => currentJobs.filter((currentJob) => currentJob.id !== job.id));
+              setAcceptedJobs((currentJobs) => [
+                {
+                  ...job,
+                  id: accepted.jobId,
+                  status: 'Accepted',
+                  technicianUid: technician.uid,
+                  technicianName: technician.name,
+                },
+                ...currentJobs,
+              ]);
+              Alert.alert('Job Accepted!', 'The customer details and live route are now available in your active jobs.');
+            } catch (error) {
+              const err = error as { code?: string; error?: string; message?: string; activeJobs?: number };
+              if (err?.code === 'TECHNICIAN_AT_CAPACITY' || String(err?.error || '').toLowerCase().includes('at capacity') || String(err?.message || '').toLowerCase().includes('at capacity')) {
+                Alert.alert(
+                  "You're At Capacity",
+                  err?.message || `You currently have ${err?.activeJobs ?? workloadActiveJobs} active repair requests and cannot accept another request. New jobs are paused while you're at capacity — complete an active job to accept new work.`,
+                  [{ text: 'OK' }],
+                );
+              } else {
+                Alert.alert('Unable to accept job', (error as { error?: string })?.error || 'This job may already have been accepted by another technician.');
+              }
+            } finally {
+              setAcceptingJobId(null);
+            }
+          },
         },
-        ...currentJobs
-      ]);
-      Alert.alert('Job Accepted!', 'The customer details and live route are now available in your active jobs.');
-    } catch (error) {
-      const err = error as { code?: string; error?: string; message?: string; activeJobs?: number };
-      if (err?.code === 'TECHNICIAN_AT_CAPACITY' || String(err?.error || '').toLowerCase().includes('at capacity') || String(err?.message || '').toLowerCase().includes('at capacity')) {
-        Alert.alert(
-          "You're At Capacity",
-          err?.message || `You currently have ${err?.activeJobs ?? workloadActiveJobs} active repair requests and cannot accept another request. New jobs are paused while you're at capacity — complete an active job to accept new work.`,
-          [{ text: 'OK' }]
-        );
-      } else {
-        Alert.alert('Unable to accept job', (error as { error?: string })?.error || 'This job may already have been accepted by another technician.');
-      }
-    } finally {
-      setAcceptingJobId(null);
-    }
+      ],
+    );
   };
 
   const handleDeclineJob = async (job: Job): Promise<void> => {
@@ -402,17 +432,11 @@ export default function AvailableJobsScreen({ technician, onNavigateToMap, onNav
   const renderScheduleMeta = (job: Job): React.JSX.Element => {
     const parts = scheduleParts(job);
     return (
-      <View style={styles.scheduleBlock}>
-        <View style={styles.metaItem}>
-          <Ionicons name="calendar-outline" size={16} color={colors.muted} accessible={false} />
-          <Text style={styles.metaText} numberOfLines={1}>{parts.date}</Text>
-        </View>
-        {parts.time ? (
-          <View style={styles.metaItem}>
-            <Ionicons name="time-outline" size={16} color={colors.muted} accessible={false} />
-            <Text style={styles.metaText} numberOfLines={1}>{parts.time}</Text>
-          </View>
-        ) : null}
+      <View style={styles.metaItem}>
+        <Ionicons name="calendar-outline" size={14} color={colors.muted} accessible={false} />
+        <Text style={styles.metaText} numberOfLines={1}>
+          {parts.date}{parts.time ? ` • ${parts.time}` : ''}
+        </Text>
       </View>
     );
   };
@@ -467,19 +491,19 @@ export default function AvailableJobsScreen({ technician, onNavigateToMap, onNav
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.teal} colors={[colors.teal]} />}
     >
+      <View style={styles.centerWrap}>
       <View style={styles.heroRow}>
         <View style={styles.heroCopy}>
           <Text style={styles.eyebrow}>TECHNICIAN HUB</Text>
           <Text style={styles.greeting}>Jobs for your skills</Text>
-          <Text style={styles.subtitle}>Review nearby repair work and choose your next dispatch.</Text>
         </View>
         <View style={styles.heroActions}>
           <View
             style={styles.jobCount}
             accessibilityRole="text"
-            accessibilityLabel={`${jobs.length} nearby jobs`}
+            accessibilityLabel={`${nearbyJobs.length} nearby jobs within ${NEARBY_QUEUE_RADIUS_KM} km`}
           >
-            <Text style={styles.jobCountValue}>{jobs.length}</Text>
+            <Text style={styles.jobCountValue}>{nearbyJobs.length}</Text>
             <Text style={styles.jobCountLabel}>nearby</Text>
           </View>
           <Pressable
@@ -498,41 +522,35 @@ export default function AvailableJobsScreen({ technician, onNavigateToMap, onNav
         </View>
       </View>
 
-      {/* Workload ambient strip — calm, persistent capacity communication.
-          Replaces the generic "Availability is ON" presentation. Manual availability
-          and workload capacity remain distinct: this strip reflects workload (derived
-          from existing acceptedJobs ACTIVE filter) not a manual toggle. */}
+      {/* Workload ambient strip — SECONDARY, never competing with the two feeds.
+          Compact inline strip (11–12px type, canvas ground). Derived from existing
+          acceptedJobs ACTIVE filter; thresholds mirror backend workload.js. */}
       {(() => {
         const workloadConfig = workloadStatus === 'at_capacity'
           ? {
               label: 'At Capacity' as const,
               icon: 'alert-circle-outline' as IconName,
               color: colors.danger,
-              bg: colors.danger + '15',
-              border: colors.danger + '30',
-              title: `At Capacity — ${workloadActiveJobs} active ${workloadActiveJobs === 1 ? 'job' : 'jobs'}`,
-              message: 'New jobs are paused. Complete an active job to accept new work.',
+              bg: colors.danger + '10',
+              border: colors.danger + '20',
+              message: 'New jobs paused — complete one to resume.',
             }
           : workloadStatus === 'busy'
             ? {
                 label: 'Busy' as const,
                 icon: 'time-outline' as IconName,
                 color: colors.gold,
-                bg: colors.gold + '15',
-                border: colors.gold + '30',
-                title: `Busy — ${workloadActiveJobs} active ${workloadActiveJobs === 1 ? 'job' : 'jobs'}`,
-                message: 'You have several active jobs. You can still accept new work.',
+                bg: colors.gold + '12',
+                border: colors.gold + '22',
+                message: 'Several active jobs — you can still accept.',
               }
             : {
                 label: 'Available' as const,
                 icon: 'checkmark-circle-outline' as IconName,
                 color: colors.green,
-                bg: colors.green + '15',
-                border: colors.green + '30',
-                title: `Available — ${workloadActiveJobs} active ${workloadActiveJobs === 1 ? 'job' : 'jobs'}`,
-                message: workloadActiveJobs === 0
-                  ? 'You’re ready for new requests.'
-                  : 'You’re ready for new requests.',
+                bg: colors.green + '10',
+                border: colors.green + '20',
+                message: 'Ready for new requests.',
               };
         return (
           <View
@@ -548,29 +566,59 @@ export default function AvailableJobsScreen({ technician, onNavigateToMap, onNav
             accessibilityLabel={`${workloadConfig.label} — ${workloadActiveJobs} active ${workloadActiveJobs === 1 ? 'job' : 'jobs'}. ${workloadConfig.message}`}
           >
             <View style={[styles.workloadIcon, { backgroundColor: workloadConfig.bg, borderColor: workloadConfig.border }]}>
-              <Ionicons name={workloadConfig.icon} size={20} color={workloadConfig.color} accessible={false} />
+              <Ionicons name={workloadConfig.icon} size={14} color={workloadConfig.color} accessible={false} />
             </View>
             <View style={styles.workloadCopy}>
               <Text style={styles.workloadKicker}>WORKLOAD</Text>
               <Text style={[styles.workloadTitle, { color: workloadConfig.color }]} numberOfLines={1}>
                 {workloadConfig.label}
-                <Text style={[styles.workloadTitle, { color: colors.muted, fontFamily: fonts.medium }]}> — </Text>
-                <Text style={[styles.workloadCount, { color: workloadConfig.color }]}>{workloadActiveJobs} active {workloadActiveJobs === 1 ? 'job' : 'jobs'}</Text>
+                <Text style={[styles.workloadCount, { color: colors.muted, fontFamily: fonts.medium }]}> · {workloadActiveJobs} active</Text>
               </Text>
-              <Text style={styles.workloadMessage}>{workloadConfig.message}</Text>
             </View>
             <View style={[styles.workloadStatusDot, { backgroundColor: workloadConfig.color }]} accessible={false} />
           </View>
         );
       })()}
 
-      {/* ACCEPTED JOBS SECTION */}
-      <View style={styles.sectionHeader}>
+      {/* Ledger tabs — one feed at a time, calm Harbor segmented control */}
+      <View style={styles.feedTabs} accessibilityRole="tablist">
+        <Pressable
+          accessibilityRole="tab"
+          accessibilityState={{ selected: feedTab === 'active' }}
+          accessibilityLabel={`Active jobs, ${acceptedJobs.length} in progress`}
+          onPress={() => setFeedTab('active')}
+          style={({ pressed }) => [styles.feedTab, feedTab === 'active' && styles.feedTabActive, pressed && styles.pressedSoft]}
+        >
+          <Text style={[styles.feedTabText, feedTab === 'active' && styles.feedTabTextActive]}>ACTIVE</Text>
+          <View style={[styles.feedTabCount, feedTab === 'active' && styles.feedTabCountActive]}>
+            <Text style={[styles.feedTabCountText, feedTab === 'active' && styles.feedTabCountTextActive]}>{acceptedJobs.length}</Text>
+          </View>
+        </Pressable>
+        <Pressable
+          accessibilityRole="tab"
+          accessibilityState={{ selected: feedTab === 'queue' }}
+          accessibilityLabel={`Nearby queue, ${nearbyJobs.length} within ${NEARBY_QUEUE_RADIUS_KM} km`}
+          onPress={() => setFeedTab('queue')}
+          style={({ pressed }) => [styles.feedTab, feedTab === 'queue' && styles.feedTabActive, pressed && styles.pressedSoft]}
+        >
+          <Text style={[styles.feedTabText, feedTab === 'queue' && styles.feedTabTextActive]}>NEARBY QUEUE</Text>
+          <View style={[styles.feedTabCount, feedTab === 'queue' && styles.feedTabCountActive]}>
+            <Text style={[styles.feedTabCountText, feedTab === 'queue' && styles.feedTabCountTextActive]}>{nearbyJobs.length}</Text>
+          </View>
+        </Pressable>
+      </View>
+
+      {feedTab === 'active' && (
         <View>
-          <Text style={styles.kicker}>YOUR WORK</Text>
-          <Text style={styles.sectionTitle}>My active jobs</Text>
+          {/* ACCEPTED JOBS SECTION — PRIMARY FEED */}
+          <View style={styles.activeSectionHeader}>
+        <View>
+          <Text style={styles.activeKicker}>YOUR WORK</Text>
+          <Text style={styles.activeSectionTitle}>My active jobs</Text>
         </View>
-        <Text style={styles.acceptedCount}>{acceptedJobs.length}</Text>
+        <View style={styles.activeCountBadge}>
+          <Text style={styles.activeCountBadgeText}>{acceptedJobs.length}</Text>
+        </View>
       </View>
 
       {acceptedJobs.length === 0 ? (
@@ -712,21 +760,25 @@ export default function AvailableJobsScreen({ technician, onNavigateToMap, onNav
           );
         })
       )}
+        </View>
+      )}
 
-      {/* DISPATCH QUEUE */}
-      <View style={[styles.sectionHeader, { marginTop: 24 }]}>
+      {feedTab === 'queue' && (
         <View>
-          <Text style={styles.kicker}>DISPATCH QUEUE</Text>
-          <Text style={styles.sectionTitle}>Available repairs</Text>
+          {/* DISPATCH QUEUE — SECONDARY FEED */}
+          <View style={styles.queueSectionHeader}>
+        <View style={styles.queueHeaderCopy}>
+          <Text style={styles.queueKicker}>DISPATCH QUEUE</Text>
+          <Text style={styles.queueSectionTitle}>Available repairs</Text>
         </View>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Refresh available repairs"
           hitSlop={10}
           onPress={handleRefresh}
-          style={({ pressed }) => [styles.refreshButton, pressed && styles.pressedSoft]}
+          style={({ pressed }) => [styles.queueRefreshButton, pressed && styles.pressedSoft]}
         >
-          <Ionicons name="refresh-outline" size={21} color={colors.teal} accessible={false} />
+          <Ionicons name="refresh-outline" size={18} color={colors.muted} accessible={false} />
         </Pressable>
       </View>
 
@@ -775,18 +827,18 @@ export default function AvailableJobsScreen({ technician, onNavigateToMap, onNav
               </Pressable>
             </View>
           ) : null}
-          {jobs.length === 0 ? (
-            <View style={styles.emptyCard} accessibilityLabel="No matching jobs">
+          {nearbyJobs.length === 0 ? (
+            <View style={styles.emptyCard} accessibilityLabel="No matching jobs within 10 km">
               <View style={styles.emptyIcon}>
                 <Ionicons name="briefcase-outline" size={28} color={colors.teal} accessible={false} />
               </View>
-              <Text style={styles.emptyTitle}>No matching jobs nearby</Text>
+              <Text style={styles.emptyTitle}>No nearby jobs</Text>
               <Text style={styles.emptyText}>
-                Stay active. New repair requests matching your skills will appear here.
+                No requests within {NEARBY_QUEUE_RADIUS_KM} km — pull to refresh.
               </Text>
             </View>
           ) : (
-        jobs.map((job) => {
+        nearbyJobs.map((job) => {
           const jobCoords = resolveJobCoords(job);
           const calculatedDistance = job.distanceKm != null
             ? job.distanceKm
@@ -797,18 +849,17 @@ export default function AvailableJobsScreen({ technician, onNavigateToMap, onNav
           const isHighlighted = highlightedJobId && String(highlightedJobId) === String(job.id);
           return (
             <View key={job.id} style={[styles.jobCard, isHighlighted && styles.highlightedCard]}>
-              <View style={styles.jobTopRow}>
-                <View style={styles.categoryIcon}>
-                  <Ionicons name="construct-outline" size={21} color={colors.teal} accessible={false} />
+              <View style={styles.queueJobTopRow}>
+                <View style={styles.queueCategoryIcon}>
+                  <Ionicons name="construct-outline" size={18} color={colors.teal} accessible={false} />
                 </View>
                 <View style={styles.jobHeading}>
-                  <Text style={styles.kicker}>SERVICE REQUEST</Text>
-                  <Text style={styles.jobTitle}>{job.applianceType || 'Repair request'}</Text>
+                  <Text style={styles.queueJobTitle} numberOfLines={1}>{job.applianceType || 'Repair request'}</Text>
                 </View>
                 {calculatedDistance != null && (
-                  <View style={styles.distancePill}>
-                    <Ionicons name="navigate-outline" size={13} color={colors.tealDark} accessible={false} />
-                    <Text style={styles.distanceText}>{calculatedDistance} km</Text>
+                  <View style={styles.queueDistancePill}>
+                    <Ionicons name="navigate-outline" size={11} color={colors.tealDark} accessible={false} />
+                    <Text style={styles.queueDistanceText}>{calculatedDistance} km</Text>
                   </View>
                 )}
               </View>
@@ -861,8 +912,11 @@ export default function AvailableJobsScreen({ technician, onNavigateToMap, onNav
           )}
         </>
       )}
+        </View>
+      )}
 
       {/* OTP COMPLETION MODAL */}
+      </View>
       <Modal
         visible={otpModalVisible}
         transparent
@@ -886,10 +940,14 @@ export default function AvailableJobsScreen({ technician, onNavigateToMap, onNav
               keyboardType="number-pad"
               maxLength={4}
               value={otpCode}
-              onChangeText={setOtpCode}
+              onChangeText={(text) => setOtpCode(text.replace(/\D/g, '').slice(0, 4))}
               autoFocus
+              selectTextOnFocus
+              autoCorrect={false}
+              autoComplete="sms-otp"
+              textContentType="oneTimeCode"
               accessibilityLabel="4-digit completion code"
-              accessibilityHint="Enter the code provided by the customer"
+              accessibilityHint="Enter or paste the 4-digit code provided by the customer"
             />
 
             <View style={styles.modalButtonRow}>
@@ -928,7 +986,8 @@ export default function AvailableJobsScreen({ technician, onNavigateToMap, onNav
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.canvas },
-  content: { padding: 20, paddingBottom: 36 },
+  content: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 36, alignItems: 'center' },
+  centerWrap: { width: '100%', maxWidth: 480, alignSelf: 'center' },
 
   // Shared anti-slop press states: transform + opacity only (GPU path).
   pressed: { transform: [{ scale: 0.97 }], opacity: 0.96 },
@@ -943,11 +1002,11 @@ const styles = StyleSheet.create({
   skeletonJobCopy: { flex: 1 },
   skeletonJobActions: { gap: 6 },
 
-  heroRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
-  heroCopy: { flex: 1, paddingRight: 16 },
-  heroActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  eyebrow: { color: colors.teal, fontSize: 10, letterSpacing: 1.5, fontFamily: fonts.bold, marginBottom: 7 },
-  greeting: { color: colors.ink, fontSize: 27, fontFamily: fonts.bold },
+  heroRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 12 },
+  heroCopy: { flex: 1, paddingRight: 12 },
+  heroActions: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 },
+  eyebrow: { color: colors.teal, fontSize: 10, letterSpacing: 1.4, fontFamily: fonts.bold, marginBottom: 4, textTransform: 'uppercase' as const },
+  greeting: { color: colors.ink, fontSize: 26, fontFamily: fonts.extraBold, letterSpacing: -0.7, lineHeight: 32 },
   subtitle: { color: colors.muted, fontSize: 13, lineHeight: 18, marginTop: 6, fontFamily: fonts.regular },
   jobCount: { width: 46, height: 46, borderRadius: 15, backgroundColor: colors.tealLight, alignItems: 'center', justifyContent: 'center' },
   jobCountValue: { color: colors.tealDark, fontSize: 20, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
@@ -961,38 +1020,64 @@ const styles = StyleSheet.create({
   statusTitle: { color: colors.ink, fontSize: 14, fontFamily: fonts.bold, marginBottom: 3 },
   statusText: { color: colors.muted, fontSize: 12, lineHeight: 17, fontFamily: fonts.medium },
   liveDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.green },
-  // Workload ambient strip — Trusted Harbor calm accountability. Tonal layered
-  // surfaces, flat-by-default, functional colors only for status (green/gold/danger).
-  // Never color-alone: icon + text + count together; strong contrast on white.
+  // Workload ambient strip — SECONDARY, never competing with the two feeds.
+  // Distilled to a compact inline status bar (Trusted Harbor, flat-by-default).
+  // Small type, muted canvas ground, hairline border; workload never outranks jobs.
   workloadCard: {
-    backgroundColor: colors.white,
-    borderRadius: 18,
+    backgroundColor: colors.canvas,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.line,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
+    borderColor: colors.lineSoft,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 26,
-    gap: 12,
+    marginBottom: 16,
+    gap: 10,
   },
-  workloadCardAvailable: { borderColor: colors.line },
-  workloadCardBusy: { borderColor: '#FDE68A' },
-  workloadCardAtCapacity: { borderColor: '#FECACA' },
+  workloadCardAvailable: { borderColor: colors.lineSoft, backgroundColor: '#F5F8FA' },
+  workloadCardBusy: { borderColor: '#FDE68A', backgroundColor: '#FFFBEB' },
+  workloadCardAtCapacity: { borderColor: '#FECACA', backgroundColor: '#FEF2F2' },
   workloadIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
+    width: 30,
+    height: 30,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
   },
-  workloadCopy: { flex: 1, gap: 2 },
-  workloadKicker: { color: colors.teal, fontSize: 10, letterSpacing: 1.5, fontFamily: fonts.bold, lineHeight: 14 },
-  workloadTitle: { fontSize: 14, fontFamily: fonts.bold, lineHeight: 18 },
-  workloadCount: { fontSize: 14, fontFamily: fonts.bold, fontVariant: ['tabular-nums'] },
-  workloadMessage: { color: colors.muted, fontSize: 12, lineHeight: 16, fontFamily: fonts.medium },
-  workloadStatusDot: { width: 9, height: 9, borderRadius: 5, marginLeft: 4 },
+  workloadCopy: { flex: 1, gap: 1 },
+  workloadKicker: { color: colors.muted, fontSize: 11, letterSpacing: 1.1, fontFamily: fonts.bold, lineHeight: 13 },
+  workloadTitle: { fontSize: 12, fontFamily: fonts.bold, lineHeight: 15 },
+  workloadCount: { fontSize: 12, fontFamily: fonts.bold, fontVariant: ['tabular-nums'] },
+  workloadMessage: { color: colors.muted, fontSize: 11, lineHeight: 13, fontFamily: fonts.regular },
+  workloadStatusDot: { width: 7, height: 7, borderRadius: 4, marginLeft: 2, opacity: 0.9 },
+  // Ledger tabs — ACTIVE | NEARBY QUEUE — one feed at a time (Cowan 4) — generous separation from workload, tight within
+  feedTabs: { flexDirection: 'row', gap: 6, marginBottom: 16, backgroundColor: colors.white, borderRadius: 12, padding: 4, borderWidth: 1, borderColor: colors.line },
+  feedTab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 44, borderRadius: 10, paddingHorizontal: 8 },
+  feedTabActive: { backgroundColor: colors.teal },
+  feedTabText: { color: colors.muted, fontSize: 11, fontFamily: fonts.bold, letterSpacing: 0.8 },
+  feedTabTextActive: { color: colors.white },
+  feedTabCount: { minWidth: 20, height: 20, borderRadius: 10, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
+  feedTabCountActive: { backgroundColor: 'rgba(255,255,255,0.25)', borderColor: 'rgba(255,255,255,0.3)' },
+  feedTabCountText: { color: colors.muted, fontSize: 11, fontFamily: fonts.bold, fontVariant: ['tabular-nums'] },
+  feedTabCountTextActive: { color: colors.white },
+  // PRIMARY feed header — strong, confident, generous breathing room — more space above than below
+  activeSectionHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12, marginTop: 4, gap: 12 },
+  activeKicker: { color: colors.teal, fontSize: 10, letterSpacing: 1.4, fontFamily: fonts.bold, marginBottom: 2, textTransform: 'uppercase' as const },
+  activeSectionTitle: { color: colors.ink, fontSize: 20, fontFamily: fonts.bold, letterSpacing: -0.3, lineHeight: 24 },
+  activeSectionHint: { color: colors.muted, fontSize: 11, fontFamily: fonts.regular, marginTop: 2, lineHeight: 14 },
+  activeCountBadge: { minWidth: 30, height: 30, borderRadius: 15, backgroundColor: colors.teal, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
+  activeCountBadgeText: { color: colors.white, fontSize: 13, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
+  // Secondary feed header — smaller, muted, deliberately quieter
+  sectionDivider: { height: 1, backgroundColor: colors.lineSoft, marginVertical: 18, marginHorizontal: -4 },
+  queueSectionHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12, marginTop: 4, gap: 10 },
+  queueHeaderCopy: { flex: 1, gap: 2 },
+  queueKicker: { color: colors.muted, fontSize: 10, letterSpacing: 1.2, fontFamily: fonts.bold, marginBottom: 2, textTransform: 'uppercase' as const },
+  queueSectionTitle: { color: colors.ink, fontSize: 16, fontFamily: fonts.semiBold, letterSpacing: -0.2, lineHeight: 20 },
+  queueHint: { color: colors.muted, fontSize: 11, fontFamily: fonts.regular, marginTop: 2, lineHeight: 13 },
+  queueRefreshButton: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line },
+  // Keep legacy names for any remaining refs (no visual weight)
   sectionHeader: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 12 },
   kicker: { color: colors.teal, fontSize: 10, letterSpacing: 1.4, fontFamily: fonts.bold, marginBottom: 3 },
   sectionTitle: { color: colors.ink, fontSize: 20, fontFamily: fonts.bold },
@@ -1000,14 +1085,14 @@ const styles = StyleSheet.create({
   acceptedCount: { color: colors.teal, fontSize: 15, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'], marginBottom: 2 },
   acceptedEmpty: { backgroundColor: colors.tealLight, borderRadius: 14, padding: 13, flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 22 },
   acceptedEmptyText: { color: colors.tealDark, fontSize: 12, fontFamily: fonts.semiBold },
-  acceptedCard: { backgroundColor: colors.white, borderRadius: 20, borderWidth: 1, borderColor: colors.hudBorder, padding: 16, marginBottom: 14, ...shadows.card },
-  acceptedTopRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 },
-  acceptedIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: colors.tealLight, alignItems: 'center', justifyContent: 'center', marginRight: 11 },
-  acceptedCopy: { flex: 1 },
-  statusBadge: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, borderWidth: 1, marginBottom: 6 },
-  statusBadgeText: { fontSize: 10, fontFamily: fonts.bold },
-  acceptedTitle: { color: colors.ink, fontSize: 16, fontFamily: fonts.bold },
-  acceptedMeta: { color: colors.muted, fontSize: 12, marginTop: 3, fontFamily: fonts.regular },
+  acceptedCard: { backgroundColor: colors.white, borderRadius: 18, borderWidth: 1, borderColor: colors.hudBorder, padding: 16, marginBottom: 12, gap: 0, ...shadows.card },
+  acceptedTopRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12, gap: 11 },
+  acceptedIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: colors.tealLight, alignItems: 'center', justifyContent: 'center' },
+  acceptedCopy: { flex: 1, gap: 3 },
+  statusBadge: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, borderWidth: 1, marginBottom: 4 },
+  statusBadgeText: { fontSize: 10, fontFamily: fonts.bold, letterSpacing: 0.2 },
+  acceptedTitle: { color: colors.ink, fontSize: 16, fontFamily: fonts.bold, lineHeight: 20 },
+  acceptedMeta: { color: colors.muted, fontSize: 12, marginTop: 2, fontFamily: fonts.regular, lineHeight: 16 },
   acceptedSchedule: { marginTop: 4 },
   scheduleInline: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   acceptedScheduleText: { color: colors.tealDark, fontSize: 12, fontFamily: fonts.semiBold, flexShrink: 1 },
@@ -1023,16 +1108,24 @@ const styles = StyleSheet.create({
   startJobButtonText: { color: colors.white, fontSize: 13, fontFamily: fonts.bold },
   completeJobButton: { minHeight: 48, borderRadius: 14, backgroundColor: colors.green, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, ...shadows.card },
   completeJobButtonText: { color: colors.white, fontSize: 13, fontFamily: fonts.bold },
-  jobCard: { backgroundColor: colors.white, borderRadius: 20, borderWidth: 1, borderColor: colors.line, padding: 18, marginBottom: 14, ...shadows.card },
+  // QUEUE (secondary feed) — quieter, flatter, tighter. Most important scan: title + distance — gap hierarchy tight within
+  jobCard: { backgroundColor: colors.white, borderRadius: 16, borderWidth: 1, borderColor: colors.lineSoft, padding: 14, marginBottom: 10, gap: 0, ...shadows.card, boxShadow: '0 3px 8px rgba(16,42,67,0.04)', elevation: 1 },
   highlightedCard: { borderColor: colors.teal, borderWidth: 2, ...shadows.cardStrong },
+  queueJobTopRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 10 },
+  queueCategoryIcon: { width: 36, height: 36, borderRadius: 11, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.lineSoft },
+  queueJobTitle: { color: colors.ink, fontSize: 15, fontFamily: fonts.bold, letterSpacing: -0.2, lineHeight: 18 },
+  queueJobSub: { color: colors.muted, fontSize: 11, fontFamily: fonts.regular, marginTop: 1, lineHeight: 13 },
+  queueDistancePill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.hudBorder, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
+  queueDistanceText: { color: colors.tealDark, fontSize: 11, fontFamily: fonts.bold, fontVariant: ['tabular-nums'] },
+  // Legacy aliases (no longer used in queue cards)
   jobTopRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
   categoryIcon: { width: 44, height: 44, borderRadius: 16, backgroundColor: colors.tealLight, alignItems: 'center', justifyContent: 'center', marginRight: 11 },
   jobHeading: { flex: 1 },
   jobTitle: { color: colors.ink, fontSize: 18, fontFamily: fonts.bold },
   distancePill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.hudBorder, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
   distanceText: { color: colors.tealDark, fontSize: 12, fontFamily: fonts.bold, fontVariant: ['tabular-nums'] },
-  problem: { color: colors.muted, fontSize: 13, lineHeight: 19, marginBottom: 15, fontFamily: fonts.regular },
-  metaBlock: { borderTopWidth: 1, borderTopColor: colors.line, borderBottomWidth: 1, borderBottomColor: colors.line, paddingVertical: 11, gap: 9, marginBottom: 14 },
+  problem: { color: colors.muted, fontSize: 12.5, lineHeight: 18, marginBottom: 11, fontFamily: fonts.regular },
+  metaBlock: { borderTopWidth: 1, borderTopColor: colors.lineSoft, borderBottomWidth: 1, borderBottomColor: colors.lineSoft, paddingVertical: 9, gap: 7, marginBottom: 10 },
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   metaText: { flex: 1, color: colors.muted, fontSize: 12, fontFamily: fonts.medium },
   scheduleBlock: { gap: 9 },

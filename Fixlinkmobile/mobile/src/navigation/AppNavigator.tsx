@@ -246,33 +246,32 @@ export default function AppNavigator() {
     setTab('chat');
   };
 
-  const handleNotificationPress = async (notification) => {
+  const handleNotificationPress = (notification) => {
     const isFirstClick = !selectedNotification || String(selectedNotification.id) !== String(notification.id);
+    // Tap row → show details + mark read. Navigation is explicit via Open button.
     if (isFirstClick) {
-      // First click -> show details + mark read if unread (immediate badge update)
       setSelectedNotification(notification);
       setNotifDetailError(null);
       if (!notification.read) {
-        // optimistic UI: decrease badge immediately by 1, never negative
         setChatNotifications((prev) => prev.map((n) => String(n.id) === String(notification.id) ? { ...n, read: true, readAt: new Date().toISOString() } : n));
         void markNotificationRead(notification.id).catch((error) => {
           const status = error?.response?.status ?? error?.status;
           const isNotFound = status === 404 || String(error?.message || '').includes('404') || String(error?.error || '').toLowerCase().includes('not found');
-          if (isNotFound) {
-            // Row may have been cascade-deleted with its job (spec says keep notification available) or backend not yet deployed.
-            // Keep optimistic read state – do not revert, do not spam console, do not show error.
-            return;
-          }
+          if (isNotFound) return;
           console.warn('Unable to mark notification read:', error);
-          // revert on failure so badge stays synced; backend will still show unread on next poll
           setChatNotifications((prev) => prev.map((n) => String(n.id) === String(notification.id) ? { ...n, read: false, readAt: null } : n));
           setNotifDetailError('Could not mark as read. Please check your connection.');
         });
       }
       return;
     }
+    // Already selected — keep details visible; use Open button to navigate.
+    setSelectedNotification(notification);
+    setNotifDetailError(null);
+  };
 
-    // Second click on same notification -> navigate to exact destination
+  const handleOpenNotification = async (notification) => {
+    if (!notification) return;
     if (!notification.jobId) {
       setNotifDetailError('This notification has no related request to open.');
       return;
@@ -295,18 +294,11 @@ export default function AppNavigator() {
           setNotifDetailError('You no longer have permission to view this request.');
           return;
         }
-        // For network errors, still show generic but keep notification
-        if (msg) {
-          setNotifDetailError(msg);
-        } else {
-          setNotifDetailError('Unable to open the related request. Please try again.');
-        }
+        if (msg) setNotifDetailError(msg);
+        else setNotifDetailError('Unable to open the related request. Please try again.');
         return;
       }
-
-      // job fetched successfully; now role-aware navigation using actual job/request ID
       if (notification.type === 'chat') {
-        // New Message -> direct to Chat screen exact conversation/thread
         setSelectedChatTarget({
           id: notification.jobId,
           jobId: notification.jobId,
@@ -315,7 +307,6 @@ export default function AppNavigator() {
           applianceType: job?.applianceType || job?.appliance_type || 'Repair Job',
           status: job?.status || 'Active',
         });
-        // Ensure inbox sync: markJobMessagesRead already called via notification read, but ensure
         try { await markJobMessagesRead(notification.jobId, user.uid); } catch (_) {}
         setTab('chat');
         setNotificationsOpen(false);
@@ -323,13 +314,9 @@ export default function AppNavigator() {
         setNotifDetailError(null);
         return;
       }
-
-      // type === 'job' : covers Request Update / Request Accepted / Request Completed
-      // All use actual job/request ID; destination based on status and role via existing workflow
       if (isCustomer) {
         const statusKey = String(job.status || '').toLowerCase();
         if (statusKey === 'completed') {
-          // Customer Request Completed → exact completed job in Progress with review accessible
           setCustomerFocusedJobId(job.id);
           setTechnicianHighlightedJobId(null);
           setAcceptedOnlyProgress(false);
@@ -339,7 +326,6 @@ export default function AppNavigator() {
           setNotifDetailError(null);
           return;
         }
-        // Request Update / Request Accepted → exact request details
         setCustomerFocusedJobId(null);
         setSelectedRequest(job);
         setCustomerTab('details');
@@ -348,7 +334,6 @@ export default function AppNavigator() {
         setNotifDetailError(null);
         return;
       } else {
-        // Technician job notification → exact job highlighted in AvailableJobsScreen
         setTechnicianHighlightedJobId(job.id);
         setCustomerFocusedJobId(null);
         setTechnicianTab('jobs');
@@ -413,11 +398,11 @@ export default function AppNavigator() {
                   <TouchableOpacity onPress={() => { setSelectedNotification(null); setNotifDetailError(null); }} style={styles.detailClose}><Ionicons name="close" size={14} color={colors.muted} /></TouchableOpacity>
                 </View>
                 <Text style={styles.detailText}>{selectedNotification.text}</Text>
-                {selectedNotification.jobId ? <Text style={styles.detailMeta}>Tap again to open {selectedNotification.type === 'chat' ? 'conversation' : 'request'} #{String(selectedNotification.jobId).slice(0,6).toUpperCase()}</Text> : <Text style={styles.detailMeta}>No related request to open.</Text>}
+                {selectedNotification.jobId ? <Text style={styles.detailMeta}>Open to view {selectedNotification.type === 'chat' ? 'conversation' : 'request'} #{String(selectedNotification.jobId).slice(0,6).toUpperCase()}</Text> : <Text style={styles.detailMeta}>No related request to open.</Text>}
                 {notifNavLoading === selectedNotification.id ? <View style={styles.detailLoading}><ActivityIndicator size="small" color={colors.teal} /><Text style={styles.detailLoadingText}>Opening…</Text></View> : null}
                 {notifDetailError ? <View style={styles.detailError}><Ionicons name="alert-circle-outline" size={14} color="#B91C1C" /><Text style={styles.detailErrorText}>{notifDetailError}</Text></View> : null}
                 <View style={styles.detailActions}>
-                  <Pressable onPress={() => selectedNotification && handleNotificationPress(selectedNotification)} style={({ pressed }) => [styles.detailPrimary, pressed && { opacity: 0.85 }]}><Text style={styles.detailPrimaryText}>{selectedNotification.type === 'chat' ? 'Open conversation' : 'Open request'}</Text><Ionicons name="arrow-forward" size={14} color={colors.white} /></Pressable>
+                  <Pressable onPress={() => selectedNotification && handleOpenNotification(selectedNotification)} style={({ pressed }) => [styles.detailPrimary, pressed && { opacity: 0.85 }]}><Text style={styles.detailPrimaryText}>{selectedNotification.type === 'chat' ? 'Open conversation' : 'Open request'}</Text><Ionicons name="arrow-forward" size={14} color={colors.white} /></Pressable>
                   <Pressable onPress={() => { setSelectedNotification(null); setNotifDetailError(null); }} style={({ pressed }) => [styles.detailSecondary, pressed && { opacity: 0.85 }]}><Text style={styles.detailSecondaryText}>Close</Text></Pressable>
                 </View>
               </View>
@@ -444,7 +429,7 @@ export default function AppNavigator() {
                       <Text style={[styles.noticeText, isRead && styles.noticeTextRead]} numberOfLines={2}>{notification.text}</Text>
                       <View style={styles.noticeMetaRow}>
                         <Text style={[styles.noticeTime, isRead && styles.noticeTimeRead]}>{isRead ? 'Read' : 'Unread'} • {formatNotificationTime(notification.timestamp)}</Text>
-                        {isSelected ? <View style={styles.tapHint}><Text style={styles.tapHintText}>Tap again to open</Text></View> : null}
+                        {isSelected ? <View style={styles.tapHint}><Text style={styles.tapHintText}>Selected — tap Open above</Text></View> : null}
                       </View>
                     </View>
                     {!isRead ? <View style={styles.unreadDot} /> : null}
@@ -464,15 +449,15 @@ export default function AppNavigator() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.canvas }, authContainer: { flex: 1, backgroundColor: colors.canvas }, screenContainer: { flex: 1 },
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(16,42,67,0.26)', alignItems: 'flex-end', paddingTop: 86, paddingHorizontal: 16 }, notificationPanel: { width: '100%', maxWidth: 390, maxHeight: 560, backgroundColor: colors.white, borderRadius: 22, padding: 20, boxShadow: '0 12px 24px rgba(16,42,67,0.2)', elevation: 12 }, panelHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }, panelKicker: { color: colors.teal, fontSize: 10, letterSpacing: 1.5, fontFamily: fonts.bold, marginBottom: 5 }, panelTitle: { color: colors.ink, fontSize: 23, fontFamily: fonts.bold }, closeButton: { width: 34, height: 34, borderRadius: 12, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center' },
+  container: { flex: 1, backgroundColor: colors.canvas }, authContainer: { flex: 1, backgroundColor: colors.canvas }, screenContainer: { flex: 1, width: '100%' as const, alignSelf: 'center' as const },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(16,42,67,0.26)', alignItems: 'center', paddingTop: 86, paddingHorizontal: 16 }, notificationPanel: { width: '100%', maxWidth: 390, maxHeight: 560, backgroundColor: colors.white, borderRadius: 22, padding: 20, boxShadow: '0 12px 24px rgba(16,42,67,0.2)', elevation: 12, alignSelf: 'center' as const }, panelHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, gap: 12 }, panelKicker: { color: colors.teal, fontSize: 10, letterSpacing: 1.5, fontFamily: fonts.bold, marginBottom: 4, textTransform: 'uppercase' as const }, panelTitle: { color: colors.ink, fontSize: 22, fontFamily: fonts.bold, letterSpacing: -0.3 }, closeButton: { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line },
   detailCard: { backgroundColor: '#F0FDFA', borderWidth: 1, borderColor: '#B2E2D8', borderRadius: 16, padding: 14, marginBottom: 12 },
   detailHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
   detailIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: '#E6F6F3', alignItems: 'center', justifyContent: 'center' },
   detailHeaderCopy: { flex: 1 },
   detailTitle: { color: colors.ink, fontSize: 13, fontFamily: fonts.bold },
   detailSub: { color: colors.muted, fontSize: 11, fontFamily: fonts.medium, marginTop: 2 },
-  detailClose: { width: 24, height: 24, borderRadius: 12, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line },
+  detailClose: { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line },
   detailText: { color: colors.ink, fontSize: 13, lineHeight: 19, fontFamily: fonts.regular, marginBottom: 8 },
   detailMeta: { color: colors.teal, fontSize: 11, fontFamily: fonts.semiBold, marginBottom: 10 },
   detailLoading: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
@@ -480,14 +465,14 @@ const styles = StyleSheet.create({
   detailError: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 10 },
   detailErrorText: { flex: 1, color: '#B91C1C', fontSize: 12, fontFamily: fonts.medium, lineHeight: 16 },
   detailActions: { flexDirection: 'row', gap: 8 },
-  detailPrimary: { flex: 1, minHeight: 40, borderRadius: 12, backgroundColor: colors.teal, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  detailPrimary: { flex: 1, minHeight: 44, borderRadius: 12, backgroundColor: colors.teal, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   detailPrimaryText: { color: colors.white, fontSize: 12, fontFamily: fonts.bold },
-  detailSecondary: { minHeight: 40, borderRadius: 12, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
+  detailSecondary: { minHeight: 44, borderRadius: 12, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
   detailSecondaryText: { color: colors.muted, fontSize: 12, fontFamily: fonts.semiBold },
   notifList: { maxHeight: 360 },
   emptyNotif: { alignItems: 'center', paddingVertical: 18, gap: 6 },
   emptyNotifText: { color: colors.ink, fontSize: 13, fontFamily: fonts.bold },
   emptyNotifSub: { color: colors.muted, fontSize: 11, fontFamily: fonts.regular, textAlign: 'center', paddingHorizontal: 12, lineHeight: 15 },
-  notice: { flexDirection: 'row', gap: 12, paddingVertical: 14, borderTopWidth: 1, borderTopColor: colors.line, alignItems: 'center' }, noticeSelected: { backgroundColor: '#F0FDFA', borderRadius: 12, paddingHorizontal: 10, borderTopColor: 'transparent', marginVertical: 2, borderWidth: 1, borderColor: '#B2E2D8' }, noticeRead: { opacity: 0.72 }, noticeIcon: { width: 38, height: 38, borderRadius: 13, backgroundColor: '#E6F6F3', alignItems: 'center', justifyContent: 'center' }, noticeIconGold: { backgroundColor: '#FFF8E7' }, noticeIconRead: { backgroundColor: '#F1F5F9' }, noticeIconSelected: { backgroundColor: colors.white, borderWidth: 1, borderColor: '#B2E2D8' }, noticeCopy: { flex: 1 }, noticeTitle: { color: colors.ink, fontSize: 14, fontFamily: fonts.bold, marginBottom: 4 }, noticeTitleRead: { color: colors.muted }, noticeText: { color: colors.muted, fontSize: 12, lineHeight: 17, fontFamily: fonts.regular }, noticeTextRead: { color: '#94A3B8' }, noticeMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 }, noticeTime: { color: colors.muted, fontSize: 10, fontFamily: fonts.semiBold }, noticeTimeRead: { color: '#94A3B8', fontFamily: fonts.medium }, tapHint: { backgroundColor: colors.teal, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 }, tapHintText: { color: colors.white, fontSize: 9, fontFamily: fonts.bold }, unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.teal, marginLeft: 4 },
-  bottomNav: { flexDirection: 'row', justifyContent: 'space-around', paddingTop: 9, paddingBottom: 8, backgroundColor: colors.white, borderTopWidth: 1, borderTopColor: colors.line }, navItem: { alignItems: 'center', minWidth: 65, minHeight: 52, justifyContent: 'center' }, navItemPressed: { transform: [{ scale: 0.97 }], opacity: 0.94 }, navIcon: { width: 42, height: 30, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }, navIconActive: { backgroundColor: '#E6F6F3' }, navLabel: { color: colors.muted, fontSize: 10, fontFamily: fonts.semiBold, marginTop: 3 }, navLabelActive: { color: colors.teal },
+  notice: { flexDirection: 'row', gap: 12, paddingVertical: 14, borderTopWidth: 1, borderTopColor: colors.line, alignItems: 'center' }, noticeSelected: { backgroundColor: '#F0FDFA', borderRadius: 12, paddingHorizontal: 10, borderTopColor: 'transparent', marginVertical: 2, borderWidth: 1, borderColor: '#B2E2D8' }, noticeRead: { opacity: 0.72 }, noticeIcon: { width: 38, height: 38, borderRadius: 13, backgroundColor: '#E6F6F3', alignItems: 'center', justifyContent: 'center' }, noticeIconGold: { backgroundColor: '#FFF8E7' }, noticeIconRead: { backgroundColor: '#F1F5F9' }, noticeIconSelected: { backgroundColor: colors.white, borderWidth: 1, borderColor: '#B2E2D8' }, noticeCopy: { flex: 1 }, noticeTitle: { color: colors.ink, fontSize: 14, fontFamily: fonts.bold, marginBottom: 4 }, noticeTitleRead: { color: colors.muted }, noticeText: { color: colors.muted, fontSize: 12, lineHeight: 17, fontFamily: fonts.regular }, noticeTextRead: { color: '#94A3B8' }, noticeMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 }, noticeTime: { color: colors.muted, fontSize: 11, fontFamily: fonts.semiBold }, noticeTimeRead: { color: '#94A3B8', fontFamily: fonts.medium }, tapHint: { backgroundColor: colors.teal, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 }, tapHintText: { color: colors.white, fontSize: 10, fontFamily: fonts.bold }, unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.teal, marginLeft: 4 },
+  bottomNav: { flexDirection: 'row', justifyContent: 'space-around', paddingTop: 9, paddingBottom: 8, paddingHorizontal: 8, backgroundColor: colors.white, borderTopWidth: 1, borderTopColor: colors.line, gap: 4 }, navItem: { alignItems: 'center', minWidth: 64, minHeight: 52, justifyContent: 'center', flex: 1, maxWidth: 120 }, navItemPressed: { transform: [{ scale: 0.97 }], opacity: 0.94 }, navIcon: { width: 42, height: 30, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }, navIconActive: { backgroundColor: '#E6F6F3' }, navLabel: { color: colors.muted, fontSize: 10, fontFamily: fonts.semiBold, marginTop: 3, letterSpacing: 0.2 }, navLabelActive: { color: colors.teal, fontFamily: fonts.bold },
 });
