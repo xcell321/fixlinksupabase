@@ -504,7 +504,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
                     activeOpacity={0.7}
                     accessibilityRole="button"
                     accessibilityLabel={`Select ${name}`}
-                    hitSlop={4}
+                    hitSlop={8}
                   >
                     <Ionicons name={getApplianceIcon(name) as never} size={12} color={isActive ? colors.teal : colors.muted} />
                     <Text style={[styles.quickChipText, isActive && styles.quickChipTextActive]} numberOfLines={1}>{name}</Text>
@@ -531,7 +531,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
               <Text style={styles.requiredMark}> *</Text>
             </View>
             <View style={[styles.textAreaContainer, !!stepErrors.description && styles.inputError]}>
-              <Ionicons name="chatbox-ellipses-outline" size={18} color={!!stepErrors.description ? colors.error : colors.muted} style={{ marginTop: 2 }} />
+              <Ionicons name="chatbox-ellipses-outline" size={18} color={!!stepErrors.description ? colors.danger : colors.muted} style={{ marginTop: 2 }} />
               <TextInput
                 style={styles.textArea}
                 placeholder="Example: Refrigerator not cooling, makes a humming noise. Started yesterday..."
@@ -586,7 +586,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
                 </View>
               </View>
             ) : (
-              <TouchableOpacity style={styles.photoPicker} onPress={handlePhotoAction} activeOpacity={0.7} disabled={photoBusy} accessibilityRole="button" accessibilityLabel="Add a photo of the problem" hitSlop={4}>
+              <TouchableOpacity style={styles.photoPicker} onPress={handlePhotoAction} activeOpacity={0.7} disabled={photoBusy} accessibilityRole="button" accessibilityLabel="Add a photo of the problem" hitSlop={8}>
                 {photoBusy ? (
                   <ActivityIndicator size="small" color={colors.teal} />
                 ) : (
@@ -613,14 +613,17 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
         <View style={styles.stepBody}>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Preferred date<Text style={styles.requiredMark}> *</Text></Text>
+            <View style={styles.labelRow}>
+              <Text style={styles.inputLabel}>Preferred date</Text>
+              <Text style={styles.requiredMark}> *</Text>
+            </View>
             <TouchableOpacity 
               style={[styles.selectInput, !!stepErrors.date && styles.inputError]} 
               onPress={() => { setMode('date'); setShowDatePicker(true); }} 
               activeOpacity={0.7}
               accessibilityRole="button"
               accessibilityLabel="Select preferred date"
-              hitSlop={6}
+              hitSlop={8}
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
                 <View style={[styles.inputIconTile, styles.inputIconTileActive]}>
@@ -638,7 +641,9 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Preferred time window</Text>
+            <View style={styles.labelRow}>
+              <Text style={styles.inputLabel}>Preferred time window</Text>
+            </View>
             <View style={styles.slotContainer}>
               {TIME_SLOTS.map((slot) => {
                 const isActive = selectedTimeSlot === slot && !isCustomTime;
@@ -654,7 +659,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
                     accessibilityRole="button"
                     accessibilityLabel={slot}
                     accessibilityState={{ selected: isActive }}
-                    hitSlop={4}
+                    hitSlop={8}
                   >
                     <Text style={[styles.slotChipText, isActive && styles.slotChipTextActive]}>{slot}</Text>
                   </TouchableOpacity>
@@ -669,9 +674,9 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
                 activeOpacity={0.7}
                 accessibilityRole="button"
                 accessibilityLabel="Choose exact time"
-                hitSlop={4}
+                hitSlop={8}
               >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <View style={styles.slotExactInner}>
                   <Ionicons name="time-outline" size={14} color={isCustomTime ? colors.teal : colors.muted} />
                   <Text style={[styles.slotChipText, isCustomTime && styles.slotChipTextActive]}>
                     {isCustomTime ? selectedTimeSlot : 'Exact Time...'}
@@ -680,6 +685,20 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
               </TouchableOpacity>
             </View>
           </View>
+
+          <View style={styles.locationConfirmCard}>
+            <View style={styles.locationConfirmIcon}>
+              <Ionicons name="calendar-outline" size={16} color={colors.teal} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.locationConfirmTitle}>Appointment set</Text>
+              <Text style={styles.locationConfirmSub} numberOfLines={2}>
+                {date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} • {selectedTimeSlot}
+              </Text>
+            </View>
+            <Ionicons name="shield-checkmark" size={16} color={colors.green} />
+          </View>
+          <Text style={styles.helperText}>The technician confirms the exact arrival window after accepting.</Text>
 
           {showDatePicker && (
             <DateTimePicker
@@ -704,7 +723,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
             <Text style={styles.inputLabel}>Service location</Text>
             <Text style={styles.requiredMark}> *</Text>
             {locationLocked && coords ? (
-              <View style={[styles.miniPill, { marginLeft: 8, backgroundColor: '#E6F6F3', borderColor: colors.hudBorder }]}>
+              <View style={[styles.miniPill, { marginLeft: 8, backgroundColor: colors.tealLight, borderColor: colors.hudBorder }]}>
                 <Ionicons name="navigate" size={10} color={colors.teal} />
                 <Text style={[styles.miniPillText, { color: colors.teal }]}>Pinned</Text>
               </View>
@@ -713,8 +732,8 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
 
           <View style={styles.locationFieldWrap}>
             <View style={styles.locationContainer}>
-              <View style={[styles.selectInput, { flex: 1, marginBottom: 0 }, !!stepErrors.location && styles.inputError]}>
-                <Ionicons name="location-outline" size={18} color={!!stepErrors.location ? colors.error : colors.muted} />
+              <View style={[styles.selectInput, { flex: 3, minWidth: 170, marginBottom: 0 }, !!stepErrors.location && styles.inputError]}>
+                <Ionicons name="location-outline" size={18} color={!!stepErrors.location ? colors.danger : colors.muted} />
                 <TextInput
                   style={[styles.selectInputText, { paddingVertical: 0, flex: 1 }]}
                   placeholder="Type a barangay, city, street or store"
@@ -796,8 +815,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
     <ScrollView ref={scrollRef} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
       <View style={styles.centerWrap}>
       <View style={styles.sectionHeaderContainer}>
-        <Text style={styles.kicker}>NEW SERVICE</Text>
-        <Text style={styles.sectionTitle}>Submit Repair Request</Text>
+        <Text style={styles.screenKicker}>SUBMIT REPAIR REQUEST</Text>
       </View>
 
       <View style={styles.card}>
@@ -854,9 +872,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
               <Ionicons name="chevron-back" size={16} color={colors.ink} />
               <Text style={styles.secondaryButtonText}>Back</Text>
             </TouchableOpacity>
-          ) : (
-            <View style={{ flex: 1 }} />
-          )}
+          ) : null}
 
           {currentStep < TOTAL_STEPS ? (
             <TouchableOpacity
@@ -870,7 +886,6 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
               hitSlop={8}
             >
               <Text style={[styles.primaryButtonText, !canContinueForStep(currentStep) && styles.primaryButtonTextMuted]}>Continue</Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.white} style={!canContinueForStep(currentStep) && { opacity: 0.55 }} />
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
@@ -885,10 +900,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
               {loading ? (
                 <ActivityIndicator color={colors.white} />
               ) : (
-                <>
-                  <Text style={styles.primaryButtonText}>Submit Request</Text>
-                  <Ionicons name="checkmark-circle-outline" size={16} color={colors.white} />
-                </>
+                <Text style={styles.primaryButtonText}>Submit Request</Text>
               )}
             </TouchableOpacity>
           )}
@@ -1056,19 +1068,20 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
 const styles = StyleSheet.create({
   scrollContent: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 36, backgroundColor: colors.canvas, alignItems: 'center' as const },
   centerWrap: { width: '100%' as const, maxWidth: 480, alignSelf: 'center' as const },
-  sectionHeaderContainer: { marginBottom: 16, marginTop: 4, gap: 2 },
+  sectionHeaderContainer: { marginBottom: 14, marginTop: 6 },
   kicker: { color: colors.teal, fontSize: 10, letterSpacing: 1.4, fontFamily: fonts.extraBold, marginBottom: 2, textTransform: 'uppercase' as const },
-  sectionTitle: { fontSize: 22, fontFamily: fonts.extraBold, color: colors.ink, letterSpacing: -0.5, lineHeight: 26 },
-  sectionSubtitle: { fontSize: 13, fontFamily: fonts.regular, color: colors.muted, lineHeight: 18, marginTop: 4 },
+  screenKicker: { color: colors.muted, fontSize: 10, letterSpacing: 1.4, fontFamily: fonts.extraBold, textTransform: 'uppercase' as const },
+  sectionTitle: { fontSize: 20, fontFamily: fonts.extraBold, color: colors.ink, letterSpacing: -0.3, lineHeight: 25 },
+  sectionSubtitle: { fontSize: 14, fontFamily: fonts.regular, color: colors.muted, lineHeight: 20, marginTop: 6 },
 
-  card: { backgroundColor: colors.white, borderRadius: 24, padding: 16, borderWidth: 1, borderColor: colors.line, boxShadow: '0 8px 16px rgba(16,42,67,0.07)', elevation: 4, gap: 0 },
+  card: { backgroundColor: colors.white, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: colors.line, boxShadow: '0 6px 14px rgba(16,42,67,0.06)', elevation: 3, gap: 0 },
 
   // Stepper — tight within, generous separation between sections (spacing thesis)
   stepperHeader: { gap: 14, paddingBottom: 4 },
   stepperTopRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
   stepKicker: { color: colors.teal, fontSize: 10, letterSpacing: 1.2, fontFamily: fonts.extraBold, textTransform: 'uppercase' as const },
-  stepTitle: { fontSize: 18, fontFamily: fonts.extraBold, color: colors.ink, letterSpacing: -0.3, marginTop: 4, lineHeight: 22 },
-  stepSubtitle: { fontSize: 13, fontFamily: fonts.regular, color: colors.muted, lineHeight: 18, marginTop: 2 },
+  stepTitle: { fontSize: 20, fontFamily: fonts.extraBold, color: colors.ink, letterSpacing: -0.3, marginTop: 6, lineHeight: 25 },
+  stepSubtitle: { fontSize: 14, fontFamily: fonts.regular, color: colors.muted, lineHeight: 20, marginTop: 2 },
   stepCountBadge: { minWidth: 44, height: 28, borderRadius: 14, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
   stepCountText: { fontSize: 12, fontFamily: fonts.bold, color: colors.ink, fontVariant: ['tabular-nums'] as const },
   progressTrack: { flexDirection: 'row', gap: 6, marginTop: 2 },
@@ -1078,19 +1091,19 @@ const styles = StyleSheet.create({
   stepDotsRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 0, marginTop: 6, paddingHorizontal: 4, overflow: 'visible' as const },
   dotCell: { flex: 1, alignItems: 'center', position: 'relative' as const, gap: 6, minWidth: 0, overflow: 'visible' as const },
   dot: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.line, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
-  dotActive: { backgroundColor: colors.teal, borderColor: colors.teal, boxShadow: '0 4px 8px rgba(15,118,110,0.22)', elevation: 3 },
+  dotActive: { backgroundColor: colors.teal, borderColor: colors.teal },
   dotCompleted: { backgroundColor: colors.teal, borderColor: colors.teal },
   dotUpcoming: { backgroundColor: colors.white, borderColor: colors.line },
   dotText: { fontSize: 12, fontFamily: fonts.bold, color: colors.muted, fontVariant: ['tabular-nums'] as const },
   dotTextActive: { color: colors.white },
   dotTextUpcoming: { color: colors.muted },
-  dotLabel: { fontSize: 9, fontFamily: fonts.semiBold, color: colors.muted, letterSpacing: 0.3, textAlign: 'center' as const, lineHeight: 12, marginTop: 1 },
+  dotLabel: { fontSize: 10, fontFamily: fonts.semiBold, color: colors.muted, letterSpacing: 0.3, textAlign: 'center' as const, lineHeight: 14, marginTop: 1 },
   dotLabelActive: { color: colors.teal, fontFamily: fonts.bold },
   dotConnector: { position: 'absolute' as const, top: 14, left: '62%', right: '-38%', height: 2, backgroundColor: colors.line, zIndex: 0 },
   dotConnectorCompleted: { backgroundColor: colors.teal, opacity: 0.9 },
-  divider: { height: 1, backgroundColor: colors.lineSoft, marginTop: 16, marginBottom: 16 },
+  divider: { height: 1, backgroundColor: colors.lineSoft, marginTop: 14, marginBottom: 14 },
 
-  stepBody: { gap: 16, marginTop: 2 },
+  stepBody: { gap: 14, marginTop: 2 },
   stepIntroBlock: { backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, borderRadius: 14, padding: 12, gap: 4 },
   stepIntroTitle: { fontSize: 15, fontFamily: fonts.bold, color: colors.ink, letterSpacing: -0.2 },
   stepIntroCopy: { fontSize: 12.5, fontFamily: fonts.regular, color: colors.muted, lineHeight: 17 },
@@ -1098,21 +1111,21 @@ const styles = StyleSheet.create({
   inputGroup: { gap: 0 },
   labelRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   inputLabel: { fontSize: 13, fontFamily: fonts.bold, color: colors.ink },
-  requiredMark: { color: colors.error, fontSize: 13, fontFamily: fonts.bold },
+  requiredMark: { color: colors.danger, fontSize: 13, fontFamily: fonts.bold },
   optionalLabel: { fontSize: 11, fontFamily: fonts.medium, color: colors.muted },
-  helperText: { fontSize: 11.5, fontFamily: fonts.regular, color: colors.muted, lineHeight: 15, marginTop: 6 },
-  errorText: { fontSize: 12, fontFamily: fonts.medium, color: '#C53030', lineHeight: 16, marginTop: 6 },
-  inputError: { borderColor: '#FC8181', borderWidth: 1.5 },
+  helperText: { fontSize: 12, fontFamily: fonts.regular, color: colors.muted, lineHeight: 16, marginTop: 6 },
+  errorText: { fontSize: 12, fontFamily: fonts.medium, color: colors.danger, lineHeight: 16, marginTop: 6 },
+  inputError: { borderColor: colors.danger, borderWidth: 1.5 },
 
   inputIconTile: { width: 28, height: 28, borderRadius: 9, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
-  inputIconTileActive: { backgroundColor: '#E6F6F3', borderColor: colors.hudBorder },
+  inputIconTileActive: { backgroundColor: colors.tealLight, borderColor: colors.hudBorder },
 
   // quick picks — grouped tight (8) within, generous (16) from next input
-  quickPickWrap: { backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, borderRadius: 14, padding: 12, gap: 10, marginTop: 4 },
+  quickPickWrap: { gap: 10, marginTop: 6 },
   quickPickLabel: { fontSize: 10, fontFamily: fonts.extraBold, color: colors.muted, letterSpacing: 1, textTransform: 'uppercase' as const },
   quickChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'flex-start' },
-  quickChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 11, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, maxWidth: '48%', minHeight: 38 },
-  quickChipActive: { backgroundColor: '#E6F6F3', borderColor: colors.teal },
+  quickChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 12, borderRadius: 999, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, maxWidth: '48%', minHeight: 48 },
+  quickChipActive: { backgroundColor: colors.tealLight, borderColor: colors.teal },
   quickChipText: { fontSize: 12, fontFamily: fonts.semiBold, color: colors.muted, flexShrink: 1 },
   quickChipTextActive: { color: colors.teal },
   viewAllCategoriesRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingTop: 2 },
@@ -1120,12 +1133,12 @@ const styles = StyleSheet.create({
 
   // selected meta
   selectedMetaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
-  miniPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: colors.hudBorder, backgroundColor: '#E6F6F3' },
+  miniPill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: colors.hudBorder, backgroundColor: colors.tealLight },
   miniPillDevice: { backgroundColor: colors.white, borderColor: colors.line },
   miniPillText: { fontSize: 11, fontFamily: fonts.semiBold, color: colors.teal },
 
   photoPicker: { minHeight: 72, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.teal, borderStyle: 'dashed', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  photoPickerIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#E6F6F3', alignItems: 'center', justifyContent: 'center' },
+  photoPickerIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: colors.tealLight, alignItems: 'center', justifyContent: 'center' },
   photoPickerCopy: { flex: 1 },
   photoPickerTitle: { fontSize: 14, fontFamily: fonts.semiBold, color: colors.ink },
   photoPickerSub: { fontSize: 11, fontFamily: fonts.regular, color: colors.muted, marginTop: 2 },
@@ -1135,10 +1148,10 @@ const styles = StyleSheet.create({
   photoReadyRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   photoReadyText: { fontSize: 13, fontFamily: fonts.bold, color: colors.ink },
   photoHint: { fontSize: 11, fontFamily: fonts.regular, color: colors.muted, lineHeight: 15 },
-  photoPreviewActions: { flexDirection: 'row', gap: 8, marginTop: 6 },
-  photoSecondaryButton: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, minHeight: 32 },
+  photoPreviewActions: { flexDirection: 'row', flexWrap: 'wrap' as const, gap: 8, marginTop: 6 },
+  photoSecondaryButton: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, minHeight: 44 },
   photoSecondaryText: { fontSize: 12, fontFamily: fonts.semiBold, color: colors.teal },
-  photoBadge: { marginLeft: 8, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 999, backgroundColor: '#E6F6F3', borderWidth: 1, borderColor: colors.hudBorder },
+  photoBadge: { marginLeft: 8, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 999, backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.hudBorder },
   photoBadgeText: { fontSize: 10, fontFamily: fonts.semiBold, color: colors.teal, letterSpacing: 0.2 },
   
   selectInput: { height: 52, backgroundColor: colors.surfaceSunken, borderWidth: 1, borderColor: colors.line, borderRadius: 14, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -1149,17 +1162,18 @@ const styles = StyleSheet.create({
   charRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, gap: 8 },
   charCount: { fontSize: 11, fontFamily: fonts.medium, color: colors.muted, fontVariant: ['tabular-nums'] as const },
 
-  slotContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 2 },
-  slotChip: { paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.canvas, minHeight: 40, justifyContent: 'center' },
-  slotChipActive: { backgroundColor: '#E6F6F3', borderColor: colors.teal },
-  slotChipText: { fontSize: 12, fontFamily: fonts.semiBold, color: colors.muted },
+  slotContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 2 },
+  slotChip: { flex: 1, minWidth: 140, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.canvas, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  slotChipActive: { backgroundColor: colors.tealLight, borderColor: colors.teal },
+  slotChipText: { fontSize: 12, fontFamily: fonts.semiBold, color: colors.muted, textAlign: 'center' as const, lineHeight: 16 },
   slotChipTextActive: { color: colors.teal },
+  slotExactInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   timeHintRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
   timeHintText: { fontSize: 11, fontFamily: fonts.regular, color: colors.muted, flex: 1, lineHeight: 14 },
   
-  locationContainer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  locationContainer: { flexDirection: 'row', flexWrap: 'wrap' as const, alignItems: 'center', gap: 10 },
   locationFieldWrap: { position: 'relative', zIndex: 20 },
-  locateButton: { backgroundColor: colors.teal, height: 52, paddingHorizontal: 16, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 6, boxShadow: '0 4px 8px rgba(15,118,110,0.2)', elevation: 3, minWidth: 92, justifyContent: 'center' },
+  locateButton: { backgroundColor: colors.teal, height: 52, paddingHorizontal: 16, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 6, boxShadow: '0 4px 10px rgba(15,118,110,0.18)', elevation: 3, minWidth: 92, flex: 1, justifyContent: 'center' },
   locateButtonText: { color: colors.white, fontSize: 13, fontFamily: fonts.bold },
 
   suggestionsPanel: { position: 'absolute', top: 58, left: 0, right: 0, backgroundColor: colors.white, borderRadius: 14, borderWidth: 1, borderColor: colors.line, zIndex: 30, elevation: 8, boxShadow: '0 6px 12px rgba(16,42,67,0.15)', overflow: 'hidden' },
@@ -1168,25 +1182,25 @@ const styles = StyleSheet.create({
   suggestionStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 14 },
   suggestionStatusText: { flex: 1, color: colors.muted, fontSize: 12, fontFamily: fonts.medium },
   suggestionRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: colors.line },
-  suggestionIconWrap: { width: 30, height: 30, borderRadius: 10, backgroundColor: '#E6F6F3', alignItems: 'center', justifyContent: 'center' },
+  suggestionIconWrap: { width: 30, height: 30, borderRadius: 10, backgroundColor: colors.tealLight, alignItems: 'center', justifyContent: 'center' },
   suggestionCopy: { flex: 1 },
   suggestionLabel: { color: colors.ink, fontSize: 13, fontFamily: fonts.semiBold },
   suggestionSub: { color: colors.muted, fontSize: 11, marginTop: 2, fontFamily: fonts.regular, paddingBottom: 1 },
-  suggestionFooter: { paddingHorizontal: 14, paddingVertical: 9, backgroundColor: '#F5F8FA', borderTopWidth: 1, borderTopColor: colors.line },
+  suggestionFooter: { paddingHorizontal: 14, paddingVertical: 10, backgroundColor: colors.canvas, borderTopWidth: 1, borderTopColor: colors.line },
   suggestionFooterText: { color: colors.muted, fontSize: 11, fontFamily: fonts.regular, textAlign: 'center' },
 
-  locationConfirmCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#E6F6F3', borderWidth: 1, borderColor: colors.hudBorder, borderRadius: 12, padding: 11, marginTop: 10 },
+  locationConfirmCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.hudBorder, borderRadius: 12, padding: 12, marginTop: 10 },
   locationConfirmIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.hudBorder, alignItems: 'center', justifyContent: 'center' },
   locationConfirmTitle: { fontSize: 12, fontFamily: fonts.bold, color: colors.ink },
   locationConfirmSub: { fontSize: 11, fontFamily: fonts.regular, color: colors.muted, marginTop: 2, lineHeight: 14 },
   privacyNote: { flexDirection: 'row', gap: 8, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, borderRadius: 12, padding: 10, alignItems: 'flex-start' },
   privacyNoteText: { flex: 1, fontSize: 11, fontFamily: fonts.regular, color: colors.muted, lineHeight: 15 },
 
-  navRow: { flexDirection: 'row', gap: 12, marginTop: 20, alignItems: 'center', flexWrap: 'wrap' as const },
-  secondaryButton: { flex: 1, minWidth: 110, height: 48, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  navRow: { flexDirection: 'row', gap: 12, marginTop: 20, alignItems: 'center' },
+  secondaryButton: { flex: 1, minWidth: 0, height: 48, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   secondaryButtonText: { color: colors.ink, fontSize: 14, fontFamily: fonts.bold, letterSpacing: 0.2 },
-  primaryButton: { backgroundColor: colors.teal, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, boxShadow: '0 6px 12px rgba(15,118,110,0.22)', elevation: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 18 },
-  primaryButtonFlex: { flex: 1.5, minWidth: 140 },
+  primaryButton: { backgroundColor: colors.teal, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, boxShadow: '0 4px 10px rgba(15,118,110,0.18)', elevation: 3, paddingHorizontal: 18 },
+  primaryButtonFlex: { flex: 1, minWidth: 0 },
   primaryButtonMuted: { opacity: 0.55 },
   primaryButtonText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold, letterSpacing: 0.4 },
   primaryButtonTextMuted: { opacity: 0.85 },
@@ -1195,11 +1209,11 @@ const styles = StyleSheet.create({
   modalOverlay: { flex: 1, backgroundColor: 'rgba(16, 42, 67, 0.4)', justifyContent: 'flex-end' },
   modalView: { backgroundColor: colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 20, maxHeight: '80%', boxShadow: '0 -4px 12px rgba(0,0,0,0.1)', elevation: 10 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.line },
-  modalBackIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.canvas, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.line },
-  modalCloseIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.canvas, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.line },
+  modalBackIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.canvas, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.line },
+  modalCloseIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.canvas, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.line },
   modalSubtitle: { color: colors.muted, fontSize: 11, fontFamily: fonts.medium, marginTop: 3, textAlign: 'center' as const },
   modalItem: { paddingVertical: 12, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: colors.lineSoft, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderRadius: 12, marginBottom: 2 },
-  modalItemSelected: { backgroundColor: '#E6F6F3', paddingHorizontal: 10, borderBottomColor: 'transparent', borderWidth: 1, borderColor: colors.hudBorder },
+  modalItemSelected: { backgroundColor: colors.tealLight, paddingHorizontal: 10, borderBottomColor: 'transparent', borderWidth: 1, borderColor: colors.hudBorder },
   modalItemIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
   modalItemIconSelected: { backgroundColor: colors.white, borderColor: colors.hudBorder },
   modalItemText: { fontSize: 14, fontFamily: fonts.medium, color: colors.ink },
