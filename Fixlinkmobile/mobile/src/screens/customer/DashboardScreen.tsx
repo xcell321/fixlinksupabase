@@ -2,13 +2,32 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { fetchCompletedJobs, fetchCustomerRequests } from '../services/api';
+import { fetchCompletedJobs, fetchCustomerRequests, fetchPlatformCategories } from '../services/api';
 import { colors, fonts } from '../../theme';
 import { getApplianceIcon, getStatusColor, getStatusIcon } from '../../utils/applianceIcons';
 
-export default function DashboardScreen({ user, notificationCount = 0, onOpenNotifications, onNavigateToSubmit, onNavigateToProgress, onOpenRequest }) {
+// Mirrors RequestProgressScreen ACTIVE_STATUSES verbatim — the single source of
+// truth for "applicable active job". Post-accept only; Pending never shows a hero.
+const ACTIVE_STATUSES = ['accepted', 'confirmed', 'customer ready', 'in progress'];
+
+// Next-action hints mirror exactly the actions RequestDetailsScreen /
+// RequestProgressScreen render for each status. Display-only text inside the
+// row (the row itself navigates to details where the real action lives), so a
+// hint can never imply an action the job state does not allow.
+const getNextAction = (req) => {
+  const s = String(req?.status || '').toLowerCase();
+  if (s === 'accepted') return { icon: 'checkmark-circle', text: 'Confirm repair' };
+  if (s === 'confirmed') return { icon: 'flag', text: 'Mark ready for visit' };
+  if (s === 'customer ready' || s === 'in progress') return { icon: 'map', text: 'Track technician' };
+  if (s === 'completed') return { icon: 'star-outline', text: 'Leave a review' };
+  if (s === 'pending') return { icon: 'time-outline', text: 'Finding your technician' };
+  return null;
+};
+
+export default function DashboardScreen({ user, notificationCount = 0, onOpenNotifications, onNavigateToSubmit, onNavigateToProgress, onOpenRequest, onTrackJob }) {
   const [trackedRequests, setTrackedRequests] = useState([]);
   const [completedJobs, setCompletedJobs] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [tipDismissed, setTipDismissed] = useState(false);
@@ -30,14 +49,30 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
     return () => { active = false; clearInterval(interval); };
   }, [name, uid]);
 
+  // Admin-managed service catalog — same dynamic source as SubmitRequestScreen.
+  // Rendered only when loaded; never hardcoded, no reserved space on failure.
+  useEffect(() => {
+    let active = true;
+    fetchPlatformCategories()
+      .then((data) => { if (active) setCategories(Array.isArray(data) ? data : []); })
+      .catch(() => { if (active) setCategories([]); });
+    return () => { active = false; };
+  }, []);
+
   const handleRefresh = async () => {
     setRefreshing(true);
     try { await fetchAll(); } finally { setRefreshing(false); }
   };
 
   const pendingCount = trackedRequests.filter((r) => (r.status || '').toLowerCase() === 'pending').length;
-  const activeCount = trackedRequests.filter((r) => ['accepted', 'confirmed', 'customer ready', 'in progress'].includes((r.status || '').toLowerCase())).length;
+  const activeCount = trackedRequests.filter((r) => ACTIVE_STATUSES.includes((r.status || '').toLowerCase())).length;
   const completedCount = completedJobs.length;
+
+  // Category shortcuts reuse the existing Submit Request flow. Preselection is
+  // not supported by SubmitRequestScreen, so navigate plainly — no backend change.
+  const handleCategoryTap = () => {
+    if (typeof onNavigateToSubmit === 'function') onNavigateToSubmit();
+  };
 
   const recentRequests = [...trackedRequests, ...completedJobs]
     .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
@@ -100,15 +135,39 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
           <View style={styles.actionIcon}><Ionicons name="add" size={22} color={colors.white} /></View>
           <Text style={styles.primaryActionTitle}>New request</Text>
           <Text style={styles.primaryActionCopy}>Tell us what needs fixing</Text>
-          <Ionicons name="arrow-forward" size={16} color={colors.white} style={styles.actionArrow} />
         </TouchableOpacity>
         <TouchableOpacity style={styles.secondaryAction} onPress={onNavigateToProgress} activeOpacity={0.88} accessibilityRole="button" accessibilityLabel="Track a job">
           <View style={styles.secondaryIcon}><Ionicons name="navigate-outline" size={20} color={colors.teal} /></View>
           <Text style={styles.secondaryActionTitle}>Track a job</Text>
           <Text style={styles.secondaryActionCopy}>See live request updates</Text>
-          <Ionicons name="arrow-forward" size={16} color={colors.teal} style={styles.actionArrow} />
         </TouchableOpacity>
       </View>
+
+      {categories.length > 0 ? (
+        <View style={styles.catBlock}>
+          <Text style={styles.sectionTitle}>Category</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catRow}>
+            {categories.map((c) => {
+              const catName = String(c?.name || '').trim();
+              if (!catName) return null;
+              return (
+                <TouchableOpacity
+                  key={String(c?.id || catName)}
+                  style={styles.catChip}
+                  onPress={handleCategoryTap}
+                  activeOpacity={0.85}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Request ${catName}`}
+                  accessibilityHint="Opens the submit request flow"
+                >
+                  <Ionicons name={getApplianceIcon(catName)} size={14} color={colors.teal} />
+                  <Text style={styles.catChipText} numberOfLines={1}>{catName}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      ) : null}
 
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Recent requests</Text>
@@ -129,6 +188,7 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
         <View style={styles.recentLedger}>
           {recentRequests.map((req, idx) => {
             const color = getStatusColor(req.status);
+            const next = getNextAction(req);
             return (
               <TouchableOpacity
                 key={req.id}
@@ -150,6 +210,12 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
                     </View>
                     {req.createdAt ? <Text style={styles.reqDate} numberOfLines={1}>{new Date(req.createdAt).toLocaleDateString()}</Text> : null}
                   </View>
+                  {next ? (
+                    <View style={styles.nextHint}>
+                      <Ionicons name={next.icon} size={11} color={color} />
+                      <Text style={styles.nextHintText} numberOfLines={1}>{next.text}</Text>
+                    </View>
+                  ) : null}
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={colors.muted} />
               </TouchableOpacity>
@@ -224,7 +290,11 @@ const styles = StyleSheet.create({
   secondaryActionTitle: { color: colors.ink, fontSize: 16, fontFamily: fonts.bold, marginBottom: 2, letterSpacing: -0.2 },
   primaryActionCopy: { color: '#C7F1EC', fontSize: 12, lineHeight: 16, fontFamily: fonts.medium },
   secondaryActionCopy: { color: colors.muted, fontSize: 12, lineHeight: 16, fontFamily: fonts.regular },
-  actionArrow: { position: 'absolute', right: 14, bottom: 14 },
+
+  catBlock: { marginBottom: 22 },
+  catRow: { gap: 8, paddingRight: 4, alignItems: 'center' },
+  catChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 999, paddingVertical: 10, paddingHorizontal: 12, minHeight: 44, maxWidth: 220 },
+  catChipText: { color: colors.ink, fontSize: 12, fontFamily: fonts.semiBold, flexShrink: 1 },
 
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, gap: 10 },
   viewAllHit: { minHeight: 44, minWidth: 44, justifyContent: 'center', alignItems: 'flex-end', paddingHorizontal: 4 },
@@ -240,6 +310,8 @@ const styles = StyleSheet.create({
   pill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, borderWidth: 1, maxWidth: '100%' },
   pillText: { fontSize: 10, fontFamily: fonts.bold, letterSpacing: 0.2, textTransform: 'capitalize' as const },
   reqDate: { color: colors.muted, fontSize: 11, fontFamily: fonts.medium, flexShrink: 1, fontVariant: ['tabular-nums'] as const },
+  nextHint: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  nextHintText: { color: colors.muted, fontSize: 11, fontFamily: fonts.medium, flexShrink: 1, lineHeight: 14 },
   emptyCard: { backgroundColor: colors.white, borderRadius: 20, borderWidth: 1, borderColor: colors.line, padding: 16, flexDirection: 'row', alignItems: 'center', marginBottom: 14, gap: 12, minHeight: 72 },
   emptyIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: colors.tealLight, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.hudBorder },
   emptyText: { flex: 1, gap: 2, minWidth: 0 },

@@ -6,7 +6,31 @@ import * as Clipboard from 'expo-clipboard';
 import { confirmRepairRequest, fetchTechnicianProfile, markCustomerReady } from '../services/api';
 import { PhotoLightbox } from '../../components/RequestPhoto';
 import { colors, fonts } from '../../theme';
-import { getApplianceIcon, getStatusColor, getStatusIcon, getStatusGuidance, STEPS } from '../../utils/applianceIcons';
+import { getApplianceIcon, getStatusColor, getStatusIcon, getStatusGuidance } from '../../utils/applianceIcons';
+
+// Six-step workflow, using exact request status names (no renames, no abbreviations).
+const FULL_STEPS = ['Pending', 'Accepted', 'Confirmed', 'Customer Ready', 'In Progress', 'Completed'] as const;
+
+// Accepted = technician has accepted (hand), Confirmed = customer has confirmed (check).
+// Shared utils keep both as 'hand-left'; this detail-screen mapping makes the pair
+// visually distinct with existing Ionicons only. All other statuses defer to utils.
+const detailStatusIcon = (status: unknown): string => {
+  const key = String(status ?? '').toLowerCase();
+  if (key === 'accepted') return 'hand-left';
+  if (key === 'confirmed') return 'checkmark-circle';
+  return getStatusIcon(status);
+};
+
+// Show date AND time only when a real timestamp already exists; otherwise return
+// null so the caller gracefully omits the line instead of inventing data.
+const formatHistoryDateTime = (iso: unknown): string | null => {
+  if (!iso) return null;
+  const date = new Date(String(iso));
+  if (Number.isNaN(date.getTime())) return null;
+  const day = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  const time = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return `${day} • ${time}`;
+};
 
 export default function RequestDetailsScreen({ request, onBack, onMessageTechnician, onTrackMap }) {
   const [techProfile, setTechProfile] = useState(null);
@@ -29,15 +53,18 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
   const statusKey = status.toLowerCase();
   const statusColor = getStatusColor(status);
   const guidance = getStatusGuidance(status);
+  const detailIcon = detailStatusIcon(status);
   const isAccepted = statusKey === 'accepted';
   const isConfirmed = statusKey === 'confirmed';
   const isReady = statusKey === 'customer ready';
   const isInProgress = statusKey === 'in progress';
   const isActive = isAccepted || isConfirmed || isReady || isInProgress;
   const isCancelled = statusKey === 'cancelled';
+  const isNoShow = statusKey === 'no-show' || statusKey === 'no show';
+  const isTerminal = isCancelled || isNoShow;
   const isCompleted = statusKey === 'completed';
 
-  const currentStep = isCancelled
+  const currentStep = isCancelled || isNoShow
     ? 0
     : isCompleted
       ? 6
@@ -113,100 +140,268 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
     ]);
   };
 
-  const activityRows = [
-    request.createdAt && { icon: 'paper-plane-outline', label: 'Submitted', date: new Date(request.createdAt).toLocaleDateString() },
-    request.acceptedAt && { icon: 'hand-left-outline', label: 'Accepted', date: new Date(request.acceptedAt).toLocaleDateString() },
-    request.completedAt && { icon: 'checkmark-done-outline', label: 'Completed', date: new Date(request.completedAt).toLocaleDateString() },
-  ].filter(Boolean);
+  // Single coherent history rail: chronological, status dots, date AND time only
+  // from timestamps that already exist. Steps without a stored timestamp (Confirmed,
+  // Customer Ready) appear when reached, with the time line gracefully omitted.
+  const historyEvents = (() => {
+    const events = [];
+    const reached = (n: number) => currentStep >= n;
+    events.push({
+      key: 'pending',
+      label: 'Pending',
+      detail: 'Request submitted',
+      timestamp: request.createdAt ?? null,
+      color: getStatusColor('Pending'),
+      icon: detailStatusIcon('Pending'),
+    });
+    if (reached(2) || request.acceptedAt) {
+      events.push({
+        key: 'accepted',
+        label: 'Accepted',
+        detail: 'Technician accepted the request',
+        timestamp: request.acceptedAt ?? null,
+        color: getStatusColor('Accepted'),
+        icon: detailStatusIcon('Accepted'),
+      });
+    }
+    if (reached(3)) {
+      events.push({
+        key: 'confirmed',
+        label: 'Confirmed',
+        detail: 'You confirmed the repair',
+        timestamp: null,
+        color: getStatusColor('Confirmed'),
+        icon: detailStatusIcon('Confirmed'),
+      });
+    }
+    if (reached(4)) {
+      events.push({
+        key: 'ready',
+        label: 'Customer Ready',
+        detail: 'Service location marked ready',
+        timestamp: null,
+        color: getStatusColor('Customer Ready'),
+        icon: detailStatusIcon('Customer Ready'),
+      });
+    }
+    if (reached(5) || request.startedAt) {
+      events.push({
+        key: 'progress',
+        label: 'In Progress',
+        detail: 'Repair started',
+        timestamp: request.startedAt ?? null,
+        color: getStatusColor('In Progress'),
+        icon: detailStatusIcon('In Progress'),
+      });
+    }
+    if (isCompleted) {
+      events.push({
+        key: 'completed',
+        label: 'Completed',
+        detail: 'Job completed',
+        timestamp: request.completedAt ?? null,
+        color: getStatusColor('Completed'),
+        icon: detailStatusIcon('Completed'),
+      });
+    }
+    if (isCancelled) {
+      events.push({
+        key: 'cancelled',
+        label: 'Cancelled',
+        detail: 'Request cancelled',
+        timestamp: request.cancelledAt ?? null,
+        color: getStatusColor('Cancelled'),
+        icon: detailStatusIcon('Cancelled'),
+      });
+    }
+    if (isNoShow) {
+      events.push({
+        key: 'noshow',
+        label: 'No-Show',
+        detail: 'No one was at the service location',
+        timestamp: null,
+        color: getStatusColor('No-Show'),
+        icon: detailStatusIcon('No-Show'),
+      });
+    }
+    return events;
+  })();
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.canvas} />
 
       <View style={styles.navBar}>
-        <TouchableOpacity style={styles.backButtonContainer} onPress={onBack}>
+        <TouchableOpacity
+          style={styles.backButtonContainer}
+          onPress={onBack}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
           <Ionicons name="arrow-back" size={20} color={colors.ink} />
           <Text style={styles.backButton}>Back</Text>
         </TouchableOpacity>
-        <Text style={styles.navTitle}>REQUEST DETAILS</Text>
+        <Text style={styles.navTitle} numberOfLines={1} ellipsizeMode="tail">REQUEST DETAILS</Text>
         <View style={[styles.navPill, { backgroundColor: statusColor + '15', borderColor: statusColor + '40' }]}>
-          <Ionicons name={getStatusIcon(status)} size={11} color={statusColor} />
-          <Text style={[styles.navPillText, { color: statusColor }]}>{status}</Text>
+          <Ionicons name={detailIcon} size={11} color={statusColor} />
+          <Text style={[styles.navPillText, { color: statusColor }]} numberOfLines={1} ellipsizeMode="tail">{status}</Text>
         </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Status Hero */}
-        <View style={styles.heroCard}>
-          <View style={[styles.heroIcon, { backgroundColor: statusColor + '15' }]}>
-            <Ionicons name={getApplianceIcon(request.applianceType)} size={30} color={statusColor} />
+        {/* 1 — Current status: single compact header, no triple repetition */}
+        <View style={styles.statusCard}>
+          <View style={styles.statusHeaderRow}>
+            <View
+              style={[
+                styles.statusTile,
+                isAccepted
+                  ? styles.statusTileOutlined
+                  : styles.statusTileFilled,
+                (isAccepted || isConfirmed)
+                  ? { borderColor: statusColor, backgroundColor: isAccepted ? colors.white : statusColor }
+                  : { borderColor: statusColor + '30', backgroundColor: statusColor + '16' },
+              ]}
+            >
+              <Ionicons
+                name={detailIcon}
+                size={22}
+                color={isAccepted ? statusColor : (isConfirmed ? colors.white : statusColor)}
+              />
+            </View>
+            <View style={styles.statusHeaderCopy}>
+              {!isTerminal ? (
+                <Text style={styles.stepKicker}>STEP {currentStep} OF 6</Text>
+              ) : (
+                <Text style={styles.stepKicker}>{isCancelled ? 'CLOSED' : 'ATTENTION NEEDED'}</Text>
+              )}
+              <Text style={[styles.statusName, { color: statusColor }]} numberOfLines={2}>{status}</Text>
+            </View>
           </View>
-          <Text style={styles.heroKicker}>CURRENT STATUS</Text>
-          <Text style={[styles.heroStatus, { color: statusColor }]}>{status}</Text>
 
-          {isCancelled ? (
-            <View style={styles.cancelledBanner}>
-              <Ionicons name="close-circle" size={18} color={colors.error} />
-              <Text style={styles.cancelledText}>This request was cancelled.</Text>
+          {isTerminal ? (
+            <View style={[styles.terminalBanner, isCancelled ? styles.terminalCancelled : styles.terminalNoShow]}>
+              <Ionicons
+                name={isCancelled ? 'close-circle' : 'alert-circle'}
+                size={18}
+                color={isCancelled ? colors.error : colors.danger}
+              />
+              <Text style={styles.terminalText}>
+                {isCancelled ? 'This request was cancelled.' : 'No-show reported. No one was at the service location.'}
+              </Text>
             </View>
           ) : (
-            <View style={styles.stepper}>
-              {STEPS.map((label, idx) => {
-                const n = idx + 1;
-                const reached = n <= currentStep;
-                const active = n === currentStep;
-                return (
-                  <View key={label} style={styles.stepItem}>
-                    <View style={styles.stepTop}>
-                      <View style={[styles.dot, reached ? (active ? styles.dotActive : styles.dotDone) : styles.dotIdle]}>
-                        {reached && !active ? (
-                          <Ionicons name="checkmark" size={11} color={colors.white} />
-                        ) : (
-                          <Text style={[styles.dotText, reached && styles.dotTextActive]}>{n}</Text>
+            <View
+              style={styles.progressRail}
+              accessibilityRole="text"
+              accessibilityLabel={`Step ${currentStep} of 6, ${status}`}
+            >
+              <View style={styles.progressDots}>
+                {FULL_STEPS.map((label, idx) => {
+                  const n = idx + 1;
+                  const done = n < currentStep;
+                  const active = n === currentStep;
+                  const upcoming = n > currentStep;
+                  return (
+                    <View key={label} style={styles.progressStep} accessible={false}>
+                      <View style={styles.progressTrack}>
+                        {idx > 0 && (
+                          <View style={[styles.progressLine, n <= currentStep && { backgroundColor: statusColor }]} />
+                        )}
+                        <View
+                          accessibilityLabel={`${label}${active ? ', current step' : done ? ', done' : ''}`}
+                          style={[
+                            styles.progressDot,
+                            done && { backgroundColor: statusColor, borderColor: statusColor },
+                            active && { backgroundColor: statusColor, borderColor: statusColor },
+                            upcoming && styles.progressDotUpcoming,
+                          ]}
+                        >
+                          {done ? (
+                            <Ionicons name="checkmark" size={10} color={colors.white} />
+                          ) : active ? (
+                            <Text style={styles.progressDotNumber}>{n}</Text>
+                          ) : null}
+                        </View>
+                        {idx < FULL_STEPS.length - 1 && (
+                          <View style={[styles.progressLine, n < currentStep && { backgroundColor: statusColor }]} />
                         )}
                       </View>
-                      {idx < STEPS.length - 1 && <View style={[styles.link, n < currentStep && styles.linkDone]} />}
                     </View>
-                    <Text style={[styles.stepLabel, reached && styles.stepLabelActive]} numberOfLines={1}>{label}</Text>
-                  </View>
-                );
-              })}
+                  );
+                })}
+              </View>
             </View>
           )}
 
-          <View style={[styles.guidanceBanner, { backgroundColor: statusColor + '12', borderColor: statusColor + '38' }]}>
-            <Ionicons name={getStatusIcon(status)} size={16} color={statusColor} style={styles.guidanceIcon} />
-            <View style={styles.guidanceCopy}>
-              <Text style={[styles.guidanceKicker, { color: statusColor }]}>WHAT HAPPENS NEXT</Text>
-              <Text style={styles.guidanceTitle}>{guidance.title}</Text>
-              <Text style={styles.guidanceBody}>{guidance.body}</Text>
+          {!isTerminal && (
+            <View
+              style={[
+                styles.guidanceBlock,
+                isAccepted
+                  ? styles.guidanceOutlined
+                  : styles.guidanceFilled,
+                { borderColor: statusColor + '38', backgroundColor: isAccepted ? colors.white : statusColor + '12' },
+              ]}
+            >
+              <Ionicons
+                name={detailIcon}
+                size={16}
+                color={statusColor}
+                style={styles.guidanceIcon}
+              />
+              <View style={styles.guidanceCopy}>
+                <Text style={styles.guidanceTitle}>{guidance.title}</Text>
+                <Text style={styles.guidanceBody}>{guidance.body}</Text>
+              </View>
             </View>
-          </View>
+          )}
         </View>
 
-        {/* Activity mini-list */}
-        {activityRows.length > 0 && (
-          <View style={styles.activityCard}>
-            {activityRows.map((row) => (
-              <View key={row.label} style={styles.activityRow}>
-                <Ionicons name={row.icon} size={15} color={colors.teal} />
-                <Text style={styles.activityLabel}>{row.label}</Text>
-                <Text style={styles.activityDate}>{row.date}</Text>
-              </View>
-            ))}
+        {/* 2 — History: single coherent rail matching the progress above */}
+        {historyEvents.length > 0 && (
+          <View style={styles.historyCard}>
+            <Text style={styles.cardKicker}>HISTORY</Text>
+            {historyEvents.map((event, idx) => {
+              const dateTime = formatHistoryDateTime(event.timestamp);
+              const last = idx === historyEvents.length - 1;
+              return (
+                <View key={event.key} style={styles.historyRow}>
+                  <View style={styles.historyRail}>
+                    <View style={[styles.historyDot, { backgroundColor: event.color + '14', borderColor: event.color + '30' }]}>
+                      <Ionicons name={event.icon} size={13} color={event.color} />
+                    </View>
+                    {!last && <View style={styles.historyLine} />}
+                  </View>
+                  <View style={styles.historyCopy}>
+                    <Text style={styles.historyLabel}>{event.label}</Text>
+                    <Text style={styles.historyDetail}>{event.detail}</Text>
+                    {dateTime ? <Text style={styles.historyDateTime}>{dateTime}</Text> : null}
+                  </View>
+                </View>
+              );
+            })}
           </View>
         )}
 
-        {/* Appliance */}
+        {/* 3 — Request information */}
         <View style={styles.card}>
           <Text style={styles.cardKicker}>APPLIANCE</Text>
-          <Text style={styles.cardTitle}>{request.applianceType}</Text>
-          {request.category ? <Text style={styles.cardSub}>{request.category}</Text> : null}
+          <View style={styles.applianceHeader}>
+            <View style={styles.applianceTile}>
+              <Ionicons name={getApplianceIcon(request.applianceType)} size={22} color={colors.ink} />
+            </View>
+            <View style={styles.applianceCopy}>
+              <Text style={styles.cardTitle} numberOfLines={2}>{request.applianceType}</Text>
+              {request.category ? <Text style={styles.cardSub} numberOfLines={1}>{request.category}</Text> : null}
+            </View>
+          </View>
           <View style={styles.divider} />
           <Text style={styles.fieldLabel}>PROBLEM DESCRIPTION</Text>
           <Text style={styles.fieldText}>{request.description || 'No description provided'}</Text>
 
-          <Text style={[styles.fieldLabel, { marginTop: 16 }]}>ATTACHED PHOTO</Text>
+          <Text style={[styles.fieldLabel, { marginTop: 14 }]}>ATTACHED PHOTO</Text>
           {request.photoUrl ? (
             <TouchableOpacity style={styles.photoWrap} onPress={() => setPhotoViewerVisible(true)} activeOpacity={0.85}>
               <Image source={{ uri: request.photoUrl }} style={styles.photoImage} resizeMode="cover" />
@@ -246,7 +441,7 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
           </View>
         </View>
 
-        {/* Technician */}
+        {/* 4 — Primary action + supporting technician details */}
         {request.technicianName && (
           <View style={styles.card}>
             <Text style={styles.cardKicker}>ASSIGNED TO</Text>
@@ -255,7 +450,7 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
                 <Text style={styles.avatarText}>{request.technicianName.charAt(0).toUpperCase()}</Text>
               </View>
               <View style={styles.techCopy}>
-                <Text style={styles.techName}>{request.technicianName}</Text>
+                <Text style={styles.techName} numberOfLines={1}>{request.technicianName}</Text>
                 <View style={styles.verifiedRow}>
                   <Ionicons name="checkmark-circle" size={14} color={colors.green} />
                   <Text style={styles.verified}>Verified Technician</Text>
@@ -335,7 +530,7 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
             {/* Confirm / Ready action buttons */}
             {isAccepted && (
               <TouchableOpacity
-                style={[styles.trackMapButton, { backgroundColor: '#7C3AED', marginBottom: 10 }]}
+                style={[styles.trackMapButton, { marginBottom: 10 }]}
                 onPress={handleConfirmRepair}
                 disabled={workflowLoading === 'confirm'}
                 activeOpacity={0.88}
@@ -343,16 +538,13 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
                 {workflowLoading === 'confirm'
                   ? <ActivityIndicator color={colors.white} />
                   : (
-                    <>
-                      <Ionicons name="checkmark-circle-outline" size={18} color={colors.white} style={{ marginRight: 8 }} />
                       <Text style={styles.primaryButtonText}>Confirm Repair</Text>
-                    </>
                   )}
               </TouchableOpacity>
             )}
             {isConfirmed && (
               <TouchableOpacity
-                style={[styles.trackMapButton, { backgroundColor: colors.teal, marginBottom: 10 }]}
+                style={[styles.trackMapButton, { marginBottom: 10 }]}
                 onPress={handleMarkReady}
                 disabled={workflowLoading === 'ready'}
                 activeOpacity={0.88}
@@ -360,10 +552,7 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
                 {workflowLoading === 'ready'
                   ? <ActivityIndicator color={colors.white} />
                   : (
-                    <>
-                      <Ionicons name="flag-outline" size={18} color={colors.white} style={{ marginRight: 8 }} />
                       <Text style={styles.primaryButtonText}>I'm Ready for the Technician</Text>
-                    </>
                   )}
               </TouchableOpacity>
             )}
@@ -383,7 +572,7 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
         )}
 
         {/* Tracking privacy notice */}
-        {!isActive && !isCompleted && (
+        {!isActive && !isCompleted && !isTerminal && (
           <View style={styles.noticeCard}>
             <Ionicons name="shield-outline" size={20} color={colors.teal} />
             <View style={{ flex: 1 }}>
@@ -409,90 +598,101 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.canvas },
-  navBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.line, backgroundColor: colors.white },
-  backButtonContainer: { flexDirection: 'row', alignItems: 'center', gap: 5, width: 76 },
+  navBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.line, backgroundColor: colors.white, gap: 8 },
+  backButtonContainer: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 0, minHeight: 44, justifyContent: 'center' },
   backButton: { color: colors.ink, fontSize: 14, fontFamily: fonts.semiBold },
-  navTitle: { flex: 1, textAlign: 'center', color: colors.muted, fontSize: 11, letterSpacing: 1.5, fontFamily: fonts.bold },
-  navPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 10, borderWidth: 1, width: 76, justifyContent: 'center' },
-  navPillText: { fontSize: 11, fontFamily: fonts.bold },
+  navTitle: { flex: 1, textAlign: 'center', color: colors.muted, fontSize: 11, letterSpacing: 1.5, fontFamily: fonts.bold, flexShrink: 1 },
+  navPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, borderWidth: 1, flexShrink: 1, maxWidth: 140, minHeight: 28 },
+  navPillText: { fontSize: 11, fontFamily: fonts.bold, flexShrink: 1 },
 
-  scrollContent: { flexGrow: 1, padding: 20, paddingBottom: 32 },
+  scrollContent: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 28 },
 
-  heroCard: { backgroundColor: colors.white, borderRadius: 24, padding: 24, alignItems: 'center', borderWidth: 1, borderColor: colors.line, marginBottom: 14, boxShadow: '0 8px 16px rgba(16,42,67,0.08)', elevation: 4 },
-  heroIcon: { width: 76, height: 76, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
-  heroKicker: { color: colors.muted, fontSize: 10, letterSpacing: 1.5, fontFamily: fonts.bold, marginBottom: 4 },
-  heroStatus: { fontSize: 26, fontFamily: fonts.extraBold, marginBottom: 18 },
-  cancelledBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FEF2F2', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: '#FECACA' },
+  statusCard: { backgroundColor: colors.white, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: colors.line, marginBottom: 14, boxShadow: '0 6px 14px rgba(16,42,67,0.06)', elevation: 3 },
+  statusHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  statusTile: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, flexShrink: 0 },
+  statusTileOutlined: { backgroundColor: colors.white },
+  statusTileFilled: {},
+  statusHeaderCopy: { flex: 1, flexShrink: 1, gap: 2 },
+  stepKicker: { color: colors.muted, fontSize: 10, letterSpacing: 1.5, fontFamily: fonts.bold, fontVariant: ['tabular-nums'] },
+  statusName: { fontSize: 20, fontFamily: fonts.extraBold, lineHeight: 24, letterSpacing: -0.3 },
 
-  guidanceBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 16, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 14, borderWidth: 1, backgroundColor: colors.canvas },
-  guidanceIcon: { marginTop: 1 },
-  guidanceCopy: { flex: 1 },
-  guidanceKicker: { fontSize: 11, letterSpacing: 1.1, fontFamily: fonts.bold, marginBottom: 3 },
-  guidanceTitle: { color: colors.ink, fontSize: 14, fontFamily: fonts.bold, marginBottom: 3 },
+  terminalBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14, borderWidth: 1 },
+  terminalCancelled: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
+  terminalNoShow: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
+  terminalText: { flex: 1, flexShrink: 1, color: '#B91C1C', fontSize: 13, fontFamily: fonts.semiBold, lineHeight: 18 },
+
+  progressRail: { marginTop: 14 },
+  progressDots: { flexDirection: 'row' },
+  progressStep: { flex: 1, alignItems: 'center' },
+  progressTrack: { flexDirection: 'row', alignItems: 'center', width: '100%' },
+  progressDot: { width: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.line, flexShrink: 0 },
+  progressDotUpcoming: { backgroundColor: colors.white, borderColor: colors.line },
+  progressDotNumber: { fontSize: 10, fontFamily: fonts.bold, color: colors.white, fontVariant: ['tabular-nums'] },
+  progressLine: { flex: 1, height: 2, backgroundColor: colors.line, marginHorizontal: 3, borderRadius: 1 },
+
+  guidanceBlock: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 14, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 14, borderWidth: 1 },
+  guidanceOutlined: {},
+  guidanceFilled: {},
+  guidanceIcon: { marginTop: 1, flexShrink: 0 },
+  guidanceCopy: { flex: 1, flexShrink: 1 },
+  guidanceTitle: { color: colors.ink, fontSize: 14, fontFamily: fonts.bold, marginBottom: 3, lineHeight: 18 },
   guidanceBody: { color: colors.muted, fontSize: 12, lineHeight: 17, fontFamily: fonts.regular },
-  cancelledText: { color: '#B91C1C', fontSize: 13, fontFamily: fonts.semiBold },
 
-  stepper: { width: '100%', flexDirection: 'row', marginTop: 4 },
-  stepItem: { flex: 1, alignItems: 'center' },
-  stepTop: { flexDirection: 'row', alignItems: 'center', width: '100%', paddingHorizontal: 6 },
-  dot: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.canvas, borderWidth: 1.5, borderColor: colors.line },
-  dotDone: { backgroundColor: colors.green, borderColor: colors.green },
-  dotActive: { backgroundColor: colors.teal, borderColor: colors.teal },
-  dotIdle: { backgroundColor: colors.canvas },
-  dotText: { fontSize: 11, fontFamily: fonts.bold, color: colors.muted },
-  dotTextActive: { color: colors.white },
-  link: { flex: 1, height: 2, backgroundColor: colors.line, marginHorizontal: 4 },
-  linkDone: { backgroundColor: colors.green },
-  stepLabel: { marginTop: 6, fontSize: 11, color: colors.muted, fontFamily: fonts.semiBold },
-  stepLabelActive: { color: colors.teal },
+  historyCard: { backgroundColor: colors.white, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: colors.line, marginBottom: 14, boxShadow: '0 6px 14px rgba(16,42,67,0.06)', elevation: 3 },
+  historyRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  historyRail: { alignItems: 'center', flexShrink: 0 },
+  historyDot: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  historyLine: { width: 2, flex: 1, minHeight: 12, backgroundColor: colors.lineSoft, borderRadius: 1, marginTop: 4 },
+  historyCopy: { flex: 1, flexShrink: 1, paddingBottom: 4 },
+  historyLabel: { color: colors.ink, fontSize: 13, fontFamily: fonts.bold },
+  historyDetail: { color: colors.muted, fontSize: 12, fontFamily: fonts.regular, marginTop: 1, lineHeight: 16 },
+  historyDateTime: { color: colors.muted, fontSize: 11, fontFamily: fonts.medium, marginTop: 3, fontVariant: ['tabular-nums'] },
 
-  activityCard: { backgroundColor: colors.white, borderRadius: 18, paddingHorizontal: 16, paddingVertical: 6, borderWidth: 1, borderColor: colors.line, marginBottom: 14 },
-  activityRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, gap: 10 },
-  activityLabel: { flex: 1, color: colors.ink, fontSize: 13, fontFamily: fonts.semiBold },
-  activityDate: { color: colors.muted, fontSize: 12, fontFamily: fonts.medium },
-
-  card: { backgroundColor: colors.white, borderRadius: 24, padding: 20, borderWidth: 1, borderColor: colors.line, marginBottom: 14, boxShadow: '0 6px 14px rgba(16,42,67,0.06)', elevation: 3 },
-  cardKicker: { color: colors.teal, fontSize: 10, letterSpacing: 1.5, fontFamily: fonts.bold, marginBottom: 6 },
-  cardTitle: { fontSize: 22, fontFamily: fonts.bold, color: colors.ink },
+  card: { backgroundColor: colors.white, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: colors.line, marginBottom: 14, boxShadow: '0 6px 14px rgba(16,42,67,0.06)', elevation: 3 },
+  cardKicker: { color: colors.teal, fontSize: 10, letterSpacing: 1.5, fontFamily: fonts.bold, marginBottom: 10 },
+  applianceHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  applianceTile: { width: 44, height: 44, borderRadius: 14, backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.hudBorder, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  applianceCopy: { flex: 1, flexShrink: 1 },
+  cardTitle: { fontSize: 18, fontFamily: fonts.bold, color: colors.ink, lineHeight: 22, letterSpacing: -0.2 },
   cardSub: { color: colors.muted, fontSize: 13, fontFamily: fonts.medium, marginTop: 2 },
-  divider: { height: 1, backgroundColor: colors.line, marginVertical: 16 },
-  fieldLabel: { color: colors.muted, fontSize: 11, letterSpacing: 1.1, fontFamily: fonts.bold, marginBottom: 6 },
+  divider: { height: 1, backgroundColor: colors.line, marginVertical: 14 },
+  fieldLabel: { color: colors.muted, fontSize: 10, letterSpacing: 1.5, fontFamily: fonts.bold, marginBottom: 6 },
   fieldText: { color: colors.ink, fontSize: 14, fontFamily: fonts.medium, lineHeight: 21 },
 
   photoWrap: { marginTop: 8, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, borderRadius: 14, padding: 8 },
-  photoImage: { width: '100%', height: 190, borderRadius: 10, backgroundColor: colors.line },
+  photoImage: { width: '100%', height: 190, borderRadius: 12, backgroundColor: colors.line },
   photoHintRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8 },
   photoHintText: { color: colors.teal, fontSize: 12, fontFamily: fonts.semiBold },
   photoEmpty: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, borderRadius: 14, padding: 14, marginTop: 8 },
-  photoEmptyText: { color: colors.muted, fontSize: 13, fontFamily: fonts.medium },
+  photoEmptyText: { color: colors.muted, fontSize: 13, fontFamily: fonts.medium, flexShrink: 1 },
 
   iconRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, gap: 12 },
-  iconBubble: { width: 40, height: 40, borderRadius: 13, backgroundColor: colors.tealLight, alignItems: 'center', justifyContent: 'center' },
-  iconRowCopy: { flex: 1 },
+  iconBubble: { width: 42, height: 42, borderRadius: 14, backgroundColor: colors.tealLight, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  iconRowCopy: { flex: 1, flexShrink: 1 },
   rowLabel: { color: colors.muted, fontSize: 11, fontFamily: fonts.semiBold, marginBottom: 2 },
   rowValue: { color: colors.ink, fontSize: 14, fontFamily: fonts.medium, lineHeight: 20 },
 
-  techRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 14 },
-  avatar: { width: 54, height: 54, borderRadius: 27, backgroundColor: colors.teal, alignItems: 'center', justifyContent: 'center' },
+  techRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
+  avatar: { width: 54, height: 54, borderRadius: 27, backgroundColor: colors.teal, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   avatarText: { color: colors.white, fontSize: 21, fontFamily: fonts.extraBold },
-  techCopy: { flex: 1 },
+  techCopy: { flex: 1, flexShrink: 1 },
   techName: { fontSize: 17, fontFamily: fonts.bold, color: colors.ink },
   verifiedRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
   verified: { fontSize: 12, color: colors.green, fontFamily: fonts.semiBold },
 
   ratingBlock: { backgroundColor: colors.canvas, borderRadius: 16, borderWidth: 1, borderColor: colors.line, padding: 16, marginBottom: 14 },
   ratingHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
-  ratingBig: { fontSize: 30, fontFamily: fonts.extraBold, color: colors.ink },
+  ratingBig: { fontSize: 30, fontFamily: fonts.extraBold, color: colors.ink, fontVariant: ['tabular-nums'] },
   starsRow: { flexDirection: 'row', gap: 1 },
   starGlyph: { fontSize: 15, color: colors.line, fontFamily: fonts.regular },
   starGlyphActive: { color: '#F59E0B' },
-  ratingCount: { flex: 1, color: colors.muted, fontSize: 11, fontFamily: fonts.medium },
+  ratingCount: { flex: 1, color: colors.muted, fontSize: 11, fontFamily: fonts.medium, flexShrink: 1 },
   bars: { gap: 7 },
   barRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  barLabel: { width: 22, fontSize: 11, color: colors.ink, fontFamily: fonts.semiBold },
+  barLabel: { width: 22, fontSize: 11, color: colors.ink, fontFamily: fonts.semiBold, fontVariant: ['tabular-nums'] },
   barTrack: { flex: 1, height: 7, borderRadius: 4, backgroundColor: colors.line, overflow: 'hidden' },
   barFill: { height: 7, borderRadius: 4, backgroundColor: '#F59E0B' },
-  barValue: { width: 34, textAlign: 'right', fontSize: 11, color: colors.muted, fontFamily: fonts.semiBold },
+  barValue: { width: 34, textAlign: 'right', fontSize: 11, color: colors.muted, fontFamily: fonts.semiBold, fontVariant: ['tabular-nums'] },
   noReviewRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.canvas, borderRadius: 14, borderWidth: 1, borderColor: colors.line, padding: 14, marginBottom: 14 },
   noReviewText: { color: colors.muted, fontSize: 13, fontFamily: fonts.semiBold },
 
@@ -503,12 +703,12 @@ const styles = StyleSheet.create({
   copyPillText: { fontSize: 10, fontFamily: fonts.bold, color: colors.teal, letterSpacing: 0.2 },
   codeDigitsRow: { flexDirection: 'row', gap: 10 },
   codeDigitBox: { width: 44, height: 48, borderRadius: 12, backgroundColor: colors.white, borderWidth: 2, borderColor: colors.green, justifyContent: 'center', alignItems: 'center' },
-  codeDigitText: { fontSize: 24, fontFamily: fonts.extraBold, color: colors.ink },
+  codeDigitText: { fontSize: 24, fontFamily: fonts.extraBold, color: colors.ink, fontVariant: ['tabular-nums'] },
   codeCardSub: { fontSize: 11, color: '#065F46', textAlign: 'center', lineHeight: 15, fontFamily: fonts.medium },
 
-  trackMapButton: { backgroundColor: colors.teal, height: 50, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 10, boxShadow: '0 4px 8px rgba(15,118,110,0.25)', elevation: 4 },
-  primaryButtonText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold, letterSpacing: 0.5 },
-  messageButton: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, height: 50, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  trackMapButton: { backgroundColor: colors.teal, minHeight: 48, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 10, paddingHorizontal: 18, boxShadow: '0 4px 8px rgba(15,118,110,0.25)', elevation: 4 },
+  primaryButtonText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold, letterSpacing: 0.5, flexShrink: 1, textAlign: 'center' },
+  messageButton: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, minHeight: 48, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18 },
   secondaryButtonText: { color: colors.ink, fontSize: 14, fontFamily: fonts.bold },
 
   noticeCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.tealLight, padding: 14, borderRadius: 16, borderWidth: 1, borderColor: '#B2E2D8' },

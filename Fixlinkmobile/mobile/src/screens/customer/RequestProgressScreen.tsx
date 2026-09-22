@@ -281,8 +281,7 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
         accessibilityLabel={`Request progress: step ${current + 1} of ${PROGRESS_STEPS.length}, ${PROGRESS_STEPS[current]}`}
       >
         <View style={styles.railHeader}>
-          <Text style={styles.railKicker}>PROGRESS</Text>
-          <Text style={styles.railStepLabel}>{PROGRESS_STEPS[current]} · step {current + 1} of {PROGRESS_STEPS.length}</Text>
+          <Text style={styles.railStepLabel}>Step {current + 1} of {PROGRESS_STEPS.length}</Text>
         </View>
         <View style={styles.railBody}>
           {PROGRESS_STEPS.map((step, i) => {
@@ -365,7 +364,10 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
     const isTerminalHistory = isCancelled || isNoShow;
     const isActive = isAccepted || isConfirmed || isReady || statusKey === 'in progress';
     const statusColor = getStatusColor(req.status);
-    const guidance = getStatusGuidance(req.status);
+    const baseGuidance = getStatusGuidance(req.status);
+    const guidance = statusKey === 'accepted'
+      ? { ...baseGuidance, body: 'Confirm you need the repair and will be at the location.' }
+      : baseGuidance;
     const cancelMessage = isPending
       ? 'This can only be done before a technician accepts the request.'
       : isReady
@@ -384,13 +386,11 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
           </View>
           <View style={styles.cardHeaderCopy}>
             <Text style={styles.applianceTitle} numberOfLines={1}>{req.applianceType}</Text>
-            <Text style={styles.subLabel} numberOfLines={1}>
-              {req.technicianName
-                ? `Tech: ${req.technicianName}`
-                : isPending
-                  ? 'Awaiting technician match'
-                  : 'Matching you with a technician'}
-            </Text>
+            {req.technicianName ? (
+              <Text style={styles.subLabel} numberOfLines={1}>
+                {`Tech: ${req.technicianName}`}
+              </Text>
+            ) : null}
           </View>
         </View>
 
@@ -400,7 +400,7 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
           </View>
           <View style={styles.statusHeroCopy}>
             <Text style={styles.statusHeroKicker} accessibilityRole="text">
-              CURRENT STATUS — <Text style={[styles.statusHeroStatus, { color: statusColor }]}>{req.status || 'Pending'}</Text>
+              <Text style={[styles.statusHeroStatus, { color: statusColor }]}>{req.status || 'Pending'}</Text>
             </Text>
             <Text style={styles.statusHeroTitle} numberOfLines={1}>{guidance.title}</Text>
             <Text style={styles.statusHeroBody} numberOfLines={2}>{guidance.body}</Text>
@@ -410,7 +410,7 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
         {/* 2 — NEXT ACTION: directly below status, visually dominant */}
         {isAccepted && (
           <View style={styles.nextActionBlock}>
-            <Text style={styles.nextActionKicker}>NEXT ACTION REQUIRED</Text>
+            <Text style={styles.nextActionKicker}>NEXT STEP</Text>
             <View style={styles.primaryRow}>
               <Pressable
                 accessibilityRole="button"
@@ -419,7 +419,6 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
                 onPress={() => confirmRepair(req)}
                 style={({ pressed }) => [styles.primaryButton, styles.nextActionPrimary, pressed && styles.pressed]}
               >
-                <Ionicons name="checkmark-circle" size={16} color={colors.white} accessible={false} />
                 <Text style={styles.primaryButtonText}>Confirm Repair</Text>
               </Pressable>
               {onTrackMap && (
@@ -439,7 +438,7 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
         )}
         {isConfirmed && (
           <View style={styles.nextActionBlock}>
-            <Text style={styles.nextActionKicker}>NEXT ACTION REQUIRED</Text>
+            <Text style={styles.nextActionKicker}>NEXT STEP</Text>
             <View style={styles.primaryRow}>
               <Pressable
                 accessibilityRole="button"
@@ -448,8 +447,7 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
                 onPress={() => markReady(req)}
                 style={({ pressed }) => [styles.primaryButton, styles.nextActionPrimary, pressed && styles.pressed]}
               >
-                <Ionicons name="flag" size={16} color={colors.white} accessible={false} />
-                <Text style={styles.primaryButtonText}>I&apos;m Ready</Text>
+                <Text style={styles.primaryButtonText}>Mark Ready</Text>
               </Pressable>
               {onTrackMap && (
                 <Pressable
@@ -467,11 +465,7 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
         )}
         {isReady && (
           <View style={styles.nextActionBlock}>
-            <Text style={styles.nextActionKicker}>WHAT&apos;S NEXT</Text>
-            <View style={styles.calmingInfo}>
-              <Ionicons name="hourglass-outline" size={15} color={colors.teal} accessible={false} />
-              <Text style={styles.calmingInfoText}>Your location is marked ready — follow the technician live on the map.</Text>
-            </View>
+            <Text style={styles.nextActionKicker}>NEXT STEP</Text>
             {onTrackMap && (
               <Pressable
                 accessibilityRole="button"
@@ -480,18 +474,14 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
                 style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
               >
                 <Ionicons name="map" size={15} color={colors.white} accessible={false} />
-                <Text style={styles.primaryButtonText}>Track Technician</Text>
+                <Text style={styles.primaryButtonText}>Track</Text>
               </Pressable>
             )}
           </View>
         )}
         {statusKey === 'in progress' && (
           <View style={styles.nextActionBlock}>
-            <Text style={styles.nextActionKicker}>WHAT&apos;S NEXT</Text>
-            <View style={styles.calmingInfo}>
-              <Ionicons name="construct-outline" size={15} color={colors.teal} accessible={false} />
-              <Text style={styles.calmingInfoText}>Repairs are underway — keep your phone nearby for updates.</Text>
-            </View>
+            <Text style={styles.nextActionKicker}>NEXT STEP</Text>
             {onTrackMap && (
               <Pressable
                 accessibilityRole="button"
@@ -500,7 +490,7 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
                 style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
               >
                 <Ionicons name="map" size={15} color={colors.white} accessible={false} />
-                <Text style={styles.primaryButtonText}>Track Technician</Text>
+                <Text style={styles.primaryButtonText}>Track</Text>
               </Pressable>
             )}
           </View>
@@ -516,13 +506,6 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
             </Text>
           </View>
         )}
-        {isReady && (
-          <View style={styles.readyBadge}>
-            <Ionicons name="checkmark-circle" size={14} color={colors.teal} accessible={false} />
-            <Text style={styles.readyText}>Ready for your technician</Text>
-          </View>
-        )}
-
         {/* 3 — JOB SUMMARY: scannable facts */}
         {req.description ? <Text style={styles.description} numberOfLines={2}>{req.description}</Text> : null}
 
@@ -536,7 +519,7 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
           >
             <Image source={{ uri: req.photoUrl }} style={styles.photoBadgeThumb} />
             <Ionicons name="image-outline" size={15} color={colors.teal} accessible={false} />
-            <Text style={styles.photoBadgeText} numberOfLines={1}>Photo attached</Text>
+            <Text style={styles.photoBadgeText} numberOfLines={1}>Photo</Text>
             <Ionicons name="chevron-forward" size={15} color={colors.muted} accessible={false} />
           </Pressable>
         ) : null}
@@ -777,7 +760,7 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
       return (
         <View style={styles.aiMessageRow}>
           <Ionicons name="cloud-offline-outline" size={16} color={colors.muted} accessible={false} />
-          <Text style={styles.aiMessageText}>Recommendations are temporarily unavailable. Pull down to try again.</Text>
+          <Text style={styles.aiMessageText}>Unavailable. Pull to retry.</Text>
         </View>
       );
     }
@@ -786,7 +769,7 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
       return (
         <View style={styles.aiMessageRow}>
           <Ionicons name="alert-circle-outline" size={16} color={colors.muted} accessible={false} />
-          <Text style={styles.aiMessageText}>{data?.note || 'No eligible technicians match this request yet.'}</Text>
+          <Text style={styles.aiMessageText}>{data?.note || 'No matches yet.'}</Text>
         </View>
       );
     }
@@ -794,7 +777,7 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
     return (
       <View style={styles.aiLoading}>
         <ActivityIndicator size="small" color={colors.teal} />
-        <Text style={styles.aiLoadingText}>Analyzing your request for the best match...</Text>
+        <Text style={styles.aiLoadingText}>Finding matches…</Text>
       </View>
     );
   };
@@ -821,23 +804,23 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
 
         <View style={styles.metaRow}>
           {renderMetaItem('calendar-outline', formatCardDate(job.completedAt || job.createdAt))}
-          {renderMetaItem('star-outline', currentRating ? `${currentRating} star${currentRating > 1 ? 's' : ''} rating` : 'No rating yet')}
+          {renderMetaItem('star-outline', currentRating ? `${currentRating}/5` : 'Not rated')}
         </View>
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={expanded ? `Hide review form for ${job.applianceType ?? 'this job'}` : `Write a review for ${job.applianceType ?? 'this job'}`}
+          accessibilityLabel={expanded ? `Hide review for ${job.applianceType ?? 'this job'}` : `Write a review for ${job.applianceType ?? 'this job'}`}
           accessibilityState={{ expanded }}
           onPress={() => setExpandedReviewId(expanded ? null : job.id)}
           style={({ pressed }) => [styles.reviewToggle, pressed && styles.pressedSoft]}
         >
           <Ionicons name={expanded ? 'chevron-up' : 'star-outline'} size={16} color={colors.teal} accessible={false} />
-          <Text style={styles.reviewToggleText}>{expanded ? 'Hide review form' : 'Write a review'}</Text>
+          <Text style={styles.reviewToggleText}>{expanded ? 'Hide review' : 'Write a review'}</Text>
         </Pressable>
 
         {expanded && (
           <View style={styles.reviewContainer}>
-            <Text style={styles.inputLabel}>Rate your experience</Text>
+            <Text style={styles.inputLabel}>Your rating</Text>
             <View style={styles.stars}>
               {[1, 2, 3, 4, 5].map((star) => {
                 const selected = currentRating >= star;
@@ -866,7 +849,7 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
               <Ionicons name="chatbox-outline" size={20} color={colors.muted} style={styles.inputIcon} accessible={false} />
               <TextInput
                 style={styles.reviewInput}
-                placeholder="How was the service? (Optional)"
+                placeholder="Optional comment"
                 placeholderTextColor={colors.muted}
                 multiline
                 onChangeText={(text) => setReviewComments({ ...reviewComments, [job.id]: text })}
@@ -885,7 +868,7 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
               {reviewSubmitting === job.id ? (
                 <ActivityIndicator color={colors.white} />
               ) : (
-                <Text style={styles.primaryButtonText}>Submit Review</Text>
+                <Text style={styles.primaryButtonText}>Submit</Text>
               )}
             </Pressable>
           </View>
