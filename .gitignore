@@ -6,3 +6,10 @@
 *.apk
 node_modules/
 **/node_modules/
+
+# AI tooling artifacts (local only)
+.agents/
+.opencode/
+.impeccable/
+agent-spec/
+skills-lock.json
