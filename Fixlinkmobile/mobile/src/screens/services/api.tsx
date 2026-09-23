@@ -124,16 +124,46 @@ export const declineRepairRequest = async (jobId: string, technicianUid: string)
   (await api.put(`/requests/${jobId}/decline`, { technicianUid })).data;
 export const cancelRepairRequest = async (requestId: string, cancellationReason: string): Promise<unknown> =>
   (await api.put(`/requests/${encodeURIComponent(requestId)}/cancel`, { cancellationReason })).data;
-export const updateJobStatus = async (jobId: string, status: string, technicianUid: string, cancellationReason?: string): Promise<unknown> =>
-  (await api.put(`/requests/accepted/${jobId}/status`, { status, technicianUid, cancellationReason })).data;
-export const confirmRepairRequest = async (jobId: string): Promise<unknown> =>
-  (await api.post(`/requests/${encodeURIComponent(jobId)}/confirm-repair`)).data;
-export const markCustomerReady = async (jobId: string): Promise<unknown> =>
-  (await api.post(`/requests/${encodeURIComponent(jobId)}/customer-ready`)).data;
-export const recordTechnicianArrival = async (jobId: string, technicianUid: string): Promise<unknown> =>
-  (await api.post(`/requests/${encodeURIComponent(jobId)}/arrive`, { technicianUid })).data;
-export const reportNoShow = async (jobId: string, technicianUid: string, reason: string): Promise<unknown> =>
-  (await api.post(`/requests/${encodeURIComponent(jobId)}/report-no-show`, { technicianUid, reason })).data;
+export const updateJobStatus = async (jobId: string, status: string, technicianUid: string, cancellationReason?: string): Promise<unknown> => {
+  try {
+    return (await api.put(`/requests/accepted/${jobId}/status`, { status, technicianUid, cancellationReason })).data;
+  } catch (error: unknown) {
+    const err = error as { response?: { data?: unknown } };
+    throw err.response ? err.response.data : error;
+  }
+};
+export const confirmRepairRequest = async (jobId: string): Promise<unknown> => {
+  try {
+    return (await api.post(`/requests/${encodeURIComponent(jobId)}/confirm-repair`)).data;
+  } catch (error: unknown) {
+    const err = error as { response?: { data?: unknown } };
+    throw err.response ? err.response.data : error;
+  }
+};
+export const markCustomerReady = async (jobId: string): Promise<unknown> => {
+  try {
+    return (await api.post(`/requests/${encodeURIComponent(jobId)}/customer-ready`)).data;
+  } catch (error: unknown) {
+    const err = error as { response?: { data?: unknown } };
+    throw err.response ? err.response.data : error;
+  }
+};
+export const recordTechnicianArrival = async (jobId: string, technicianUid: string): Promise<unknown> => {
+  try {
+    return (await api.post(`/requests/${encodeURIComponent(jobId)}/arrive`, { technicianUid })).data;
+  } catch (error: unknown) {
+    const err = error as { response?: { data?: unknown } };
+    throw err.response ? err.response.data : error;
+  }
+};
+export const reportNoShow = async (jobId: string, technicianUid: string, reason: string): Promise<unknown> => {
+  try {
+    return (await api.post(`/requests/${encodeURIComponent(jobId)}/report-no-show`, { technicianUid, reason })).data;
+  } catch (error: unknown) {
+    const err = error as { response?: { data?: unknown } };
+    throw err.response ? err.response.data : error;
+  }
+};
 export const fetchAcceptedJobLocation = async (jobId: string): Promise<unknown> =>
   (await api.get(`/requests/accepted/${jobId}/location`)).data;
 export const fetchJobLiveTracking = async (jobId: string): Promise<unknown> =>

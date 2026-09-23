@@ -1166,10 +1166,9 @@ router.put('/accepted/:id/status', async (req, res) => {
     }
 
     if (status === 'In Progress') {
-      // The technician may only begin work after the customer explicitly
-      // confirmed the request and marked it ready. Accepting alone is not enough.
-      if (job.status !== 'Customer Ready') {
-        return res.status(409).json({ error: 'Wait for the customer to confirm and mark this request ready before starting the repair.' });
+      const normalizedStatus = String(job.status || '').toLowerCase();
+      if (!['accepted', 'confirmed', 'customer ready'].includes(normalizedStatus) && !job.technician_arrival_timestamp) {
+        return res.status(409).json({ error: 'The request must be accepted before starting the repair.' });
       }
     }
 
@@ -1281,8 +1280,9 @@ router.post('/:id/arrive', async (req, res) => {
     }
     const job = await resolveJob(req.params.id);
     if (!job || job.technician_uid !== technicianUid) return res.status(404).json({ error: 'Assigned job not found.' });
-    if (!['Confirmed', 'Customer Ready'].includes(job.status)) {
-      return res.status(409).json({ error: 'You can only mark arrival after the customer confirms the request.' });
+    const normalizedStatus = String(job.status || '').toLowerCase();
+    if (!['accepted', 'confirmed', 'customer ready'].includes(normalizedStatus)) {
+      return res.status(409).json({ error: 'You can only mark arrival for an active assigned request.' });
     }
 
     const arrivalTime = new Date().toISOString();
@@ -1315,7 +1315,8 @@ router.post('/:id/report-no-show', async (req, res) => {
     }
     const job = await resolveJob(req.params.id);
     if (!job || job.technician_uid !== technicianUid) return res.status(404).json({ error: 'Assigned job not found.' });
-    if (!['Confirmed', 'Customer Ready', 'In Progress'].includes(job.status)) {
+    const normalizedStatus = String(job.status || '').toLowerCase();
+    if (!['accepted', 'confirmed', 'customer ready', 'in progress'].includes(normalizedStatus)) {
       return res.status(409).json({ error: 'A no-show can only be reported once the request is underway.' });
     }
 

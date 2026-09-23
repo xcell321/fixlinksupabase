@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -19,6 +19,16 @@ import HelpSheet from '../../components/HelpSheet';
 import { PhotoLightbox } from '../../components/RequestPhoto';
 import { colors, fonts, shadows } from '../../theme';
 import type { TechnicianScheduleItem, TechnicianScheduleResponse } from '../../types/schedule';
+import {
+  draftFromProfile,
+  formatExperience,
+  formatRating,
+  formatReviewDate,
+  formatSkillList,
+  getVerificationBadge,
+  EMPTY_DRAFT,
+  type TechnicianDraft,
+} from '../../utils/technicianProfileHelpers';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 type GeoStatus = 'idle' | 'detecting' | 'found' | 'not-found';
@@ -31,6 +41,7 @@ interface TechnicianRef {
 interface Review {
   rating: number;
   comment?: string;
+  createdAt?: string | null;
 }
 
 interface PortfolioPhoto {
@@ -51,15 +62,7 @@ interface TechnicianProfile {
   longitude?: number | null;
   reviews?: Review[];
   portfolio?: PortfolioPhoto[];
-}
-
-interface Draft {
-  name: string;
-  phone: string;
-  address: string;
-  bio: string;
-  skills: string;
-  yearsExperience: string;
+  profileImage?: string | null;
 }
 
 interface Coords {
@@ -82,22 +85,6 @@ interface TechnicianProfileScreenProps {
   onBack?: () => void;
 }
 
-const EMPTY_DRAFT: Draft = { name: '', phone: '', address: '', bio: '', skills: '', yearsExperience: '' };
-
-const draftFromProfile = (result: TechnicianProfile): Draft => ({
-  name: result.name ?? '',
-  phone: result.phone ?? '',
-  address: result.address ?? '',
-  bio: result.bio ?? '',
-  skills: Array.isArray(result.skills) ? result.skills.join(', ') : String(result.skills ?? ''),
-  yearsExperience: String(result.yearsExperience ?? ''),
-});
-
-const skillListOf = (profile: TechnicianProfile): string[] => {
-  if (Array.isArray(profile.skills)) return profile.skills.map((s) => String(s).trim()).filter(Boolean);
-  return String(profile.skills ?? '').split(',').map((skill) => skill.trim()).filter(Boolean);
-};
-
 function StarRow({ value, size = 14 }: { value: number; size?: number }): React.JSX.Element {
   const stars = [1, 2, 3, 4, 5].map((i) => {
     const name: IconName = value >= i - 0.25 ? 'star' : value >= i - 0.75 ? 'star-half' : 'star-outline';
@@ -114,7 +101,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
   const [uploading, setUploading] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
   const [editing, setEditing] = useState<boolean>(false);
-  const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
+  const [draft, setDraft] = useState<TechnicianDraft>(EMPTY_DRAFT);
   const [detectedCoords, setDetectedCoords] = useState<Coords | null>(null);
   const [geoStatus, setGeoStatus] = useState<GeoStatus>('idle');
   const [schedule, setSchedule] = useState<TechnicianScheduleItem[]>([]);
@@ -193,8 +180,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
 
   useEffect(() => { loadProfile(); }, []);
 
-  // Customer-visible upcoming schedule (read-only view only). Safe fields
-  // only, served by the backend; silent failure falls back to empty state.
+  // Customer-visible upcoming schedule (read-only view only).
   useEffect(() => {
     if (!readOnly || !technician.uid) return;
     let cancelled = false;
@@ -278,7 +264,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
               <Skeleton style={{ width: '80%', height: 14, borderRadius: 6 }} />
             </View>
           </View>
-          <Skeleton style={{ width: '100%', height: 18, borderRadius: 8 }} />
+          <Skeleton style={{ width: '100%', height: 72, borderRadius: 16 }} />
           <Skeleton style={{ width: '100%', height: 88, borderRadius: 16 }} />
           <Skeleton style={{ width: '100%', height: 96, borderRadius: 16 }} />
         </View>
@@ -290,7 +276,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
     return (
       <View style={styles.centerScreen}>
         <View style={styles.emptyIconWrap}>
-          <Ionicons name="person-circle-outline" size={30} color={colors.teal} />
+          <Ionicons name="person-circle-outline" size={32} color={colors.teal} />
         </View>
         <Text style={styles.emptyTitle}>Profile unavailable</Text>
         <Text style={styles.emptyText}>{loadError ?? 'This profile could not be loaded.'}</Text>
@@ -307,14 +293,15 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
     );
   }
 
-  const skills = skillListOf(profile);
+  const skills = formatSkillList(profile.skills);
   const reviews = Array.isArray(profile.reviews) ? profile.reviews : [];
   const portfolio = Array.isArray(profile.portfolio) ? profile.portfolio : [];
   const rating = typeof profile.averageRating === 'number' ? profile.averageRating : 0;
-  const setField = (key: keyof Draft) => (value: string) =>
+  const setField = (key: keyof TechnicianDraft) => (value: string) =>
     setDraft((current) => ({ ...current, [key]: value }));
   const visibleReviews = showAllReviews ? reviews : reviews.slice(0, 2);
   const hasMoreReviews = reviews.length > 2;
+  const verification = getVerificationBadge(profile.verified);
 
   return (
     <ScrollView contentContainerStyle={styles.screen} showsVerticalScrollIndicator={false}>
@@ -335,208 +322,254 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
           </View>
         )}
 
-        {/* 1. IDENTITY + CONTACT — ONE primary white cover */}
+        {/* 1. IDENTITY + CONTACT: Primary Profile Card */}
         <View style={styles.coverCard}>
           <View style={styles.coverTop}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{(profile.name || 'T').charAt(0).toUpperCase()}</Text>
-            </View>
+            {profile.profileImage ? (
+              <Image source={{ uri: profile.profileImage }} style={styles.avatarImage} />
+            ) : (
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{(profile.name || 'T').charAt(0).toUpperCase()}</Text>
+              </View>
+            )}
+
             <View style={styles.coverIdentity}>
-              <Text style={styles.coverName} numberOfLines={2}>{profile.name || 'Technician'}</Text>
-              <View style={styles.coverVerifiedRow}>
-                {profile.verified ? (
-                  <View style={styles.verifiedInline}>
+              <View style={styles.coverNameRow}>
+                <Text style={styles.coverName} numberOfLines={2}>{profile.name || 'Technician'}</Text>
+              </View>
+
+              <View style={styles.badgeRow}>
+                {verification.isVerified ? (
+                  <View style={styles.verifiedBadge}>
                     <Ionicons name="shield-checkmark" size={13} color={colors.teal} />
-                    <Text style={styles.verifiedInlineText}>Verified Technician</Text>
+                    <Text style={styles.verifiedBadgeText}>{verification.label}</Text>
                   </View>
                 ) : (
-                  <Text style={styles.roleTextMuted}>Technician</Text>
+                  <View style={styles.pendingBadge}>
+                    <Ionicons name="shield-outline" size={13} color={colors.gold} />
+                    <Text style={styles.pendingBadgeText}>{verification.label}</Text>
+                  </View>
                 )}
               </View>
+
               <View style={styles.coverRatingRow}>
                 {rating > 0 ? (
                   <>
                     <StarRow value={rating} size={13} />
-                    <Text style={styles.coverRatingText}>{rating.toFixed(1)} · {reviews.length} review{reviews.length === 1 ? '' : 's'}</Text>
+                    <Text style={styles.coverRatingText}>
+                      {rating.toFixed(1)} · {reviews.length} review{reviews.length === 1 ? '' : 's'}
+                    </Text>
                   </>
                 ) : (
                   <Text style={styles.coverRatingTextMuted}>No reviews yet</Text>
                 )}
               </View>
+
               {!readOnly && !editing && (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Edit profile"
-                  accessibilityHint="Open the profile editor"
+                  accessibilityLabel="Edit profile details"
                   hitSlop={8}
                   onPress={() => setEditing(true)}
-                  style={({ pressed }) => [styles.editProfilePill, pressed && styles.pressedSoft]}
+                  style={({ pressed }) => [styles.editProfileButton, pressed && styles.pressedSoft]}
                 >
                   <Ionicons name="pencil-outline" size={13} color={colors.teal} />
-                  <Text style={styles.editProfilePillText}>Edit Profile</Text>
+                  <Text style={styles.editProfileButtonText}>Edit Profile</Text>
                 </Pressable>
               )}
             </View>
           </View>
 
-          {/* Contact rows inside same cover */}
-          {(profile.phone || profile.address) && (
-            <>
-              <View style={styles.coverDivider} />
-              <View style={styles.coverContactList}>
-                {profile.phone ? (
-                  <View style={styles.coverContactRow}>
-                    <View style={styles.coverContactIcon}>
-                      <Ionicons name="call-outline" size={13} color={colors.teal} />
-                    </View>
-                    <Text style={styles.coverContactText} selectable>{profile.phone}</Text>
-                  </View>
-                ) : null}
-                {profile.address ? (
-                  <View style={styles.coverContactRow}>
-                    <View style={styles.coverContactIcon}>
-                      <Ionicons name="location-outline" size={13} color={colors.teal} />
-                    </View>
-                    <Text style={styles.coverContactText} numberOfLines={2}>{profile.address}</Text>
-                  </View>
-                ) : null}
+          {/* Contact Details List */}
+          <View style={styles.coverDivider} />
+          <View style={styles.coverContactList}>
+            <View style={styles.coverContactRow}>
+              <View style={styles.coverContactIcon}>
+                <Ionicons name="call-outline" size={14} color={colors.teal} />
               </View>
-            </>
-          )}
-          {/* If neither phone nor address, still show subtle placeholder so cover doesn't look truncated */}
-          {!profile.phone && !profile.address && !readOnly && (
-            <>
-              <View style={styles.coverDivider} />
-              <Text style={styles.coverEmptyContact}>Add your phone and service address to help customers reach you.</Text>
-            </>
-          )}
-        </View>
-
-        {/* 2. REPUTATION BAND — single inline on canvas, not cards */}
-        <View style={styles.reputationBand}>
-          <View style={styles.repItem}>
-            <Text style={styles.repValue}>{profile.completedJobs ?? 0}</Text>
-            <Text style={styles.repLabel}> Completed Jobs</Text>
-          </View>
-          <Text style={styles.repDot}>·</Text>
-          <View style={styles.repItem}>
-            <Text style={styles.repValue}>{profile.averageRating != null ? Number(profile.averageRating).toFixed(1) : '—'}</Text>
-            <View style={styles.repStarInline}>
-              <Ionicons name="star" size={11} color={colors.gold} />
+              <View style={styles.coverContactTextWrap}>
+                <Text style={styles.coverContactMeta}>PHONE</Text>
+                <Text style={styles.coverContactText} selectable>
+                  {profile.phone ? profile.phone : 'Not provided'}
+                </Text>
+              </View>
             </View>
-            <Text style={styles.repLabel}> Rating</Text>
-          </View>
-          <Text style={styles.repDot}>·</Text>
-          <View style={styles.repItem}>
-            <Text style={styles.repValue}>{profile.yearsExperience ? String(profile.yearsExperience) : '0'}</Text>
-            <Text style={styles.repLabel}> Years Experience</Text>
+
+            <View style={styles.coverContactRow}>
+              <View style={styles.coverContactIcon}>
+                <Ionicons name="location-outline" size={14} color={colors.teal} />
+              </View>
+              <View style={styles.coverContactTextWrap}>
+                <Text style={styles.coverContactMeta}>SERVICE ADDRESS</Text>
+                <Text style={styles.coverContactText} numberOfLines={2}>
+                  {profile.address ? profile.address : 'Not provided'}
+                </Text>
+              </View>
+            </View>
           </View>
         </View>
 
-        {/* 3. EDITOR — when editing, appears directly below cover */}
+        {/* 2. REPUTATION METRICS: 3-Up Telemetry Card */}
+        <View style={styles.statsCard}>
+          <View style={styles.statCol}>
+            <View style={styles.statIconBadge}>
+              <Ionicons name="checkmark-circle-outline" size={15} color={colors.teal} />
+            </View>
+            <Text style={styles.statNum}>{profile.completedJobs ?? 0}</Text>
+            <Text style={styles.statLabel}>JOBS DONE</Text>
+          </View>
+
+          <View style={styles.statDivider} />
+
+          <View style={styles.statCol}>
+            <View style={styles.statIconBadge}>
+              <Ionicons name="star" size={14} color={colors.gold} />
+            </View>
+            <Text style={styles.statNum}>{formatRating(profile.averageRating)}</Text>
+            <Text style={styles.statLabel}>RATING</Text>
+          </View>
+
+          <View style={styles.statDivider} />
+
+          <View style={styles.statCol}>
+            <View style={styles.statIconBadge}>
+              <Ionicons name="ribbon-outline" size={15} color={colors.teal} />
+            </View>
+            <Text style={styles.statNum}>{formatExperience(profile.yearsExperience)}</Text>
+            <Text style={styles.statLabel}>EXPERIENCE</Text>
+          </View>
+        </View>
+
+        {/* 3. EDITOR: Inline Form with Leading Icons & Sunken Inputs */}
         {editing && (
           <View style={styles.editCard}>
             <View style={styles.editHeader}>
               <Text style={styles.editKicker}>EDIT PROFILE</Text>
-              <Text style={styles.editTitle}>Update your details</Text>
+              <Text style={styles.editTitle}>Update professional details</Text>
             </View>
-            <Text style={styles.groupLabel}>Contact</Text>
-            <View style={styles.editGroup}>
-              <Text style={styles.editLabel}>Full name</Text>
-              <TextInput
-                style={styles.editInput}
-                value={draft.name}
-                onChangeText={setField('name')}
-                placeholder="Full name"
-                placeholderTextColor={colors.muted}
-                accessibilityLabel="Full name"
-              />
+
+            <Text style={styles.groupLabel}>Contact Information</Text>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Full Name</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="person-outline" size={18} color={colors.muted} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.textInput}
+                  value={draft.name}
+                  onChangeText={setField('name')}
+                  placeholder="Full name"
+                  placeholderTextColor={colors.muted}
+                  accessibilityLabel="Full name"
+                />
+              </View>
             </View>
-            <View style={styles.editGroup}>
-              <Text style={styles.editLabel}>Phone</Text>
-              <TextInput
-                style={styles.editInput}
-                value={draft.phone}
-                onChangeText={setField('phone')}
-                placeholder="Phone number"
-                placeholderTextColor={colors.muted}
-                keyboardType="phone-pad"
-                accessibilityLabel="Phone number"
-              />
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Phone Number</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="call-outline" size={18} color={colors.muted} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.textInput}
+                  value={draft.phone}
+                  onChangeText={setField('phone')}
+                  placeholder="09XX XXX XXXX"
+                  placeholderTextColor={colors.muted}
+                  keyboardType="phone-pad"
+                  accessibilityLabel="Phone number"
+                />
+              </View>
             </View>
-            <View style={styles.editGroup}>
-              <Text style={styles.editLabel}>Address</Text>
-              <TextInput
-                style={[styles.editInput, styles.editInputMulti]}
-                value={draft.address}
-                onChangeText={setField('address')}
-                placeholder="Service address"
-                placeholderTextColor={colors.muted}
-                multiline
-                accessibilityLabel="Service address"
-              />
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Service Base Address</Text>
+              <View style={[styles.inputContainer, styles.inputContainerMulti]}>
+                <Ionicons name="location-outline" size={18} color={colors.muted} style={[styles.inputIcon, styles.inputIconMulti]} />
+                <TextInput
+                  style={[styles.textInput, styles.textInputMulti]}
+                  value={draft.address}
+                  onChangeText={setField('address')}
+                  placeholder="Street, Barangay, City or Municipality"
+                  placeholderTextColor={colors.muted}
+                  multiline
+                  accessibilityLabel="Service address"
+                />
+              </View>
               {geoStatus === 'detecting' && (
                 <View style={styles.geoRow}>
                   <ActivityIndicator size="small" color={colors.teal} />
-                  <Text style={[styles.geoHint, styles.geoPending]}>Detecting location…</Text>
+                  <Text style={[styles.geoHint, styles.geoPending]}>Detecting coordinates via LocationIQ...</Text>
                 </View>
               )}
               {geoStatus === 'found' && detectedCoords && (
                 <View style={styles.geoRow}>
                   <Ionicons name="checkmark-circle" size={14} color={colors.green} />
                   <Text style={[styles.geoHint, styles.geoOk]}>
-                    {detectedCoords.latitude.toFixed(4)} · {detectedCoords.longitude.toFixed(4)}
+                    Coordinates: {detectedCoords.latitude.toFixed(4)}, {detectedCoords.longitude.toFixed(4)}
                   </Text>
                 </View>
               )}
               {geoStatus === 'not-found' && (
                 <View style={styles.geoRow}>
                   <Ionicons name="alert-circle-outline" size={14} color={colors.error} />
-                  <Text style={[styles.geoHint, styles.geoWarn]}>Location not recognized — coords stay unchanged</Text>
+                  <Text style={[styles.geoHint, styles.geoWarn]}>Location not detected: previous coordinates preserved</Text>
                 </View>
               )}
             </View>
-            <Text style={styles.groupLabel}>Professional</Text>
-            <View style={styles.editGroup}>
-              <Text style={styles.editLabel}>Bio</Text>
-              <TextInput
-                style={[styles.editInput, styles.editInputMulti]}
-                value={draft.bio}
-                onChangeText={setField('bio')}
-                placeholder="Short professional bio"
-                placeholderTextColor={colors.muted}
-                multiline
-                accessibilityLabel="Professional bio"
-              />
+
+            <Text style={styles.groupLabel}>Professional Details</Text>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Professional Bio</Text>
+              <View style={[styles.inputContainer, styles.inputContainerMulti]}>
+                <Ionicons name="document-text-outline" size={18} color={colors.muted} style={[styles.inputIcon, styles.inputIconMulti]} />
+                <TextInput
+                  style={[styles.textInput, styles.textInputMulti]}
+                  value={draft.bio}
+                  onChangeText={setField('bio')}
+                  placeholder="Briefly describe your specialization, tools, and background..."
+                  placeholderTextColor={colors.muted}
+                  multiline
+                  accessibilityLabel="Professional bio"
+                />
+              </View>
             </View>
-            <View style={styles.editGroup}>
-              <Text style={styles.editLabel}>Skills (comma-separated)</Text>
-              <TextInput
-                style={[styles.editInput, styles.editInputMulti]}
-                value={draft.skills}
-                onChangeText={setField('skills')}
-                placeholder="Refrigerator, Washing Machine"
-                placeholderTextColor={colors.muted}
-                multiline
-                accessibilityLabel="Skills, comma separated"
-              />
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Skills (comma-separated)</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="construct-outline" size={18} color={colors.muted} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.textInput}
+                  value={draft.skills}
+                  onChangeText={setField('skills')}
+                  placeholder="Refrigerator, Washing Machine, Air Conditioning"
+                  placeholderTextColor={colors.muted}
+                  accessibilityLabel="Skills, comma separated"
+                />
+              </View>
             </View>
-            <View style={styles.editGroupLast}>
-              <Text style={styles.editLabel}>Years of experience</Text>
-              <TextInput
-                style={styles.editInput}
-                value={draft.yearsExperience}
-                onChangeText={setField('yearsExperience')}
-                placeholder="0"
-                placeholderTextColor={colors.muted}
-                keyboardType="number-pad"
-                accessibilityLabel="Years of experience"
-              />
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Years of Experience</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="time-outline" size={18} color={colors.muted} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.textInput}
+                  value={draft.yearsExperience}
+                  onChangeText={setField('yearsExperience')}
+                  placeholder="0"
+                  placeholderTextColor={colors.muted}
+                  keyboardType="number-pad"
+                  accessibilityLabel="Years of experience"
+                />
+              </View>
             </View>
+
             <View style={styles.editActions}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Cancel editing"
+                accessibilityLabel="Cancel editing profile"
                 onPress={() => setEditing(false)}
                 disabled={saving}
                 style={({ pressed }) => [styles.cancelButton, pressed && !saving && styles.pressedSoft]}
@@ -551,30 +584,42 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
                 disabled={saving}
                 style={({ pressed }) => [styles.saveButton, pressed && !saving && styles.pressed]}
               >
-                {saving
-                  ? <ActivityIndicator size="small" color={colors.white} />
-                  : <Text style={styles.saveButtonText}>Save changes</Text>}
+                {saving ? (
+                  <ActivityIndicator size="small" color={colors.white} />
+                ) : (
+                  <Text style={styles.saveButtonText}>Save Changes</Text>
+                )}
               </Pressable>
             </View>
           </View>
         )}
 
-        {/* 4. PROFESSIONAL SUMMARY — quiet canvas section */}
-        <View style={styles.sectionCanvas}>
-          <Text style={styles.sectionEyebrow}>PROFESSIONAL SUMMARY</Text>
+        {/* 4. PROFESSIONAL SUMMARY */}
+        <View style={styles.cardSurface}>
+          <View style={styles.cardSurfaceHeader}>
+            <View style={styles.cardSurfaceIconWell}>
+              <Ionicons name="document-text-outline" size={16} color={colors.teal} />
+            </View>
+            <View style={styles.cardSurfaceTitleWrap}>
+              <Text style={styles.sectionEyebrow}>PROFESSIONAL SUMMARY</Text>
+              <Text style={styles.cardSurfaceTitle}>About the Technician</Text>
+            </View>
+          </View>
           {profile.bio ? (
             <Text style={styles.summaryBody}>{profile.bio}</Text>
           ) : (
-            <Text style={styles.mutedBody}>{readOnly ? 'No bio added yet.' : 'Add a short bio so customers know your background.'}</Text>
+            <Text style={styles.mutedBody}>
+              {readOnly ? 'No bio added yet.' : 'Add a short professional bio so customers understand your expertise.'}
+            </Text>
           )}
         </View>
 
-        {/* 5. REVIEWS — professional reputation preview (second bounded surface) */}
+        {/* 5. REVIEWS: Customer Feedback & Rating */}
         <View style={styles.boundedCard}>
           <View style={styles.boundedHeader}>
             <View>
               <Text style={styles.boundedEyebrow}>REPUTATION</Text>
-              <Text style={styles.boundedTitle}>Reviews</Text>
+              <Text style={styles.boundedTitle}>Customer Reviews</Text>
             </View>
             <Text style={styles.boundedMeta}>{reviews.length} review{reviews.length === 1 ? '' : 's'}</Text>
           </View>
@@ -582,8 +627,10 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
           {reviews.length > 0 && rating > 0 ? (
             <View style={styles.reviewSummary}>
               <Text style={styles.reviewAvgValue}>{rating.toFixed(1)}</Text>
-              <StarRow value={rating} size={14} />
-              <Text style={styles.reviewAvgLabel}>average</Text>
+              <View style={styles.reviewSummaryStars}>
+                <StarRow value={rating} size={15} />
+                <Text style={styles.reviewAvgLabel}>Overall Rating</Text>
+              </View>
             </View>
           ) : null}
 
@@ -594,9 +641,18 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
                   <View key={`${r.rating}-${i}`} style={[styles.reviewItem, i === visibleReviews.length - 1 && styles.reviewItemLast]}>
                     <View style={styles.reviewTopRow}>
                       <StarRow value={Number(r.rating) || 0} size={12} />
-                      <Text style={styles.reviewRatingText}>{Number(r.rating) || 0}/5</Text>
+                      <View style={styles.reviewMetaRow}>
+                        <Text style={styles.reviewRatingText}>{Number(r.rating) || 0}/5</Text>
+                        {Boolean(r.createdAt) && (
+                          <Text style={styles.reviewDateText}>{formatReviewDate(r.createdAt)}</Text>
+                        )}
+                      </View>
                     </View>
-                    {r.comment ? <Text style={styles.reviewComment}>{r.comment}</Text> : <Text style={styles.reviewNoComment}>No comment</Text>}
+                    {r.comment ? (
+                      <Text style={styles.reviewComment}>{r.comment}</Text>
+                    ) : (
+                      <Text style={styles.reviewNoComment}>No written comment provided.</Text>
+                    )}
                   </View>
                 ))}
               </View>
@@ -607,7 +663,9 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
                   onPress={() => setShowAllReviews((v) => !v)}
                   style={({ pressed }) => [styles.viewAllButton, pressed && styles.pressedSoft]}
                 >
-                  <Text style={styles.viewAllText}>{showAllReviews ? 'Show less' : `View all ${reviews.length} reviews`}</Text>
+                  <Text style={styles.viewAllText}>
+                    {showAllReviews ? 'Show fewer reviews' : `View all ${reviews.length} reviews`}
+                  </Text>
                   <Ionicons name={showAllReviews ? 'chevron-up' : 'chevron-forward'} size={14} color={colors.teal} />
                 </Pressable>
               )}
@@ -615,65 +673,110 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
           ) : (
             <View style={styles.emptyRow}>
               <Ionicons name="chatbubbles-outline" size={18} color={colors.muted} />
-              <Text style={styles.mutedSmall}>No reviews yet — completed jobs will appear here.</Text>
+              <Text style={styles.mutedSmall}>No reviews yet: ratings appear after completed repairs.</Text>
             </View>
           )}
         </View>
 
-        {/* 6. SKILLS — quieter canvas, no checkmarks, wrapping chips */}
-        <View style={styles.sectionCanvas}>
-          <Text style={styles.sectionEyebrow}>SKILLS</Text>
-          <Text style={styles.sectionSubtle}>Specializations</Text>
+        {/* 6. SPECIALIZATIONS & SKILLS */}
+        <View style={styles.cardSurface}>
+          <View style={styles.cardSurfaceHeader}>
+            <View style={styles.cardSurfaceIconWell}>
+              <Ionicons name="construct-outline" size={16} color={colors.teal} />
+            </View>
+            <View style={styles.cardSurfaceTitleWrap}>
+              <Text style={styles.sectionEyebrow}>SPECIALIZATIONS</Text>
+              <Text style={styles.cardSurfaceTitle}>Skills & Capabilities</Text>
+            </View>
+            {skills.length > 0 && (
+              <View style={styles.countBadge}>
+                <Text style={styles.countBadgeText}>{skills.length} skills</Text>
+              </View>
+            )}
+          </View>
           {skills.length > 0 ? (
             <View style={styles.skillWrap}>
               {skills.map((skill) => (
-                <View key={skill} style={styles.skillChipQuiet}>
-                  <Text style={styles.skillQuietText} numberOfLines={1}>{skill}</Text>
+                <View key={skill} style={styles.skillChip}>
+                  <Ionicons name="checkmark" size={12} color={colors.teal} style={styles.skillChipIcon} />
+                  <Text style={styles.skillChipText} numberOfLines={1}>{skill}</Text>
                 </View>
               ))}
             </View>
           ) : (
-            <Text style={styles.mutedBody}>No skills listed.</Text>
+            <Text style={styles.mutedBody}>No skills listed yet.</Text>
           )}
         </View>
 
-        {/* 7. SERVICE AREA — human-readable primary, coordinates secondary */}
-        <View style={styles.sectionCanvas}>
-          <Text style={styles.sectionEyebrow}>SERVICE AREA</Text>
-          <Text style={styles.serviceLabel}>Where you operate</Text>
+        {/* 7. SERVICE AREA & COVERAGE */}
+        <View style={styles.cardSurface}>
+          <View style={styles.cardSurfaceHeader}>
+            <View style={styles.cardSurfaceIconWell}>
+              <Ionicons name="navigate-outline" size={16} color={colors.teal} />
+            </View>
+            <View style={styles.cardSurfaceTitleWrap}>
+              <Text style={styles.sectionEyebrow}>SERVICE AREA</Text>
+              <Text style={styles.cardSurfaceTitle}>Operational Coverage</Text>
+            </View>
+          </View>
+
           <Text style={styles.serviceAddress} numberOfLines={3}>
-            {profile.address ? profile.address : 'No service address added yet.'}
+            {profile.address ? profile.address : 'No service address specified.'}
           </Text>
-          {profile.latitude != null && profile.longitude != null ? (
-            <Text style={styles.serviceCoords}>
-              {Number(profile.latitude).toFixed(4)} · {Number(profile.longitude).toFixed(4)}
-            </Text>
-          ) : (
-            <Text style={styles.mutedSmall}>No coordinates yet — edit the address above to auto-detect.</Text>
-          )}
+
+          <View style={styles.serviceTelemetryRow}>
+            <View style={styles.telemetryPill}>
+              <Ionicons name="radio-outline" size={13} color={colors.teal} />
+              <Text style={styles.telemetryPillText}>20 km radius</Text>
+            </View>
+
+            {profile.latitude != null && profile.longitude != null ? (
+              <View style={styles.telemetryPill}>
+                <Ionicons name="locate-outline" size={13} color={colors.teal} />
+                <Text style={styles.telemetryPillText}>
+                  {Number(profile.latitude).toFixed(4)}, {Number(profile.longitude).toFixed(4)}
+                </Text>
+              </View>
+            ) : (
+              <View style={[styles.telemetryPill, styles.telemetryPillPending]}>
+                <Ionicons name="time-outline" size={13} color={colors.muted} />
+                <Text style={styles.telemetryPillPendingText}>GPS pending</Text>
+              </View>
+            )}
+          </View>
         </View>
 
-        {/* 8. SCHEDULE — customer read-only view (canvas, not a dashboard card) */}
+        {/* 8. SCHEDULE (read-only customer view) */}
         {readOnly && (
-          <View style={styles.sectionCanvas}>
-            <Text style={styles.sectionEyebrow}>SCHEDULE</Text>
-            <Text style={styles.sectionSubtle}>Current and upcoming jobs</Text>
+          <View style={styles.cardSurface}>
+            <View style={styles.cardSurfaceHeader}>
+              <View style={styles.cardSurfaceIconWell}>
+                <Ionicons name="calendar-outline" size={16} color={colors.teal} />
+              </View>
+              <View style={styles.cardSurfaceTitleWrap}>
+                <Text style={styles.sectionEyebrow}>SCHEDULE</Text>
+                <Text style={styles.cardSurfaceTitle}>Current & Upcoming Bookings</Text>
+              </View>
+            </View>
+
             {scheduleLoading ? (
               <View style={styles.emptyRow}>
                 <ActivityIndicator size="small" color={colors.teal} />
-                <Text style={styles.mutedSmall}>Loading schedule…</Text>
+                <Text style={styles.mutedSmall}>Loading schedule...</Text>
               </View>
             ) : schedule.length > 0 ? (
               <View style={styles.scheduleList}>
                 {schedule.map((item, i) => (
                   <View key={`${item.status}-${i}`} style={[styles.schedItem, i === schedule.length - 1 && styles.schedItemLast]}>
                     <View style={styles.schedLine}>
-                      <Ionicons name="calendar-outline" size={13} color={colors.teal} accessible={false} />
+                      <Ionicons name="calendar-outline" size={14} color={colors.teal} accessible={false} />
                       <Text style={styles.schedDate} numberOfLines={1}>{formatScheduleDate(item)}</Text>
-                      <Text style={styles.schedStatus} numberOfLines={1}>{item.status}</Text>
+                      <View style={styles.schedStatusBadge}>
+                        <Text style={styles.schedStatus} numberOfLines={1}>{item.status}</Text>
+                      </View>
                     </View>
                     <View style={styles.schedLine}>
-                      <Ionicons name="time-outline" size={13} color={colors.teal} accessible={false} />
+                      <Ionicons name="time-outline" size={14} color={colors.muted} accessible={false} />
                       <Text style={styles.schedTime} numberOfLines={1}>
                         {item.preferredTime || 'Time to confirm'} • {item.applianceType}
                       </Text>
@@ -690,7 +793,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
           </View>
         )}
 
-        {/* 9. PORTFOLIO / WORK SHOWCASE — professional showcase (third bounded surface) */}
+        {/* 9. PORTFOLIO / WORK SHOWCASE: preserved exactly as requested */}
         <View style={styles.boundedCard}>
           <View style={styles.portfolioHeader}>
             <View style={styles.portfolioHeaderCopy}>
@@ -761,11 +864,11 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
             </View>
           )}
           {portfolio.length === 0 && !readOnly && selectedPhotos.length === 0 && (
-            <Text style={styles.portfolioHint}>Show your best work — completed repairs build trust faster than any description.</Text>
+            <Text style={styles.portfolioHint}>Show your best work: completed repairs build trust faster than any description.</Text>
           )}
         </View>
 
-        {/* 10. HELP + LOGOUT — separated with visual break */}
+        {/* 10. HELP & ACCOUNT ACTIONS */}
         <View style={styles.footerBreak}>
           <View style={styles.footerDivider} />
           {!readOnly && (
@@ -777,13 +880,13 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
               style={({ pressed }) => [styles.helpRow, pressed && styles.pressedSoft]}
             >
               <View style={styles.helpIconWrap}>
-                <Ionicons name="help-circle-outline" size={16} color={colors.teal} />
+                <Ionicons name="help-circle-outline" size={18} color={colors.teal} />
               </View>
               <View style={styles.helpCopy}>
                 <Text style={styles.helpTitle}>Help & How It Works</Text>
-                <Text style={styles.helpSub}>Finding work, tracking, OTP and workload</Text>
+                <Text style={styles.helpSub}>Workflow, tracking, OTP verification, and guidelines</Text>
               </View>
-              <Ionicons name="chevron-forward" size={14} color={colors.muted} />
+              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
             </Pressable>
           )}
           {!readOnly && onLogout && (
@@ -792,10 +895,10 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
               accessibilityLabel="Log out"
               hitSlop={6}
               onPress={onLogout}
-              style={({ pressed }) => [styles.logoutQuiet, pressed && styles.pressedSoft]}
+              style={({ pressed }) => [styles.logoutButton, pressed && styles.pressedSoft]}
             >
-              <Ionicons name="log-out-outline" size={16} color={colors.error} />
-              <Text style={styles.logoutQuietText}>Log Out</Text>
+              <Ionicons name="log-out-outline" size={18} color={colors.danger} />
+              <Text style={styles.logoutButtonText}>Log Out</Text>
             </Pressable>
           )}
         </View>
@@ -808,11 +911,11 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
 }
 
 const styles = StyleSheet.create({
-  screen: { padding: 16, paddingBottom: 32, backgroundColor: colors.canvas, flexGrow: 1 },
+  screen: { padding: 16, paddingBottom: 36, backgroundColor: colors.canvas, flexGrow: 1 },
   inner: { width: '100%', maxWidth: 480, alignSelf: 'center' },
   screenLoading: { flex: 1, backgroundColor: colors.canvas, padding: 16, paddingTop: 20 },
-  loadingInner: { width: '100%', maxWidth: 480, alignSelf: 'center', gap: 12 },
-  centerScreen: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.canvas, padding: 32, gap: 10 },
+  loadingInner: { width: '100%', maxWidth: 480, alignSelf: 'center', gap: 14 },
+  centerScreen: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.canvas, padding: 32, gap: 12 },
 
   pressed: { transform: [{ scale: 0.97 }], opacity: 0.96 },
   pressedSoft: { transform: [{ scale: 0.97 }], opacity: 0.94 },
@@ -822,65 +925,58 @@ const styles = StyleSheet.create({
   backButtonText: { color: colors.ink, fontSize: 13, fontFamily: fonts.semiBold },
   readOnlyNavTitle: { color: colors.muted, fontSize: 10, letterSpacing: 1.5, fontFamily: fonts.bold, flexShrink: 1, textAlign: 'right' },
 
-  // 1. COVER — ONE primary white surface
-  coverCard: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 20, padding: 16, marginBottom: 14, ...shadows.card },
+  // 1. COVER: Primary Profile Card
+  coverCard: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 22, padding: 18, marginBottom: 14, ...shadows.card },
   coverTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
-  avatar: { width: 64, height: 64, borderRadius: 16, backgroundColor: colors.teal, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
-  avatarText: { color: colors.white, fontSize: 26, fontFamily: fonts.bold },
-  coverIdentity: { flex: 1, gap: 5, minWidth: 0 },
+  avatar: { width: 68, height: 68, borderRadius: 20, backgroundColor: colors.teal, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
+  avatarImage: { width: 68, height: 68, borderRadius: 20, flexShrink: 0 },
+  avatarText: { color: colors.white, fontSize: 28, fontFamily: fonts.bold },
+  coverIdentity: { flex: 1, gap: 6, minWidth: 0 },
+  coverNameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   coverName: { color: colors.ink, fontSize: 20, fontFamily: fonts.bold, lineHeight: 24, letterSpacing: -0.3 },
-  coverVerifiedRow: { flexDirection: 'row', alignItems: 'center' },
-  verifiedInline: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  verifiedInlineText: { color: colors.teal, fontSize: 12, fontFamily: fonts.semiBold },
-  roleTextMuted: { color: colors.muted, fontSize: 12, fontFamily: fonts.medium },
+  badgeRow: { flexDirection: 'row', alignItems: 'center' },
+  verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.hudBorder, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
+  verifiedBadgeText: { color: colors.teal, fontSize: 11, fontFamily: fonts.bold },
+  pendingBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
+  pendingBadgeText: { color: colors.gold, fontSize: 11, fontFamily: fonts.bold },
   coverRatingRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   coverRatingText: { color: colors.muted, fontSize: 11, fontFamily: fonts.semiBold, fontVariant: ['tabular-nums'] },
   coverRatingTextMuted: { color: colors.muted, fontSize: 11, fontFamily: fonts.medium, fontStyle: 'italic' },
   starRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  editProfilePill: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 6, minHeight: 36, paddingHorizontal: 14, borderRadius: 999, backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.hudBorder },
-  editProfilePillText: { color: colors.teal, fontSize: 12, fontFamily: fonts.bold },
-  coverDivider: { height: 1, backgroundColor: colors.lineSoft, marginTop: 14, marginBottom: 12 },
-  coverContactList: { gap: 8 },
-  coverContactRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 28 },
-  coverContactIcon: { width: 28, height: 28, borderRadius: 8, backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.hudBorder, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  coverContactText: { flex: 1, color: colors.ink, fontSize: 13, fontFamily: fonts.medium, lineHeight: 18, flexShrink: 1 },
-  coverEmptyContact: { color: colors.muted, fontSize: 12, fontFamily: fonts.regular, fontStyle: 'italic', lineHeight: 16 },
+  editProfileButton: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 4, minHeight: 34, paddingHorizontal: 12, borderRadius: 999, backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.hudBorder },
+  editProfileButtonText: { color: colors.teal, fontSize: 12, fontFamily: fonts.bold },
 
-  // 2. REPUTATION BAND — canvas inline, compact
-  reputationBand: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', flexWrap: 'wrap', gap: 8, marginBottom: 28, paddingHorizontal: 2 },
-  repItem: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  repValue: { color: colors.ink, fontSize: 14, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'], letterSpacing: -0.2 },
-  repLabel: { color: colors.muted, fontSize: 13, fontFamily: fonts.medium },
-  repDot: { color: colors.line, fontSize: 12, marginHorizontal: 1, fontFamily: fonts.regular },
-  repStarInline: { marginLeft: 1 },
+  coverDivider: { height: 1, backgroundColor: colors.lineSoft, marginTop: 16, marginBottom: 14 },
+  coverContactList: { gap: 10 },
+  coverContactRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  coverContactIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.hudBorder, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  coverContactTextWrap: { flex: 1 },
+  coverContactMeta: { color: colors.muted, fontSize: 9, fontFamily: fonts.bold, letterSpacing: 1 },
+  coverContactText: { color: colors.ink, fontSize: 13, fontFamily: fonts.semiBold, lineHeight: 18, marginTop: 1 },
 
-  // Shared canvas section
-  sectionCanvas: { marginBottom: 30, paddingHorizontal: 2 },
-  sectionEyebrow: { color: colors.teal, fontSize: 11, letterSpacing: 1.4, fontFamily: fonts.bold, marginBottom: 10 },
-  sectionSubtle: { color: colors.muted, fontSize: 13, fontFamily: fonts.medium, marginTop: -6, marginBottom: 10 },
-  summaryBody: { color: colors.ink, fontSize: 15, lineHeight: 24, fontFamily: fonts.regular },
-  mutedBody: { color: colors.muted, fontSize: 13, fontFamily: fonts.regular, fontStyle: 'italic', lineHeight: 19 },
-  mutedSmall: { color: colors.muted, fontSize: 12, fontFamily: fonts.regular, fontStyle: 'italic', flexShrink: 1, lineHeight: 16 },
+  // 2. REPUTATION METRICS: 3-Up Telemetry Card
+  statsCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 18, paddingVertical: 14, paddingHorizontal: 8, marginBottom: 18, ...shadows.card },
+  statCol: { flex: 1, alignItems: 'center', gap: 3 },
+  statIconBadge: { width: 26, height: 26, borderRadius: 8, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.lineSoft, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
+  statNum: { color: colors.ink, fontSize: 17, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'], letterSpacing: -0.3 },
+  statLabel: { color: colors.muted, fontSize: 10, fontFamily: fonts.bold, letterSpacing: 0.8 },
+  statDivider: { width: 1, height: 36, backgroundColor: colors.lineSoft },
 
-  // Bounded cards (2 surfaces: reviews + portfolio)
-  boundedCard: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 20, padding: 16, marginBottom: 30, ...shadows.card },
-  boundedHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14, gap: 12 },
-  boundedEyebrow: { color: colors.teal, fontSize: 11, letterSpacing: 1.4, fontFamily: fonts.bold, marginBottom: 2 },
-  boundedTitle: { color: colors.ink, fontSize: 17, fontFamily: fonts.bold, letterSpacing: -0.2 },
-  boundedMeta: { color: colors.muted, fontSize: 11, fontFamily: fonts.semiBold, marginTop: 4, flexShrink: 0 },
-
-  // Editor
-  editCard: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.hudBorder, borderRadius: 20, padding: 16, marginBottom: 30, ...shadows.cardStrong },
-  editHeader: { marginBottom: 14, gap: 2 },
+  // 3. EDIT PROFILE CARD
+  editCard: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.hudBorder, borderRadius: 22, padding: 18, marginBottom: 24, ...shadows.cardStrong },
+  editHeader: { marginBottom: 16, gap: 3 },
   editKicker: { color: colors.teal, fontSize: 10, letterSpacing: 1.4, fontFamily: fonts.bold },
-  editTitle: { color: colors.ink, fontSize: 16, fontFamily: fonts.bold },
-  groupLabel: { color: colors.ink, fontSize: 11, fontFamily: fonts.extraBold, letterSpacing: 0.5, marginBottom: 10, marginTop: 6, textTransform: 'uppercase' },
-  editGroup: { marginBottom: 12 },
-  editGroupLast: { marginBottom: 4 },
-  editLabel: { color: colors.ink, fontSize: 12, fontFamily: fonts.bold, marginBottom: 6 },
-  editInput: { minHeight: 44, borderWidth: 1, borderColor: colors.line, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, color: colors.ink, backgroundColor: colors.canvas, fontSize: 14, fontFamily: fonts.medium },
-  editInputMulti: { minHeight: 72, textAlignVertical: 'top' },
-  geoRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
+  editTitle: { color: colors.ink, fontSize: 17, fontFamily: fonts.bold },
+  groupLabel: { color: colors.ink, fontSize: 11, fontFamily: fonts.extraBold, letterSpacing: 0.8, marginBottom: 12, marginTop: 8, textTransform: 'uppercase' },
+  inputGroup: { gap: 6, marginBottom: 14 },
+  inputLabel: { color: colors.ink, fontSize: 12, fontFamily: fonts.semiBold },
+  inputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceSunken, borderWidth: 1, borderColor: colors.line, borderRadius: 14, paddingHorizontal: 14, minHeight: 50 },
+  inputContainerMulti: { minHeight: 80, alignItems: 'flex-start', paddingVertical: 10 },
+  inputIcon: { marginRight: 10, flexShrink: 0 },
+  inputIconMulti: { marginTop: 4 },
+  textInput: { flex: 1, color: colors.ink, fontSize: 14, fontFamily: fonts.medium, paddingVertical: 10 },
+  textInputMulti: { minHeight: 60, textAlignVertical: 'top' },
+  geoRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6, paddingHorizontal: 4 },
   geoHint: { fontSize: 11, lineHeight: 15, fontFamily: fonts.medium, fontVariant: ['tabular-nums'], flexShrink: 1 },
   geoPending: { color: colors.muted },
   geoOk: { color: colors.tealDark },
@@ -891,41 +987,71 @@ const styles = StyleSheet.create({
   saveButton: { flex: 2, minHeight: 48, borderRadius: 14, backgroundColor: colors.teal, alignItems: 'center', justifyContent: 'center', ...shadows.card },
   saveButtonText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
 
+  // Shared Card Surface (About, Skills, Service Area, Schedule)
+  cardSurface: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 20, padding: 18, marginBottom: 18, ...shadows.card },
+  cardSurfaceHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
+  cardSurfaceIconWell: { width: 34, height: 34, borderRadius: 10, backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.hudBorder, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  cardSurfaceTitleWrap: { flex: 1 },
+  cardSurfaceTitle: { color: colors.ink, fontSize: 16, fontFamily: fonts.bold, letterSpacing: -0.2 },
+  sectionEyebrow: { color: colors.teal, fontSize: 10, letterSpacing: 1.4, fontFamily: fonts.bold, marginBottom: 2 },
+  summaryBody: { color: colors.ink, fontSize: 14, lineHeight: 22, fontFamily: fonts.regular },
+  mutedBody: { color: colors.muted, fontSize: 13, fontFamily: fonts.regular, fontStyle: 'italic', lineHeight: 20 },
+  mutedSmall: { color: colors.muted, fontSize: 12, fontFamily: fonts.regular, fontStyle: 'italic', flexShrink: 1, lineHeight: 16 },
+
+  // Count Badge
+  countBadge: { backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.hudBorder, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
+  countBadgeText: { color: colors.teal, fontSize: 11, fontFamily: fonts.bold },
+
+  // Skills
+  skillWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  skillChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.hudBorder, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
+  skillChipIcon: { flexShrink: 0 },
+  skillChipText: { color: colors.ink, fontSize: 12, fontFamily: fonts.semiBold },
+
+  // Service Area
+  serviceAddress: { color: colors.ink, fontSize: 14, fontFamily: fonts.semiBold, lineHeight: 20, marginBottom: 12 },
+  serviceTelemetryRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
+  telemetryPill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.surfaceSunken, borderWidth: 1, borderColor: colors.line, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
+  telemetryPillText: { color: colors.ink, fontSize: 11, fontFamily: fonts.medium, fontVariant: ['tabular-nums'] },
+  telemetryPillPending: { borderColor: colors.lineSoft },
+  telemetryPillPendingText: { color: colors.muted, fontSize: 11, fontFamily: fonts.medium, fontStyle: 'italic' },
+
+  // Schedule
+  scheduleList: { gap: 0 },
+  schedItem: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.lineSoft, gap: 5 },
+  schedItemLast: { borderBottomWidth: 0, paddingBottom: 0 },
+  schedLine: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  schedDate: { color: colors.ink, fontSize: 13, fontFamily: fonts.semiBold, fontVariant: ['tabular-nums'], flexShrink: 1 },
+  schedStatusBadge: { marginLeft: 'auto', backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.hudBorder, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
+  schedStatus: { color: colors.teal, fontSize: 10, fontFamily: fonts.bold },
+  schedTime: { color: colors.muted, fontSize: 12, fontFamily: fonts.medium, flexShrink: 1 },
+
+  // Bounded cards (Reviews + Portfolio)
+  boundedCard: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 20, padding: 18, marginBottom: 18, ...shadows.card },
+  boundedHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14, gap: 12 },
+  boundedEyebrow: { color: colors.teal, fontSize: 10, letterSpacing: 1.4, fontFamily: fonts.bold, marginBottom: 2 },
+  boundedTitle: { color: colors.ink, fontSize: 17, fontFamily: fonts.bold, letterSpacing: -0.2 },
+  boundedMeta: { color: colors.muted, fontSize: 11, fontFamily: fonts.semiBold, marginTop: 4, flexShrink: 0 },
+
   // Reviews
-  reviewSummary: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.lineSoft, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 12 },
-  reviewAvgValue: { color: colors.ink, fontSize: 19, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
-  reviewAvgLabel: { color: colors.muted, fontSize: 12, fontFamily: fonts.medium, marginLeft: 2 },
+  reviewSummary: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surfaceSunken, borderWidth: 1, borderColor: colors.lineSoft, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 14 },
+  reviewAvgValue: { color: colors.ink, fontSize: 24, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
+  reviewSummaryStars: { gap: 3 },
+  reviewAvgLabel: { color: colors.muted, fontSize: 11, fontFamily: fonts.medium },
   reviewList: { gap: 0 },
   reviewItem: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.lineSoft },
   reviewItemLast: { borderBottomWidth: 0, paddingBottom: 0 },
   reviewTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
-  reviewRatingText: { color: colors.muted, fontSize: 11, fontFamily: fonts.bold, fontVariant: ['tabular-nums'] },
-  reviewComment: { color: colors.ink, fontSize: 14, lineHeight: 20, fontFamily: fonts.regular },
+  reviewMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  reviewRatingText: { color: colors.ink, fontSize: 11, fontFamily: fonts.bold, fontVariant: ['tabular-nums'] },
+  reviewDateText: { color: colors.muted, fontSize: 11, fontFamily: fonts.medium },
+  reviewComment: { color: colors.ink, fontSize: 13, lineHeight: 19, fontFamily: fonts.regular },
   reviewNoComment: { color: colors.muted, fontSize: 12, fontFamily: fonts.regular, fontStyle: 'italic' },
   viewAllButton: { marginTop: 14, minHeight: 44, borderRadius: 12, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   viewAllText: { color: colors.teal, fontSize: 13, fontFamily: fonts.bold },
   emptyRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },
 
-  // Skills — quiet chips, wrapping
-  skillWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 2 },
-  skillChipQuiet: { maxWidth: '100%', backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 999, paddingHorizontal: 13, paddingVertical: 8 },
-  skillQuietText: { color: colors.ink, fontSize: 13, fontFamily: fonts.semiBold, flexShrink: 1 },
-
-  // Service area
-  serviceLabel: { color: colors.muted, fontSize: 12, fontFamily: fonts.medium, marginBottom: 4, letterSpacing: 0.2 },
-  serviceAddress: { color: colors.ink, fontSize: 15, fontFamily: fonts.semiBold, lineHeight: 21 },
-  serviceCoords: { color: colors.muted, fontSize: 12, fontFamily: fonts.medium, fontVariant: ['tabular-nums'], marginTop: 8, letterSpacing: 0.2 },
-
-  // Schedule
-  scheduleList: { gap: 0, marginTop: 2 },
-  schedItem: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.lineSoft, gap: 5 },
-  schedItemLast: { borderBottomWidth: 0, paddingBottom: 0 },
-  schedLine: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  schedDate: { color: colors.ink, fontSize: 13, fontFamily: fonts.semiBold, fontVariant: ['tabular-nums'], flexShrink: 1 },
-  schedStatus: { color: colors.teal, fontSize: 11, fontFamily: fonts.bold, marginLeft: 'auto', flexShrink: 0 },
-  schedTime: { color: colors.muted, fontSize: 12, fontFamily: fonts.medium, flexShrink: 1 },
-
-  // Portfolio
+  // Portfolio (Preserved as requested)
   portfolioHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 },
   portfolioHeaderCopy: { flex: 1, minWidth: 0 },
   addPhotosButton: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36, paddingHorizontal: 14, borderRadius: 999, backgroundColor: colors.teal, ...shadows.card, flexShrink: 0 },
@@ -941,19 +1067,19 @@ const styles = StyleSheet.create({
   primaryButtonSolid: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.teal, borderRadius: 14, paddingHorizontal: 18, minHeight: 48, ...shadows.card },
   primaryButtonText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
 
-  // Footer — Help + Logout separated
-  footerBreak: { marginTop: 4, gap: 10, paddingBottom: 8 },
-  footerDivider: { height: 1, backgroundColor: colors.lineSoft, marginBottom: 14 },
-  helpRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 14, paddingHorizontal: 14, minHeight: 52 },
-  helpIconWrap: { width: 32, height: 32, borderRadius: 10, backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.hudBorder, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  // Footer: Help + Logout
+  footerBreak: { marginTop: 8, gap: 12, paddingBottom: 12 },
+  footerDivider: { height: 1, backgroundColor: colors.lineSoft, marginBottom: 8 },
+  helpRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 16, paddingHorizontal: 16, minHeight: 56, ...shadows.subtle },
+  helpIconWrap: { width: 34, height: 34, borderRadius: 10, backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.hudBorder, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   helpCopy: { flex: 1, minWidth: 0 },
   helpTitle: { color: colors.ink, fontSize: 13, fontFamily: fonts.bold },
   helpSub: { color: colors.muted, fontSize: 11, fontFamily: fonts.regular, marginTop: 2 },
-  logoutQuiet: { minHeight: 44, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 16, backgroundColor: '#FFF5F5', borderWidth: 1, borderColor: '#FECACA' },
-  logoutQuietText: { color: colors.error, fontSize: 13, fontFamily: fonts.semiBold },
+  logoutButton: { minHeight: 48, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 16, backgroundColor: '#FFF5F5', borderWidth: 1, borderColor: '#FECACA' },
+  logoutButtonText: { color: colors.danger, fontSize: 13, fontFamily: fonts.bold },
 
-  // Loading / error
-  skeletonAvatar: { width: 64, height: 64, borderRadius: 16 },
+  // Loading / Error
+  skeletonAvatar: { width: 68, height: 68, borderRadius: 20 },
   emptyIconWrap: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.tealLight, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line },
   emptyTitle: { color: colors.ink, fontSize: 16, fontFamily: fonts.bold, textAlign: 'center' },
   emptyText: { color: colors.muted, fontSize: 13, fontFamily: fonts.regular, textAlign: 'center', lineHeight: 18, paddingHorizontal: 12 },

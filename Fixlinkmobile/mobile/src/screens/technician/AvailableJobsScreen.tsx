@@ -1,7 +1,8 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Modal,
   RefreshControl,
   ScrollView,
@@ -28,10 +29,21 @@ import {
 } from '../services/api';
 import { colors, fonts, shadows } from '../../theme';
 import { getApplianceIcon, getStatusColor, getStatusIcon } from '../../utils/applianceIcons';
+import {
+  calculateWorkloadSummary,
+  formatJobSchedule,
+  filterJobs,
+  validateOtpCode,
+  canMarkArrival,
+  canStartRepair,
+  getTechnicianCredentialBadgeInfo,
+  type JobItem
+} from '../../utils/availableJobsHelpers';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 interface Coords {
+  [key: string]: unknown;
   latitude: number;
   longitude: number;
 }
@@ -41,77 +53,31 @@ interface TechnicianRef {
   name?: string;
   latitude?: number | string;
   longitude?: number | string;
-}
-
-interface Job {
-  id: string;
+  verified?: boolean;
+  verificationStatus?: string;
   status?: string;
-  applianceType?: string;
-  customerName?: string;
-  location?: string;
-  latitude?: number | string;
-  longitude?: number | string;
-  distanceKm?: number;
-  description?: string;
-  preferredDate?: string;
-  preferredTime?: string;
-  scheduledDate?: string;
-  technicianArrivalAt?: string;
-  technicianUid?: string;
-  technicianName?: string;
-  photoUrl?: string | null;
+  profileImage?: string | null;
 }
 
 interface AvailableJobsScreenProps {
   technician: TechnicianRef;
-  onNavigateToMap?: (job: Job) => void;
-  onNavigateToChat?: (job: Job) => void;
+  onNavigateToMap?: (job: JobItem) => void;
+  onNavigateToChat?: (job: JobItem) => void;
   onOpenNotifications?: () => void;
   notificationCount?: number;
   highlightedJobId?: string | null;
 }
 
 const NEARBY_QUEUE_RADIUS_KM = 10;
-const jobsCache = new Map<string, { jobs: Job[]; acceptedJobs: Job[]; lastSyncAt: Date | null; fetchError: boolean }>();
+const jobsCache = new Map<string, { jobs: JobItem[]; acceptedJobs: JobItem[]; lastSyncAt: Date | null; fetchError: boolean }>();
 
-const formatSchedule = (job: Job): string => {
-  if (job?.preferredDate && job?.preferredTime) {
-    return `${job.preferredDate} • ${job.preferredTime}`;
-  }
-  if (job?.preferredTime) return job.preferredTime;
-  if (job?.preferredDate) return job.preferredDate;
-  if (job?.scheduledDate) {
-    try {
-      const d = new Date(job.scheduledDate);
-      if (!isNaN(d.getTime())) {
-        return `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} • ${d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}`;
-      }
-    } catch {
-      return String(job.scheduledDate);
-    }
-  }
-  return 'Schedule to confirm';
-};
-
-const scheduleParts = (job: Job): { date: string; time: string | null } => {
-  const full = formatSchedule(job);
-  const sep = full.indexOf('•');
-  if (sep === -1) return { date: full, time: null };
-  return { date: full.slice(0, sep).trim(), time: full.slice(sep + 1).trim() };
-};
-
-const statusIconName = (status: string | undefined): IconName =>
-  getStatusIcon(status) as IconName;
-
-// Display-only mapping from the existing active-job count to a workload label.
-// Thresholds mirror backend/src/utils/workload.js#getWorkloadStatus
-// (0–2 available, 3–5 busy, 6+ at_capacity) for ambient presentation only.
-// Authoritative capacity protection stays server-side (409 TECHNICIAN_AT_CAPACITY).
-const getWorkloadDisplayStatus = (count: number): 'available' | 'busy' | 'at_capacity' => {
-  if (count >= 6) return 'at_capacity';
-  if (count >= 3) return 'busy';
-  return 'available';
-};
+const CATEGORY_CHIPS = [
+  { id: 'all', label: 'All Jobs', icon: 'grid-outline' as IconName },
+  { id: 'aircon', label: 'Aircon', icon: 'snow-outline' as IconName },
+  { id: 'refrigerator', label: 'Refrigerator', icon: 'cube-outline' as IconName },
+  { id: 'washing', label: 'Washing', icon: 'water-outline' as IconName },
+  { id: 'computer', label: 'Computer', icon: 'laptop-outline' as IconName }
+];
 
 export default function AvailableJobsScreen({
   technician,
@@ -122,8 +88,8 @@ export default function AvailableJobsScreen({
   highlightedJobId = null
 }: AvailableJobsScreenProps): React.JSX.Element {
   const cached = technician?.uid ? jobsCache.get(technician.uid) : undefined;
-  const [jobs, setJobs] = useState<Job[]>(cached?.jobs ?? []);
-  const [acceptedJobs, setAcceptedJobs] = useState<Job[]>(cached?.acceptedJobs ?? []);
+  const [jobs, setJobs] = useState<JobItem[]>(cached?.jobs ?? []);
+  const [acceptedJobs, setAcceptedJobs] = useState<JobItem[]>(cached?.acceptedJobs ?? []);
   const [loading, setLoading] = useState<boolean>(cached ? false : true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [fetchError, setFetchError] = useState<boolean>(cached?.fetchError ?? false);
@@ -131,6 +97,17 @@ export default function AvailableJobsScreen({
   const [acceptingJobId, setAcceptingJobId] = useState<string | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  // Operational states
+  const [isOnline, setIsOnline] = useState<boolean>(true);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedJobForDetails, setSelectedJobForDetails] = useState<JobItem | null>(null);
+
+  // Feed Tab navigation: 'queue' (Available Leads) vs 'active' (My Active Jobs)
+  const [feedTab, setFeedTab] = useState<'queue' | 'active'>('queue');
+
+  // Coords state
   const [techCoords, setTechCoords] = useState<Coords | null>(
     technician?.latitude && technician?.longitude
       ? { latitude: Number(technician.latitude), longitude: Number(technician.longitude) }
@@ -139,65 +116,45 @@ export default function AvailableJobsScreen({
 
   // OTP Verification Modal State
   const [otpModalVisible, setOtpModalVisible] = useState<boolean>(false);
-  const [selectedJobForOtp, setSelectedJobForOtp] = useState<Job | null>(null);
+  const [selectedJobForOtp, setSelectedJobForOtp] = useState<JobItem | null>(null);
   const [otpCode, setOtpCode] = useState<string>('');
   const [verifyingOtp, setVerifyingOtp] = useState<boolean>(false);
 
-  const activeCount = acceptedJobs.length;
   const technicianName = technician?.name || 'Technician';
   const avatarInitial = technicianName.charAt(0).toUpperCase();
 
-  // Display-only count used in the at-capacity message and the compact
-  // workload strip. Authoritative blocking stays server-side
-  // (409 TECHNICIAN_AT_CAPACITY).
-  const workloadActiveJobs = acceptedJobs.length;
-  const workloadStatus = getWorkloadDisplayStatus(workloadActiveJobs);
+  // Filtered jobs in queue based on category, search text, and radius
+  const filteredQueueJobs = useMemo(() => {
+    return filterJobs(jobs, {
+      category: selectedCategory,
+      searchQuery: searchQuery,
+      maxDistanceKm: NEARBY_QUEUE_RADIUS_KM,
+      highlightedJobId: highlightedJobId
+    });
+  }, [jobs, selectedCategory, searchQuery, highlightedJobId]);
 
-  // Ambient workload state for the status strip (display-only; authoritative
-  // capacity protection stays server-side via 409 TECHNICIAN_AT_CAPACITY).
+  // Workload computation based on real accepted jobs in database
+  const activeCount = acceptedJobs.length;
+  const pendingCount = filteredQueueJobs.length;
+  const workloadSummary = calculateWorkloadSummary(activeCount);
+  const workloadStatus = workloadSummary.status;
+
   const workloadHue = workloadStatus === 'at_capacity'
     ? { label: 'At Capacity', color: colors.danger }
     : workloadStatus === 'busy'
       ? { label: 'Busy', color: colors.gold }
       : { label: 'Available', color: colors.green };
 
-  const nearbyJobs = jobs.filter((job) => {
-    if (highlightedJobId && String(job.id) === String(highlightedJobId)) return true;
-    if (job.distanceKm == null) return true;
-    return Number(job.distanceKm) <= NEARBY_QUEUE_RADIUS_KM;
-  });
-
-  // Pending metric mirrors the visible nearby queue (10 km rule) so the
-  // PENDING card never disagrees with the list the technician can see.
-  const pendingCount = nearbyJobs.length;
-
-  const [feedTab, setFeedTab] = useState<'active' | 'queue'>('active');
-
+  // Switch to corresponding tab when a highlighted job ID is passed
   useEffect(() => {
     if (!highlightedJobId) return;
     const hid = String(highlightedJobId);
-    if (acceptedJobs.some((j) => String(j.id) === hid)) setFeedTab('active');
-    else if (jobs.some((j) => String(j.id) === hid)) setFeedTab('queue');
+    if (acceptedJobs.some((j) => String(j.id) === hid)) {
+      setFeedTab('active');
+    } else if (jobs.some((j) => String(j.id) === hid)) {
+      setFeedTab('queue');
+    }
   }, [highlightedJobId, acceptedJobs, jobs]);
-
-  // The one job that leads the board: the deep-linked job, else the
-  // action-needed active job (In Progress, then arrived-and-startable).
-  // Display precedence only — no ordering or state change.
-  const focusJob = (() => {
-    const pool = feedTab === 'active' ? acceptedJobs : nearbyJobs;
-    if (!pool.length) return null;
-    if (highlightedJobId) {
-      const hit = pool.find((j) => String(j.id) === String(highlightedJobId));
-      if (hit) return hit;
-    }
-    if (feedTab === 'active') {
-      return acceptedJobs.find((j) => j.status === 'In Progress')
-        ?? acceptedJobs.find((j) => !!j.technicianArrivalAt)
-        ?? null;
-    }
-    return null;
-  })();
-  const isFocus = (job: Job): boolean => !!focusJob && String(focusJob.id) === String(job.id);
 
   const getUpdatedTechCoords = async (): Promise<Coords | null> => {
     try {
@@ -227,20 +184,29 @@ export default function AvailableJobsScreen({
       getUpdatedTechCoords().catch(() => null);
       const [result, assigned] = await Promise.all([
         fetchRepairRequests(technician?.uid, coordsForFetch),
-        fetchTechnicianJobs(technician?.uid),
+        fetchTechnicianJobs(technician?.uid)
       ]);
-      const newJobs = Array.isArray(result) ? (result as Job[]) : [];
+      const newJobs = Array.isArray(result) ? (result as JobItem[]) : [];
       const newAccepted = Array.isArray(assigned)
-        ? (assigned as Job[]).filter((job) => ['Accepted', 'Confirmed', 'Customer Ready', 'In Progress'].includes(job.status ?? ''))
+        ? (assigned as JobItem[]).filter((job) =>
+            ['Accepted', 'Confirmed', 'Customer Ready', 'In Progress'].includes(job.status ?? '')
+          )
         : [];
       setJobs(newJobs);
       setAcceptedJobs(newAccepted);
       setFetchError(false);
       const now = new Date();
       setLastSyncAt(now);
-      if (technician?.uid) jobsCache.set(technician.uid, { jobs: newJobs, acceptedJobs: newAccepted, lastSyncAt: now, fetchError: false });
+      if (technician?.uid) {
+        jobsCache.set(technician.uid, {
+          jobs: newJobs,
+          acceptedJobs: newAccepted,
+          lastSyncAt: now,
+          fetchError: false
+        });
+      }
     } catch (error) {
-      console.warn('Failed to load technician jobs:', error);
+      console.warn('Failed to load technician jobs from backend:', error);
       setFetchError(true);
     } finally {
       setLoading(false);
@@ -257,53 +223,81 @@ export default function AvailableJobsScreen({
     loadJobs();
   };
 
-  const handleAcceptJob = (job: Job): void => {
-    if (!technician?.uid || acceptingJobId) return;
+  const handleAcceptJob = (job: JobItem): void => {
+    if (!technician?.uid) {
+      Alert.alert('Authentication required', 'Please sign in with a verified technician account.');
+      return;
+    }
+    if (acceptingJobId) return;
+
+    if (workloadStatus === 'at_capacity') {
+      Alert.alert(
+        'At Capacity',
+        'You currently have 6 active jobs. Please complete an ongoing repair before accepting more requests.'
+      );
+      return;
+    }
+
     Alert.alert(
-      'Accept this job?',
-      `${job.applianceType || 'Repair request'}${job.location ? ` — ${job.location}` : ''}\n\nThe customer will be notified and the job will move to your active list.`,
+      'Accept this repair request?',
+      `${job.applianceType || 'Repair request'}\nLocation: ${job.location || 'Local Catchment'}\n\nThe customer will be notified immediately and live GPS navigation will be unlocked.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Accept',
+          text: 'Accept Job',
           onPress: async () => {
             setAcceptingJobId(job.id);
             try {
-              const accepted = await acceptRepairRequest(job.id, technician.uid, technician.name || 'Technician') as { jobId: string };
+              const response = (await acceptRepairRequest(
+                job.id,
+                technician.uid,
+                technician.name || 'Technician'
+              )) as { jobId?: string; message?: string };
+
+              const acceptedJobId = response?.jobId || job.id;
+
               setJobs((currentJobs) => currentJobs.filter((currentJob) => currentJob.id !== job.id));
               setAcceptedJobs((currentJobs) => [
                 {
                   ...job,
-                  id: accepted.jobId,
+                  id: acceptedJobId,
                   status: 'Accepted',
                   technicianUid: technician.uid,
-                  technicianName: technician.name,
+                  technicianName: technician.name
                 },
-                ...currentJobs,
+                ...currentJobs
               ]);
-              Alert.alert('Job Accepted!', 'Customer details and live route are now available in your active jobs.');
+              setSelectedJobForDetails(null);
+              setFeedTab('active');
+              Alert.alert(
+                'Job Accepted',
+                'Customer details and live route are now available in your active jobs.'
+              );
+              loadJobs({ background: true });
             } catch (error) {
-              const err = error as { code?: string; message?: string; activeJobs?: number };
+              const err = error as { code?: string; message?: string; error?: string };
               if (err?.code === 'TECHNICIAN_AT_CAPACITY') {
-                Alert.alert("You're At Capacity", err?.message || 'Complete an active job to accept new work.');
+                Alert.alert('You are At Capacity', err?.message || 'Complete an active job to accept new work.');
               } else {
-                Alert.alert('Unable to accept job', (error as { error?: string })?.error || 'This job may already have been taken.');
+                Alert.alert(
+                  'Unable to accept job',
+                  err?.error || err?.message || 'This job may already have been claimed by another technician.'
+                );
               }
             } finally {
               setAcceptingJobId(null);
             }
-          },
-        },
-      ],
+          }
+        }
+      ]
     );
   };
 
-  // Dismiss permanently hides the request for this technician, so it confirms
-  // intent the same way Accept and No-Show do.
-  const handleDeclineJob = (job: Job): void => {
+  const handleDeclineJob = (job: JobItem): void => {
+    if (!technician?.uid) return;
     Alert.alert(
       'Dismiss this request?',
-      `${job.applianceType || 'Repair request'}${job.location ? ` — ${job.location}` : ''}\n\nIt will no longer appear in your queue.`,
+      `${job.applianceType || 'Repair request'}\n${job.location ? `Location: ${job.location}` : ''}\n\nThis will remove the lead from your visible queue.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -311,67 +305,121 @@ export default function AvailableJobsScreen({
           style: 'destructive',
           onPress: async () => {
             try {
-              await declineRepairRequest(job.id, technician?.uid);
+              await declineRepairRequest(job.id, technician.uid);
               setJobs((currentJobs) => currentJobs.filter((currentJob) => currentJob.id !== job.id));
+              if (selectedJobForDetails?.id === job.id) {
+                setSelectedJobForDetails(null);
+              }
             } catch (error) {
-              Alert.alert('Error', (error as { error?: string })?.error || 'Failed to dismiss job.');
+              const err = error as { error?: string; message?: string };
+              Alert.alert('Error', err?.error || err?.message || 'Failed to dismiss job.');
             }
-          },
-        },
-      ],
+          }
+        }
+      ]
     );
   };
 
-  const handleStartJob = async (job: Job): Promise<void> => {
+  const handleArrival = async (job: JobItem): Promise<void> => {
+    if (!technician?.uid) return;
     setActionLoadingId(job.id);
     try {
-      await updateJobStatus(job.id, 'In Progress', technician?.uid);
+      await recordTechnicianArrival(job.id, technician.uid);
+      setAcceptedJobs((currentJobs) =>
+        currentJobs.map((j) =>
+          j.id === job.id
+            ? { ...j, technicianArrivalAt: new Date().toISOString() }
+            : j
+        )
+      );
+      Alert.alert('Arrival Confirmed', 'The customer has been notified of your physical arrival.');
+      loadJobs({ background: true });
+    } catch (error) {
+      const err = error as {
+        response?: { data?: { error?: string; message?: string } };
+        error?: string;
+        message?: string;
+      };
+      const errorMessage =
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        err?.error ||
+        err?.message ||
+        'Please try again.';
+      Alert.alert('Unable to record arrival', errorMessage);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleStartJob = async (job: JobItem): Promise<void> => {
+    if (!technician?.uid) return;
+    setActionLoadingId(job.id);
+    try {
+      await updateJobStatus(job.id, 'In Progress', technician.uid);
       setAcceptedJobs((currentJobs) =>
         currentJobs.map((j) => (j.id === job.id ? { ...j, status: 'In Progress' } : j))
       );
       Alert.alert('Job In Progress', 'Repair started. Collect the 4-digit code from the customer when finished.');
+      loadJobs({ background: true });
     } catch (error) {
-      Alert.alert('Error', (error as { error?: string })?.error || 'Failed to update job status.');
+      const err = error as {
+        response?: { data?: { error?: string; message?: string } };
+        error?: string;
+        message?: string;
+      };
+      const errorMessage =
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        err?.error ||
+        err?.message ||
+        'Failed to update job status.';
+      Alert.alert('Error', errorMessage);
     } finally {
       setActionLoadingId(null);
     }
   };
 
-  const handleArrival = async (job: Job): Promise<void> => {
-    setActionLoadingId(job.id);
-    try {
-      await recordTechnicianArrival(job.id, technician?.uid);
-      setAcceptedJobs((currentJobs) =>
-        currentJobs.map((j) => (j.id === job.id ? { ...j, status: 'In Progress' } : j))
-      );
-      Alert.alert('Arrival recorded', 'The customer has been notified of your arrival.');
-    } catch (error) {
-      Alert.alert('Unable to record arrival', (error as { error?: string })?.error || 'Please try again.');
-    } finally {
-      setActionLoadingId(null);
-    }
-  };
-
-  const handleNoShow = (job: Job): void => {
-    Alert.alert('Report no-show?', 'This records that no one was available at the service location.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Report', style: 'destructive', onPress: async () => {
-        setActionLoadingId(job.id);
-        try {
-          await reportNoShow(job.id, technician?.uid, 'No one available at service location');
-          setAcceptedJobs((currentJobs) => currentJobs.filter((j) => j.id !== job.id));
-          Alert.alert('No-show reported', 'Customer status updated.');
-          loadJobs();
-        } catch (error) {
-          Alert.alert('Error', (error as { error?: string })?.error || 'Please try again.');
-        } finally {
-          setActionLoadingId(null);
+  const handleNoShow = (job: JobItem): void => {
+    if (!technician?.uid) return;
+    Alert.alert(
+      'Report customer no-show?',
+      'This records that the customer or appliance was not accessible at the specified service address.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm Report',
+          style: 'destructive',
+          onPress: async () => {
+            setActionLoadingId(job.id);
+            try {
+              await reportNoShow(job.id, technician.uid, 'No one available at service location');
+              setAcceptedJobs((currentJobs) => currentJobs.filter((j) => j.id !== job.id));
+              Alert.alert('No-show reported', 'Customer status updated.');
+              loadJobs();
+            } catch (error) {
+              const err = error as {
+                response?: { data?: { error?: string; message?: string } };
+                error?: string;
+                message?: string;
+              };
+              const errorMessage =
+                err?.response?.data?.error ||
+                err?.response?.data?.message ||
+                err?.error ||
+                err?.message ||
+                'Please try again.';
+              Alert.alert('Error', errorMessage);
+            } finally {
+              setActionLoadingId(null);
+            }
+          }
         }
-      } },
-    ]);
+      ]
+    );
   };
 
-  const openOtpModal = (job: Job): void => {
+  const openOtpModal = (job: JobItem): void => {
     setSelectedJobForOtp(job);
     setOtpCode('');
     setOtpModalVisible(true);
@@ -379,21 +427,39 @@ export default function AvailableJobsScreen({
 
   const handleVerifyOtp = async (): Promise<void> => {
     const cleanCode = otpCode.trim();
-    if (!cleanCode || cleanCode.length !== 4) {
-      Alert.alert('Invalid Code', 'Please enter the 4-digit customer code.');
+    if (!validateOtpCode(cleanCode)) {
+      Alert.alert('Invalid Code', 'Please enter the complete 4-digit numeric code provided by the customer.');
       return;
     }
+    if (!selectedJobForOtp) return;
+
     setVerifyingOtp(true);
     try {
-      await verifyCompletionCode(selectedJobForOtp!.id, cleanCode);
+      await verifyCompletionCode(selectedJobForOtp.id, cleanCode);
       setOtpModalVisible(false);
-      setAcceptedJobs((currentJobs) => currentJobs.filter((j) => j.id !== selectedJobForOtp!.id));
-      Alert.alert('Job Completed!', 'Repair verified and finalized successfully.');
+      setAcceptedJobs((currentJobs) => currentJobs.filter((j) => j.id !== selectedJobForOtp.id));
+      Alert.alert('Job Completed', 'Repair verified and finalized successfully.');
       loadJobs();
     } catch (error) {
-      Alert.alert('Verification Failed', (error as { error?: string })?.error || 'Incorrect code entered.');
+      const err = error as { error?: string; message?: string };
+      Alert.alert('Verification Failed', err?.error || err?.message || 'Incorrect code entered.');
     } finally {
       setVerifyingOtp(false);
+    }
+  };
+
+  const toggleDutyStatus = async (): Promise<void> => {
+    const nextState = !isOnline;
+    setIsOnline(nextState);
+    if (nextState) {
+      Alert.alert('Status: Online', 'You are active and ready to receive repair leads in your catchment.');
+      const coords = await getUpdatedTechCoords();
+      if (coords && technician?.uid) {
+        updateTechnicianLocation(technician.uid, coords).catch(() => {});
+      }
+      loadJobs({ background: true });
+    } else {
+      Alert.alert('Status: Paused', 'You are currently off duty. Incoming job notifications are paused.');
     }
   };
 
@@ -401,9 +467,10 @@ export default function AvailableJobsScreen({
     return (
       <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.centerWrap}>
-          <Skeleton style={{ width: 150, height: 24, borderRadius: 6, marginBottom: 16 }} />
-          <Skeleton style={{ width: '100%', height: 90, borderRadius: 16, marginBottom: 20 }} />
-          <Skeleton style={{ width: '100%', height: 110, borderRadius: 16, marginBottom: 20 }} />
+          <Skeleton style={{ width: 140, height: 26, borderRadius: 8, marginBottom: 16 }} />
+          <Skeleton style={{ width: '100%', height: 80, borderRadius: 16, marginBottom: 16 }} />
+          <Skeleton style={{ width: '100%', height: 110, borderRadius: 16, marginBottom: 16 }} />
+          <Skeleton style={{ width: '100%', height: 180, borderRadius: 20, marginBottom: 16 }} />
         </View>
       </ScrollView>
     );
@@ -414,348 +481,901 @@ export default function AvailableJobsScreen({
       style={styles.screen}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.teal} colors={[colors.teal]} />}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          tintColor={colors.teal}
+          colors={[colors.teal]}
+        />
+      }
     >
       <View style={styles.centerWrap}>
-        {/* Brand bar — same identity block as Customer Home, TECHNICIAN HUB variant */}
+        {/* Top Operational Bar */}
         <View style={styles.topBar}>
           <View style={styles.brandLeft}>
-            <Text style={styles.brandSmall}>FIX<Text style={styles.brandAccent}>LINK</Text></Text>
-            <Text style={styles.roleSmall}>TECHNICIAN HUB</Text>
+            <View style={styles.brandTitleRow}>
+              <Text style={styles.brandSmall}>
+                FIX<Text style={styles.brandAccent}>LINK</Text>
+              </Text>
+              <View style={styles.dispatchPill}>
+                <Text style={styles.dispatchPillText}>DISPATCH HUB</Text>
+              </View>
+            </View>
+            <Text style={styles.roleSmall}>PROXIMITY-MATCHED SERVICE</Text>
           </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={notificationCount > 0 ? `Notifications, ${notificationCount} unread` : 'Notifications, no unread'}
-            onPress={onOpenNotifications}
-            hitSlop={6}
-            style={({ pressed }) => [styles.notificationQuiet, pressed && styles.pressedSoft]}
-          >
-            <Ionicons name="notifications-outline" size={21} color={colors.tealDark} />
-            {notificationCount > 0 && (
-              <View style={styles.notifBadge}>
-                <Text style={styles.notifBadgeText}>{notificationCount > 9 ? '9+' : notificationCount}</Text>
+
+          <View style={styles.topBarRight}>
+            {/* Online / Duty status toggle button */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Duty status: ${isOnline ? 'Online' : 'Offline'}. Tap to toggle.`}
+              onPress={toggleDutyStatus}
+              style={({ pressed }) => [
+                styles.dutyPill,
+                isOnline ? styles.dutyPillOnline : styles.dutyPillOffline,
+                pressed && styles.pressedSoft
+              ]}
+            >
+              <View style={[styles.statusDot, isOnline ? styles.statusDotOnline : styles.statusDotOffline]} />
+              <Text style={[styles.dutyPillText, isOnline ? styles.dutyTextOnline : styles.dutyTextOffline]}>
+                {isOnline ? 'ONLINE' : 'PAUSED'}
+              </Text>
+            </Pressable>
+
+            {/* Notifications button */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={
+                notificationCount > 0
+                  ? `Notifications, ${notificationCount} unread`
+                  : 'Notifications, no unread'
+              }
+              onPress={onOpenNotifications}
+              hitSlop={8}
+              style={({ pressed }) => [styles.notificationQuiet, pressed && styles.pressedSoft]}
+            >
+              <Ionicons name="notifications-outline" size={20} color={colors.tealDark} />
+              {notificationCount > 0 && (
+                <View style={styles.notifBadge}>
+                  <Text style={styles.notifBadgeText}>{notificationCount > 9 ? '9+' : notificationCount}</Text>
+                </View>
+              )}
+            </Pressable>
+          </View>
+        </View>
+
+        {/* Hero Greeting and Profile Card */}
+        <View style={styles.heroCard}>
+          <View style={styles.heroLeft}>
+            <Text style={styles.greeting} numberOfLines={1}>
+              Good day, {technicianName}
+            </Text>
+            <Text style={styles.heroSubtitle} numberOfLines={1}>
+              {isOnline ? 'Ready for incoming service requests' : 'Dispatch is currently paused'}
+            </Text>
+
+            <View style={styles.heroMetricsRow}>
+              <View style={styles.heroMetricChip}>
+                <Ionicons name="flash-outline" size={13} color={colors.teal} />
+                <Text style={styles.heroMetricText}>
+                  {filteredQueueJobs.length} {filteredQueueJobs.length === 1 ? 'lead available' : 'leads available'}
+                </Text>
+              </View>
+
+              {acceptedJobs.length > 0 && (
+                <View style={styles.heroMetricChip}>
+                  <Ionicons name="construct-outline" size={13} color={colors.gold} />
+                  <Text style={styles.heroMetricText}>
+                    {acceptedJobs.length} in progress
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          <View style={styles.avatarWrap}>
+            {technician?.profileImage ? (
+              <Image source={{ uri: technician.profileImage }} style={styles.avatarImage} />
+            ) : (
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{avatarInitial}</Text>
               </View>
             )}
-          </Pressable>
-        </View>
-
-        {/* Hero row — Home's greeting anatomy, pointed at the dispatch board */}
-        <View style={styles.heroRow}>
-          <View style={styles.heroCopyWrap}>
-            <Text style={styles.greeting}>Good day, {technicianName}</Text>
-            <Text style={styles.heroCopy}>Here&apos;s your dispatch board for today.</Text>
-          </View>
-          <View style={styles.avatar}><Text style={styles.avatarText}>{avatarInitial}</Text></View>
-        </View>
-
-        {/* Work-state banner — present only when workload changes behavior */}
-        {workloadStatus !== 'available' && (() => {
-          const workloadConfig = workloadStatus === 'at_capacity'
-            ? {
-                label: 'At Capacity' as const,
-                icon: 'alert-circle-outline' as IconName,
-                color: colors.danger,
-                bg: colors.danger + '10',
-                border: colors.danger + '20',
-                message: 'New jobs paused — complete one to resume.',
-              }
-            : {
-                label: 'Busy' as const,
-                icon: 'time-outline' as IconName,
-                color: colors.gold,
-                bg: colors.gold + '12',
-                border: colors.gold + '22',
-                message: 'Several active jobs — you can still accept.',
-              };
-          return (
             <View
               style={[
-                styles.workloadStrip,
-                workloadStatus === 'at_capacity' ? styles.workloadStripAtCapacity : styles.workloadStripBusy,
+                styles.avatarPresenceDot,
+                isOnline ? styles.presenceOnline : styles.presenceOffline,
               ]}
-              accessibilityRole="text"
-              accessibilityLabel={`${workloadConfig.label} — ${workloadActiveJobs} active ${workloadActiveJobs === 1 ? 'job' : 'jobs'}. ${workloadConfig.message}`}
-            >
-              <View style={[styles.workloadIcon, { backgroundColor: workloadConfig.bg, borderColor: workloadConfig.border }]}>
-                <Ionicons name={workloadConfig.icon} size={14} color={workloadConfig.color} accessible={false} />
-              </View>
-              <Text style={[styles.workloadText, { color: workloadConfig.color }]} numberOfLines={1}>
-                {workloadConfig.label}
-                <Text style={styles.workloadCount}> · {workloadActiveJobs} active</Text>
-              </Text>
-            </View>
-          );
-        })()}
-
-        {/* Status strip — Home's stat-strip anatomy carrying the feed tabs */}
-        <View style={styles.statusStrip} accessibilityRole="tablist">
-          <Pressable
-            style={({ pressed }) => [styles.statusSegment, feedTab === 'active' && styles.statusSegmentSelected, pressed && styles.pressedSoft]}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: feedTab === 'active' }}
-            accessibilityLabel={`My Active Jobs, ${activeCount}`}
-            onPress={() => setFeedTab('active')}
-          >
-            <View style={styles.statusLabelRow}>
-              <Ionicons name="sync" size={12} color={colors.teal} />
-              <Text style={styles.statusLabel}>Active</Text>
-            </View>
-            <Text style={[styles.statusValue, feedTab === 'active' && styles.statusValueActive]}>{activeCount}</Text>
-          </Pressable>
-          <View style={styles.statusDivider} />
-          <Pressable
-            style={({ pressed }) => [styles.statusSegment, feedTab === 'queue' && styles.statusSegmentSelected, pressed && styles.pressedSoft]}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: feedTab === 'queue' }}
-            accessibilityLabel={`Pending requests, ${pendingCount}`}
-            onPress={() => setFeedTab('queue')}
-          >
-            <View style={styles.statusLabelRow}>
-              <Ionicons name="time" size={12} color={colors.gold} />
-              <Text style={styles.statusLabel}>Pending</Text>
-            </View>
-            <Text style={[styles.statusValue, feedTab === 'queue' && styles.statusValueActive]}>{pendingCount}</Text>
-          </Pressable>
-          <View style={styles.statusDivider} />
-          <View style={styles.statusSegment}>
-            <View style={styles.statusLabelRow}>
-              <Ionicons name={workloadStatus === 'at_capacity' ? 'alert-circle-outline' : workloadStatus === 'busy' ? 'time' : 'checkmark-circle'} size={12} color={workloadHue.color} />
-              <Text style={styles.statusLabel}>Workload</Text>
-            </View>
-            <Text style={[styles.statusValue, styles.statusValueWorkload, { color: workloadHue.color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{workloadHue.label}</Text>
+            />
           </View>
         </View>
-        {feedTab === 'queue' ? (
-          <Text style={styles.queueHelper} numberOfLines={1}>Showing within 10 km</Text>
-        ) : null}
 
-        <Text style={styles.sectionTitle} numberOfLines={1}>{feedTab === 'active' ? 'My active jobs' : 'Nearby queue'}</Text>
+        {/* Workload Warning Banner: shown if busy or at capacity */}
+        {workloadStatus !== 'available' && (
+          <View
+            style={[
+              styles.workloadStrip,
+              workloadStatus === 'at_capacity' ? styles.workloadStripAtCapacity : styles.workloadStripBusy
+            ]}
+            accessibilityRole="text"
+            accessibilityLabel={`${workloadHue.label}: ${activeCount} active jobs.`}
+          >
+            <Ionicons
+              name={workloadStatus === 'at_capacity' ? 'alert-circle' : 'time'}
+              size={18}
+              color={workloadHue.color}
+            />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.workloadTitle, { color: workloadHue.color }]}>
+                {workloadStatus === 'at_capacity' ? 'Workload Limit Reached' : 'High Workload Alert'}
+              </Text>
+              <Text style={styles.workloadSub}>
+                {workloadStatus === 'at_capacity'
+                  ? '6 active jobs in flight. Complete an active repair before accepting more requests.'
+                  : `${activeCount} active jobs ongoing. You have ${workloadSummary.remainingCapacity} slots remaining.`}
+              </Text>
+            </View>
+          </View>
+        )}
 
-        {/* Offline / error state — rendered only when the existing fetchError is set */}
+        {/* Segmented Feed Tabs */}
+        <View style={styles.feedTabBar} accessibilityRole="tablist">
+          <Pressable
+            style={({ pressed }) => [
+              styles.feedTabItem,
+              feedTab === 'queue' && styles.feedTabItemActive,
+              pressed && styles.pressedSoft
+            ]}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: feedTab === 'queue' }}
+            accessibilityLabel={`Available leads queue, ${pendingCount} jobs`}
+            onPress={() => setFeedTab('queue')}
+          >
+            <Ionicons
+              name="radio"
+              size={16}
+              color={feedTab === 'queue' ? colors.tealDark : colors.muted}
+            />
+            <Text style={[styles.feedTabLabel, feedTab === 'queue' && styles.feedTabLabelActive]}>
+              Available Leads
+            </Text>
+            <View style={[styles.tabBadge, feedTab === 'queue' && styles.tabBadgeActive]}>
+              <Text style={[styles.tabBadgeText, feedTab === 'queue' && styles.tabBadgeTextActive]}>
+                {pendingCount}
+              </Text>
+            </View>
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.feedTabItem,
+              feedTab === 'active' && styles.feedTabItemActive,
+              pressed && styles.pressedSoft
+            ]}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: feedTab === 'active' }}
+            accessibilityLabel={`Active jobs, ${activeCount} jobs`}
+            onPress={() => setFeedTab('active')}
+          >
+            <Ionicons
+              name="construct"
+              size={16}
+              color={feedTab === 'active' ? colors.tealDark : colors.muted}
+            />
+            <Text style={[styles.feedTabLabel, feedTab === 'active' && styles.feedTabLabelActive]}>
+              Active Jobs
+            </Text>
+            <View style={[styles.tabBadge, feedTab === 'active' && styles.tabBadgeActive]}>
+              <Text style={[styles.tabBadgeText, feedTab === 'active' && styles.tabBadgeTextActive]}>
+                {activeCount}
+              </Text>
+            </View>
+          </Pressable>
+        </View>
+
+        {/* Offline and Stale Data Banner */}
         {fetchError && jobs.length === 0 && acceptedJobs.length === 0 ? (
           <View
             style={styles.errorCard}
             accessibilityRole="alert"
-            accessibilityLabel="Unable to load jobs. Check your connection and try again."
+            accessibilityLabel="Unable to load jobs. Check your internet connection."
           >
-            <View style={styles.errorIconWrap}>
-              <Ionicons name="cloud-offline-outline" size={28} color={colors.danger} accessible={false} />
-            </View>
-            <Text style={styles.errorTitle}>Unable to load jobs</Text>
-            <Text style={styles.errorText}>Check your connection and try again. Your accepted jobs are safe.</Text>
+            <Ionicons name="cloud-offline-outline" size={36} color={colors.danger} />
+            <Text style={styles.errorTitle}>Connection Unavailable</Text>
+            <Text style={styles.errorText}>
+              Unable to reach dispatch server. Check your connection and try refreshing.
+            </Text>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Retry loading jobs"
               onPress={handleRefresh}
-              style={({ pressed }) => [styles.retryButton, pressed && styles.pressedSoft]}
+              style={({ pressed }) => [styles.primaryBtn, pressed && styles.pressedSoft, { marginTop: 12 }]}
             >
-              <Ionicons name="refresh" size={16} color={colors.white} accessible={false} />
-              <Text style={styles.retryButtonText}>Retry</Text>
+              <Ionicons name="refresh" size={16} color={colors.white} style={{ marginRight: 6 }} />
+              <Text style={styles.primaryBtnText}>Retry Connection</Text>
             </Pressable>
           </View>
         ) : null}
+
         {fetchError && (jobs.length > 0 || acceptedJobs.length > 0) ? (
           <View style={styles.offlineBanner} accessibilityRole="alert">
-            <Ionicons name="cloud-offline-outline" size={16} color={colors.muted} accessible={false} />
-            <Text style={styles.offlineBannerText} numberOfLines={2}>Unable to refresh — showing last loaded jobs.</Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Retry refreshing jobs"
-              onPress={handleRefresh}
-              style={({ pressed }) => [styles.offlineRetry, pressed && styles.pressedSoft]}
-            >
-              <Text style={styles.offlineRetryText}>Retry</Text>
+            <Ionicons name="alert-circle-outline" size={16} color={colors.muted} />
+            <Text style={styles.offlineBannerText} numberOfLines={1}>
+              Offline: showing cached dispatch feed.
+            </Text>
+            <Pressable accessibilityRole="button" accessibilityLabel="Retry refreshing" onPress={handleRefresh}>
+              <Text style={styles.offlineRetryText}>Refresh</Text>
             </Pressable>
           </View>
         ) : null}
 
-        {/* Feed List Items */}
-        {feedTab === 'active' ? (
-          acceptedJobs.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <View style={styles.emptyIcon}><Ionicons name="checkmark-circle-outline" size={20} color={colors.teal} /></View>
-              <View style={styles.emptyText}>
-                <Text style={styles.emptyTitle}>No active jobs</Text>
-                <Text style={styles.emptyCopy}>Pull a request from the Nearby queue to get started.</Text>
-              </View>
+        {/* Queue Filter Bar: Category chips + search */}
+        {feedTab === 'queue' && (
+          <View style={styles.queueControlSection}>
+            {/* Search Input Box */}
+            <View style={styles.searchBarContainer}>
+              <Ionicons name="search" size={16} color={colors.muted} style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search by appliance, customer, or location..."
+                placeholderTextColor={colors.muted}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                clearButtonMode="while-editing"
+              />
+              {searchQuery.length > 0 && (
+                <Pressable onPress={() => setSearchQuery('')} hitSlop={8} style={{ paddingRight: 8 }}>
+                  <Ionicons name="close-circle" size={16} color={colors.muted} />
+                </Pressable>
+              )}
             </View>
-          ) : (
-            <View style={styles.jobLedger}>
-            {acceptedJobs.map((job, idx) => {
-              const isInProgress = job.status === 'In Progress';
-              const isConfirmed = job.status === 'Confirmed';
-              const isReady = job.status === 'Customer Ready';
-              const hasArrived = !!job.technicianArrivalAt;
 
-              return (
-                <View key={job.id} style={[styles.jobLedgerRow, idx > 0 && styles.jobLedgerDivider, isFocus(job) && styles.jobLedgerRowFocus]}>
-                  <View style={styles.jobCardTop}>
-                    <View style={[styles.ledgerIcon, { backgroundColor: getStatusColor(job.status) + '15' }]}>
-                      <Ionicons name={statusIconName(job.status)} size={18} color={getStatusColor(job.status)} />
-                    </View>
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                      <View style={styles.jobStatusRow}>
-                        <Text style={styles.jobAppliance} numberOfLines={1}>{job.applianceType || 'Repair Job'}</Text>
-                        <View style={[styles.statusPill, { backgroundColor: getStatusColor(job.status) + '15', borderColor: getStatusColor(job.status) + '40' }]}>
-                          <Ionicons name={statusIconName(job.status)} size={10} color={getStatusColor(job.status)} />
-                          <Text style={[styles.statusPillText, { color: getStatusColor(job.status) }]} numberOfLines={1}>{job.status || 'Accepted'}</Text>
-                        </View>
-                      </View>
-                      <View style={styles.jobMetaRow}>
-                        <Ionicons name="calendar-outline" size={13} color={colors.tealDark} />
-                        <Text style={styles.jobDate} numberOfLines={1}>{formatSchedule(job)}</Text>
-                      </View>
-                      <View style={styles.jobMetaRow}>
-                        <Ionicons name="person-outline" size={13} color={colors.muted} />
-                        <Text style={styles.jobCustomer} numberOfLines={1}>{job.customerName || 'Customer'}</Text>
-                      </View>
-                      <View style={styles.jobMetaRow}>
-                        <Ionicons name="location-outline" size={13} color={colors.muted} />
-                        <Text style={styles.jobLocation} numberOfLines={1}>{job.location || 'Location specified'}</Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  {job.photoUrl ? (
-                    <PhotoThumb photoUrl={job.photoUrl} onPress={() => setPreviewUrl(job.photoUrl ?? null)} />
-                  ) : null}
-
-                  <View style={styles.jobActionRow}>
-                    {!isInProgress && !hasArrived && (isConfirmed || isReady || job.status === 'Accepted') && (
-                      <View style={styles.arrivalRow}>
-                        <Pressable style={styles.primaryBtn} onPress={() => handleArrival(job)} disabled={actionLoadingId === job.id} accessibilityRole="button" accessibilityLabel={`Mark arrival for ${job.applianceType || 'job'}`}>
-                          {actionLoadingId === job.id ? <ActivityIndicator color={colors.white} size="small" /> : <Text style={styles.primaryBtnText}>Mark Arrival</Text>}
-                        </Pressable>
-                        <Pressable style={styles.dangerOutlineBtn} onPress={() => handleNoShow(job)} accessibilityRole="button" accessibilityLabel={`Report no-show for ${job.applianceType || 'job'}`}>
-                          <Text style={styles.dangerOutlineText}>No-Show</Text>
-                        </Pressable>
-                      </View>
-                    )}
-
-                    {!isInProgress && hasArrived && (
-                      <Pressable style={styles.primaryBtn} onPress={() => handleStartJob(job)} disabled={actionLoadingId === job.id}>
-                        {actionLoadingId === job.id ? <ActivityIndicator color={colors.white} size="small" /> : <Text style={styles.primaryBtnText}>Start Repair</Text>}
-                      </Pressable>
-                    )}
-
-                    {isInProgress && (
-                      <Pressable style={styles.completeBtn} onPress={() => openOtpModal(job)}>
-                        <Ionicons name="key-outline" size={15} color={colors.white} style={{ marginRight: 6 }} />
-                        <Text style={styles.primaryBtnText}>Complete (Enter OTP)</Text>
-                      </Pressable>
-                    )}
-
-                    {onNavigateToMap && (
-                      <Pressable style={styles.iconCompanion} onPress={() => onNavigateToMap(job)} accessibilityRole="button" accessibilityLabel={`Open map for ${job.applianceType || 'job'}`}>
-                        <Ionicons name="map-outline" size={20} color={colors.tealDark} />
-                      </Pressable>
-                    )}
-                    {onNavigateToChat && (
-                      <Pressable style={styles.iconCompanion} onPress={() => onNavigateToChat(job)} accessibilityRole="button" accessibilityLabel={`Message ${job.customerName || 'customer'}`}>
-                        <Ionicons name="chatbubble-outline" size={20} color={colors.tealDark} />
-                      </Pressable>
-                    )}
-                  </View>
-                </View>
-              );
-            })}
-            </View>
-          )
-        ) : (
-          nearbyJobs.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <View style={styles.emptyIcon}><Ionicons name="radio-outline" size={20} color={colors.teal} /></View>
-              <View style={styles.emptyText}>
-                <Text style={styles.emptyTitle}>Queue is clear</Text>
-                <Text style={styles.emptyCopy}>No pending requests within 10 km right now.</Text>
-              </View>
-            </View>
-          ) : (
-            <View style={styles.jobLedger}>
-            {nearbyJobs.map((job, idx) => (
-              <View key={job.id} style={[styles.jobLedgerRow, idx > 0 && styles.jobLedgerDivider, isFocus(job) && styles.jobLedgerRowFocus]}>
-                <View style={styles.jobCardTop}>
-                  <View style={[styles.ledgerIcon, styles.ledgerIconQueue]}>
-                    <Ionicons name={getApplianceIcon(job.applianceType) as never} size={18} color={colors.teal} />
-                  </View>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <View style={styles.queueTitleRow}>
-                      <Text style={styles.jobAppliance} numberOfLines={1}>{job.applianceType || 'Repair request'}</Text>
-                      {job.distanceKm != null ? (
-                        <View style={styles.distancePill} accessibilityRole="text" accessibilityLabel={`${Number(job.distanceKm).toFixed(1)} kilometers away`}>
-                          <Ionicons name="navigate" size={10} color={colors.tealDark} />
-                          <Text style={styles.distancePillText} numberOfLines={1}>{`${Number(job.distanceKm).toFixed(1)} km`}</Text>
-                        </View>
-                      ) : null}
-                    </View>
-                    <View style={styles.jobMetaRow}>
-                      <Ionicons name="calendar-outline" size={13} color={colors.tealDark} />
-                      <Text style={styles.jobDate} numberOfLines={1}>{formatSchedule(job)}</Text>
-                    </View>
-                    <View style={styles.jobMetaRow}>
-                      <Ionicons name="location-outline" size={13} color={colors.muted} />
-                      <Text style={styles.jobLocation} numberOfLines={1}>{job.location || 'Location specified'}</Text>
-                    </View>
-                  </View>
-                </View>
-
-                {job.photoUrl ? (
-                  <PhotoThumb photoUrl={job.photoUrl} onPress={() => setPreviewUrl(job.photoUrl ?? null)} />
-                ) : null}
-
-                <View style={styles.jobActionRow}>
+            {/* Category Filter Chips */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoryScroll}
+            >
+              {CATEGORY_CHIPS.map((chip) => {
+                const isSelected = selectedCategory === chip.id;
+                return (
                   <Pressable
-                    style={styles.primaryBtn}
-                    onPress={() => handleAcceptJob(job)}
-                    disabled={acceptingJobId === job.id}
+                    key={chip.id}
+                    onPress={() => setSelectedCategory(chip.id)}
+                    style={({ pressed }) => [
+                      styles.categoryChip,
+                      isSelected && styles.categoryChipSelected,
+                      pressed && styles.pressedSoft
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isSelected }}
+                    accessibilityLabel={`Filter by ${chip.label}`}
                   >
-                    {acceptingJobId === job.id ? <ActivityIndicator color={colors.white} size="small" /> : <Text style={styles.primaryBtnText}>Accept Job</Text>}
+                    <Ionicons
+                      name={chip.icon}
+                      size={14}
+                      color={isSelected ? colors.white : colors.tealDark}
+                      style={{ marginRight: 5 }}
+                    />
+                    <Text style={[styles.categoryChipText, isSelected && styles.categoryChipTextSelected]}>
+                      {chip.label}
+                    </Text>
                   </Pressable>
-                  <Pressable style={styles.dangerOutlineBtn} onPress={() => handleDeclineJob(job)}>
-                    <Text style={styles.dangerOutlineText}>Dismiss</Text>
-                  </Pressable>
-                </View>
-              </View>
-            ))}
+                );
+              })}
+            </ScrollView>
+
+            <View style={styles.queueMetaRow}>
+              <Text style={styles.queueMetaText}>
+                Showing verified leads within {NEARBY_QUEUE_RADIUS_KM} km
+              </Text>
+              <Text style={styles.queueMetaCount}>{filteredQueueJobs.length} available</Text>
             </View>
-          )
+          </View>
+        )}
+
+        {/* Active Jobs Feed Content */}
+        {feedTab === 'active' && (
+          <View style={styles.feedListContainer}>
+            {acceptedJobs.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <View style={styles.emptyIcon}>
+                  <Ionicons name="checkmark-done-circle-outline" size={28} color={colors.teal} />
+                </View>
+                <View style={styles.emptyTextContainer}>
+                  <Text style={styles.emptyTitle}>No Active Jobs</Text>
+                  <Text style={styles.emptyCopy}>
+                    Your schedule is clear. Check the Available Leads tab to accept repair requests.
+                  </Text>
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Switch to Available Leads tab"
+                  onPress={() => setFeedTab('queue')}
+                  style={({ pressed }) => [styles.emptyActionBtn, pressed && styles.pressedSoft]}
+                >
+                  <Text style={styles.emptyActionBtnText}>Browse Leads</Text>
+                </Pressable>
+              </View>
+            ) : (
+              acceptedJobs.map((job) => {
+                const isInProgress = job.status === 'In Progress';
+                const hasArrived = Boolean(job.technicianArrivalAt);
+                const isArrivalEligible = canMarkArrival(job);
+                const isStartRepairEligible = canStartRepair(job);
+
+                return (
+                  <View key={job.id} style={styles.jobCard}>
+                    {/* Card Header */}
+                    <View style={styles.cardHeader}>
+                      <View style={styles.applianceAvatar}>
+                        <Ionicons
+                          name={getApplianceIcon(job.applianceType) as IconName}
+                          size={22}
+                          color={colors.tealDark}
+                        />
+                      </View>
+                      <View style={styles.cardTitleWrap}>
+                        <View style={styles.cardTitleTop}>
+                          <Text style={styles.cardTitle} numberOfLines={1}>
+                            {job.applianceType || 'Repair Request'}
+                          </Text>
+                          <View
+                            style={[
+                              styles.statusPill,
+                              {
+                                backgroundColor: getStatusColor(job.status) + '15',
+                                borderColor: getStatusColor(job.status) + '40'
+                              }
+                            ]}
+                          >
+                            <Ionicons
+                              name={getStatusIcon(job.status) as IconName}
+                              size={11}
+                              color={getStatusColor(job.status)}
+                            />
+                            <Text style={[styles.statusPillText, { color: getStatusColor(job.status) }]}>
+                              {job.status || 'Accepted'}
+                            </Text>
+                          </View>
+                        </View>
+                        <Text style={styles.customerNameText} numberOfLines={1}>
+                          Customer: {job.customerName || 'Verified Homeowner'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Stage Stepper Progress */}
+                    <View style={styles.stepperContainer}>
+                      <View style={styles.stepItem}>
+                        <View style={[styles.stepCircle, styles.stepCircleDone]}>
+                          <Ionicons name="checkmark" size={10} color={colors.white} />
+                        </View>
+                        <Text style={[styles.stepLabel, styles.stepLabelDone]}>Accepted</Text>
+                      </View>
+                      <View style={[styles.stepLine, hasArrived && styles.stepLineDone]} />
+                      <View style={styles.stepItem}>
+                        <View
+                          style={[
+                            styles.stepCircle,
+                            hasArrived ? styles.stepCircleDone : styles.stepCirclePending
+                          ]}
+                        >
+                          <Ionicons
+                            name={hasArrived ? 'checkmark' : 'location'}
+                            size={10}
+                            color={hasArrived ? colors.white : colors.muted}
+                          />
+                        </View>
+                        <Text style={[styles.stepLabel, hasArrived && styles.stepLabelDone]}>Arrived</Text>
+                      </View>
+                      <View style={[styles.stepLine, isInProgress && styles.stepLineDone]} />
+                      <View style={styles.stepItem}>
+                        <View
+                          style={[
+                            styles.stepCircle,
+                            isInProgress ? styles.stepCircleDone : styles.stepCirclePending
+                          ]}
+                        >
+                          <Ionicons
+                            name={isInProgress ? 'checkmark' : 'construct'}
+                            size={10}
+                            color={isInProgress ? colors.white : colors.muted}
+                          />
+                        </View>
+                        <Text style={[styles.stepLabel, isInProgress && styles.stepLabelDone]}>Repair</Text>
+                      </View>
+                      <View style={styles.stepLine} />
+                      <View style={styles.stepItem}>
+                        <View style={[styles.stepCircle, styles.stepCirclePending]}>
+                          <Ionicons name="key" size={10} color={colors.muted} />
+                        </View>
+                        <Text style={styles.stepLabel}>OTP</Text>
+                      </View>
+                    </View>
+
+                    {/* Address and Schedule Details */}
+                    <View style={styles.cardDetailsBox}>
+                      <View style={styles.detailRow}>
+                        <Ionicons name="location" size={14} color={colors.teal} />
+                        <Text style={styles.detailText} numberOfLines={1}>
+                          {job.location || 'Bogo City, Cebu'}
+                        </Text>
+                      </View>
+                      <View style={styles.detailRow}>
+                        <Ionicons name="calendar-outline" size={14} color={colors.tealDark} />
+                        <Text style={styles.detailTextSchedule} numberOfLines={1}>
+                          {formatJobSchedule(job)}
+                        </Text>
+                      </View>
+                      {job.description && (
+                        <View style={styles.problemSnippetBox}>
+                          <Ionicons name="construct-outline" size={13} color={colors.muted} />
+                          <Text style={styles.problemSnippetText} numberOfLines={2}>
+                            {job.description}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Customer Photo preview */}
+                    {job.photoUrl && (
+                      <View style={{ marginBottom: 12 }}>
+                        <PhotoThumb photoUrl={job.photoUrl} onPress={() => setPreviewUrl(job.photoUrl ?? null)} />
+                      </View>
+                    )}
+
+                    {/* Action Bar */}
+                    <View style={styles.cardActionRow}>
+                      {isArrivalEligible && (
+                        <View style={styles.actionGroup}>
+                          <Pressable
+                            style={styles.primaryBtn}
+                            onPress={() => handleArrival(job)}
+                            disabled={actionLoadingId === job.id}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Mark arrival for ${job.applianceType || 'job'}`}
+                          >
+                            {actionLoadingId === job.id ? (
+                              <ActivityIndicator color={colors.white} size="small" />
+                            ) : (
+                              <>
+                                <Ionicons
+                                  name="location"
+                                  size={15}
+                                  color={colors.white}
+                                  style={{ marginRight: 6 }}
+                                />
+                                <Text style={styles.primaryBtnText}>Mark Arrival</Text>
+                              </>
+                            )}
+                          </Pressable>
+                          <Pressable
+                            style={styles.dangerOutlineBtn}
+                            onPress={() => handleNoShow(job)}
+                            accessibilityRole="button"
+                            accessibilityLabel="Report customer no-show"
+                          >
+                            <Text style={styles.dangerOutlineText}>No-Show</Text>
+                          </Pressable>
+                        </View>
+                      )}
+
+                      {isStartRepairEligible && (
+                        <Pressable
+                          style={styles.primaryBtn}
+                          onPress={() => handleStartJob(job)}
+                          disabled={actionLoadingId === job.id}
+                          accessibilityRole="button"
+                          accessibilityLabel="Start repair"
+                        >
+                          {actionLoadingId === job.id ? (
+                            <ActivityIndicator color={colors.white} size="small" />
+                          ) : (
+                            <>
+                              <Ionicons
+                                name="play"
+                                size={15}
+                                color={colors.white}
+                                style={{ marginRight: 6 }}
+                              />
+                              <Text style={styles.primaryBtnText}>Start Repair</Text>
+                            </>
+                          )}
+                        </Pressable>
+                      )}
+
+                      {isInProgress && (
+                        <Pressable
+                          style={styles.completeBtn}
+                          onPress={() => openOtpModal(job)}
+                          accessibilityRole="button"
+                          accessibilityLabel="Enter customer 4-digit OTP to complete job"
+                        >
+                          <Ionicons
+                            name="key"
+                            size={16}
+                            color={colors.white}
+                            style={{ marginRight: 6 }}
+                          />
+                          <Text style={styles.primaryBtnText}>Verify & Complete (OTP)</Text>
+                        </Pressable>
+                      )}
+
+                      {/* Map Launcher */}
+                      {onNavigateToMap && (
+                        <Pressable
+                          style={styles.iconCompanion}
+                          onPress={() => onNavigateToMap(job)}
+                          accessibilityRole="button"
+                          accessibilityLabel="Open GPS navigation map"
+                        >
+                          <Ionicons name="map-outline" size={20} color={colors.tealDark} />
+                        </Pressable>
+                      )}
+
+                      {/* Chat Launcher */}
+                      {onNavigateToChat && (
+                        <Pressable
+                          style={styles.iconCompanion}
+                          onPress={() => onNavigateToChat(job)}
+                          accessibilityRole="button"
+                          accessibilityLabel="Open customer chat"
+                        >
+                          <Ionicons name="chatbubble-ellipses-outline" size={20} color={colors.tealDark} />
+                        </Pressable>
+                      )}
+                    </View>
+                  </View>
+                );
+              })
+            )}
+          </View>
+        )}
+
+        {/* Nearby Queue Feed Content */}
+        {feedTab === 'queue' && (
+          <View style={styles.feedListContainer}>
+            {filteredQueueJobs.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <View style={styles.emptyIcon}>
+                  <Ionicons name="radio-outline" size={28} color={colors.teal} />
+                </View>
+                <View style={styles.emptyTextContainer}>
+                  <Text style={styles.emptyTitle}>Queue is Clear</Text>
+                  <Text style={styles.emptyCopy}>
+                    No unassigned repair requests within 10 km matching your current filter. Pull down to refresh or check other categories.
+                  </Text>
+                </View>
+                {selectedCategory !== 'all' && (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Reset category filter to all"
+                    onPress={() => setSelectedCategory('all')}
+                    style={({ pressed }) => [styles.emptyActionBtn, pressed && styles.pressedSoft]}
+                  >
+                    <Text style={styles.emptyActionBtnText}>Show All Categories</Text>
+                  </Pressable>
+                )}
+              </View>
+            ) : (
+              filteredQueueJobs.map((job) => (
+                <View key={job.id} style={styles.jobCard}>
+                  {/* Card Header */}
+                  <View style={styles.cardHeader}>
+                    <View style={styles.applianceAvatar}>
+                      <Ionicons
+                        name={getApplianceIcon(job.applianceType) as IconName}
+                        size={22}
+                        color={colors.tealDark}
+                      />
+                    </View>
+                    <View style={styles.cardTitleWrap}>
+                      <View style={styles.cardTitleTop}>
+                        <Text style={styles.cardTitle} numberOfLines={1}>
+                          {job.applianceType || 'Repair Request'}
+                        </Text>
+                        {job.distanceKm != null && (
+                          <View
+                            style={styles.distanceBadge}
+                            accessibilityRole="text"
+                            accessibilityLabel={`${Number(job.distanceKm).toFixed(1)} kilometers away`}
+                          >
+                            <Ionicons name="navigate" size={10} color={colors.tealDark} />
+                            <Text style={styles.distanceBadgeText}>
+                              {`${Number(job.distanceKm).toFixed(1)} km`}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={styles.customerNameText} numberOfLines={1}>
+                        {job.customerName || 'Verified Homeowner'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Privacy Location Shield Notice */}
+                  <View style={styles.privacyShieldRow}>
+                    <Ionicons name="shield-outline" size={13} color={colors.tealDark} />
+                    <Text style={styles.privacyShieldText} numberOfLines={1}>
+                      {job.location || 'Bogo Catchment'} (Street masked until accepted)
+                    </Text>
+                  </View>
+
+                  {/* Schedule and Payout Pill Row */}
+                  <View style={styles.pillRow}>
+                    <View style={styles.schedulePill}>
+                      <Ionicons name="time-outline" size={12} color={colors.tealDark} />
+                      <Text style={styles.schedulePillText} numberOfLines={1}>
+                        {formatJobSchedule(job)}
+                      </Text>
+                    </View>
+                    {job.estimatedPayout && (
+                      <View style={styles.payoutPill}>
+                        <Ionicons name="cash-outline" size={12} color={colors.green} />
+                        <Text style={styles.payoutPillText}>{job.estimatedPayout}</Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Issue Description Box */}
+                  {job.description && (
+                    <View style={styles.issueBox}>
+                      <Text style={styles.issueText} numberOfLines={3}>
+                        {job.description}
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Customer Photo */}
+                  {job.photoUrl && (
+                    <View style={{ marginBottom: 12 }}>
+                      <PhotoThumb photoUrl={job.photoUrl} onPress={() => setPreviewUrl(job.photoUrl ?? null)} />
+                    </View>
+                  )}
+
+                  {/* Action Bar */}
+                  <View style={styles.cardActionRow}>
+                    <Pressable
+                      style={styles.primaryBtn}
+                      onPress={() => handleAcceptJob(job)}
+                      disabled={acceptingJobId === job.id}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Accept repair job for ${job.applianceType || 'request'}`}
+                    >
+                      {acceptingJobId === job.id ? (
+                        <ActivityIndicator color={colors.white} size="small" />
+                      ) : (
+                        <>
+                          <Ionicons
+                            name="checkmark-circle"
+                            size={16}
+                            color={colors.white}
+                            style={{ marginRight: 6 }}
+                          />
+                          <Text style={styles.primaryBtnText}>Accept Job</Text>
+                        </>
+                      )}
+                    </Pressable>
+
+                    <Pressable
+                      style={styles.secondaryBtn}
+                      onPress={() => setSelectedJobForDetails(job)}
+                      accessibilityRole="button"
+                      accessibilityLabel="View full job details"
+                    >
+                      <Ionicons name="eye-outline" size={16} color={colors.ink} />
+                      <Text style={styles.secondaryBtnText}>Details</Text>
+                    </Pressable>
+
+                    <Pressable
+                      style={styles.dangerOutlineBtn}
+                      onPress={() => handleDeclineJob(job)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Dismiss repair request"
+                    >
+                      <Ionicons name="close" size={16} color={colors.danger} />
+                    </Pressable>
+                  </View>
+                </View>
+              ))
+            )}
+          </View>
         )}
       </View>
 
-      {/* OTP Verification Modal */}
-      <Modal visible={otpModalVisible} transparent={true} animationType="fade" onRequestClose={() => setOtpModalVisible(false)}>
+      {/* Job Details Bottom Sheet Modal */}
+      <Modal
+        visible={selectedJobForDetails !== null}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setSelectedJobForDetails(null)}
+      >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalTitle}>Completion Code</Text>
-              <Pressable onPress={() => setOtpModalVisible(false)}>
+          <View style={styles.detailsSheet}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.sheetHeaderRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.sheetKicker}>REPAIR SPECIFICATIONS</Text>
+                <Text style={styles.sheetTitle} numberOfLines={1}>
+                  {selectedJobForDetails?.applianceType || 'Repair Request'}
+                </Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Close details modal"
+                hitSlop={12}
+                onPress={() => setSelectedJobForDetails(null)}
+                style={styles.sheetCloseBtn}
+              >
                 <Ionicons name="close" size={20} color={colors.ink} />
               </Pressable>
             </View>
-            <Text style={styles.modalDesc}>Ask the customer for their 4-digit completion code to close out this job.</Text>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
+              <View style={styles.sheetSection}>
+                <Text style={styles.sheetSectionLabel}>CUSTOMER AND PROXIMITY</Text>
+                <View style={styles.sheetInfoRow}>
+                  <Ionicons name="person" size={15} color={colors.tealDark} />
+                  <Text style={styles.sheetInfoText}>
+                    {selectedJobForDetails?.customerName || 'Verified Homeowner'}
+                  </Text>
+                </View>
+                <View style={styles.sheetInfoRow}>
+                  <Ionicons name="navigate" size={15} color={colors.tealDark} />
+                  <Text style={styles.sheetInfoText}>
+                    {selectedJobForDetails?.distanceKm != null
+                      ? `${Number(selectedJobForDetails.distanceKm).toFixed(1)} km away`
+                      : 'In local service zone'}
+                  </Text>
+                </View>
+                <View style={styles.sheetInfoRow}>
+                  <Ionicons name="location" size={15} color={colors.tealDark} />
+                  <Text style={styles.sheetInfoText}>
+                    {selectedJobForDetails?.location || 'Bogo City, Cebu'}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.sheetSection}>
+                <Text style={styles.sheetSectionLabel}>REPORTED PROBLEM</Text>
+                <Text style={styles.sheetBodyText}>
+                  {selectedJobForDetails?.description || 'No additional issue notes provided by customer.'}
+                </Text>
+              </View>
+
+              {selectedJobForDetails?.photoUrl && (
+                <View style={styles.sheetSection}>
+                  <Text style={styles.sheetSectionLabel}>ATTACHED DAMAGE PHOTO</Text>
+                  <PhotoThumb
+                    photoUrl={selectedJobForDetails.photoUrl}
+                    onPress={() => setPreviewUrl(selectedJobForDetails?.photoUrl ?? null)}
+                  />
+                </View>
+              )}
+
+              <View style={styles.sheetSection}>
+                <Text style={styles.sheetSectionLabel}>SCHEDULE AND SETTLEMENT</Text>
+                <View style={styles.sheetInfoRow}>
+                  <Ionicons name="calendar" size={15} color={colors.tealDark} />
+                  <Text style={styles.sheetInfoText}>
+                    {selectedJobForDetails ? formatJobSchedule(selectedJobForDetails) : ''}
+                  </Text>
+                </View>
+                <View style={styles.sheetInfoRow}>
+                  <Ionicons name="wallet-outline" size={15} color={colors.green} />
+                  <Text style={styles.sheetInfoText}>Cash on Service (Direct settlement upon completion)</Text>
+                </View>
+              </View>
+            </ScrollView>
+
+            <View style={styles.sheetActionRow}>
+              {selectedJobForDetails && (
+                <Pressable
+                  style={styles.primaryBtn}
+                  onPress={() => {
+                    const jobToAccept = selectedJobForDetails;
+                    setSelectedJobForDetails(null);
+                    handleAcceptJob(jobToAccept);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Accept job from details"
+                >
+                  <Ionicons name="checkmark-circle" size={16} color={colors.white} style={{ marginRight: 6 }} />
+                  <Text style={styles.primaryBtnText}>Accept This Request</Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 4-Digit OTP Completion Handshake Modal */}
+      <Modal
+        visible={otpModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setOtpModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeaderRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modalKicker}>COMPLETION HANDSHAKE</Text>
+                <Text style={styles.modalTitle}>Enter 4-Digit Code</Text>
+              </View>
+              <Pressable
+                hitSlop={12}
+                onPress={() => setOtpModalVisible(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Close OTP modal"
+                style={styles.modalCloseTarget}
+              >
+                <Ionicons name="close" size={20} color={colors.ink} />
+              </Pressable>
+            </View>
+
+            <Text style={styles.modalDesc}>
+              Ask the customer to display their 4-digit completion code on their FixLink phone screen to confirm repair closeout.
+            </Text>
+
+            {/* Discrete 4-Box PIN Display */}
+            <View style={styles.pinBoxesContainer}>
+              {[0, 1, 2, 3].map((idx) => {
+                const digit = otpCode[idx] ?? '';
+                const isFocused = otpCode.length === idx;
+                return (
+                  <View
+                    key={idx}
+                    style={[
+                      styles.pinBox,
+                      digit !== '' && styles.pinBoxFilled,
+                      isFocused && styles.pinBoxActive
+                    ]}
+                  >
+                    <Text style={styles.pinDigit}>{digit}</Text>
+                  </View>
+                );
+              })}
+            </View>
+
+            {/* Hidden Input field driving the 4-box display */}
             <TextInput
-              style={styles.otpInputBox}
-              placeholder="0000"
-              placeholderTextColor={colors.muted}
+              style={styles.hiddenPinInput}
+              value={otpCode}
+              onChangeText={(text) => setOtpCode(text.replace(/[^0-9]/g, '').slice(0, 4))}
               keyboardType="number-pad"
               maxLength={4}
-              value={otpCode}
-              onChangeText={setOtpCode}
               autoFocus={true}
             />
-            <Pressable style={styles.primaryBtn} onPress={handleVerifyOtp} disabled={verifyingOtp}>
-              {verifyingOtp ? <ActivityIndicator color={colors.white} size="small" /> : <Text style={styles.primaryBtnText}>Verify & Complete</Text>}
+
+            <Pressable
+              style={[styles.primaryBtn, { width: '100%', marginTop: 8 }]}
+              onPress={handleVerifyOtp}
+              disabled={verifyingOtp}
+              accessibilityRole="button"
+              accessibilityLabel="Verify and finalize job"
+            >
+              {verifyingOtp ? (
+                <ActivityIndicator color={colors.white} size="small" />
+              ) : (
+                <>
+                  <Ionicons name="shield-checkmark" size={16} color={colors.white} style={{ marginRight: 6 }} />
+                  <Text style={styles.primaryBtnText}>Verify and Complete Job</Text>
+                </>
+              )}
             </Pressable>
           </View>
         </View>
       </Modal>
 
-      {/* Attached repair photo viewer */}
+      {/* Customer Repair Photo Lightbox */}
       <PhotoLightbox
         visible={previewUrl !== null}
         photoUrl={previewUrl}
-        title="Problem photo"
-        subtitle="Attached by the customer"
+        title="Repair Problem Photo"
+        subtitle="Captured by customer upon request submission"
         onClose={() => setPreviewUrl(null)}
       />
     </ScrollView>
@@ -764,29 +1384,76 @@ export default function AvailableJobsScreen({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.canvas },
-  content: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 },
-  centerWrap: { width: '100%', maxWidth: 600, alignSelf: 'center' },
+  content: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 48 },
+  centerWrap: { width: '100%', maxWidth: 640, alignSelf: 'center' },
 
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 14,
-    gap: 10,
+    marginBottom: 12
   },
-  brandLeft: { flex: 1, minWidth: 0, gap: 1 },
-  brandSmall: { color: colors.ink, fontSize: 16, fontFamily: fonts.extraBold, letterSpacing: -0.3, lineHeight: 18 },
+  brandLeft: { flex: 1, minWidth: 0 },
+  brandTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  brandSmall: {
+    color: colors.ink,
+    fontSize: 18,
+    fontFamily: fonts.extraBold,
+    letterSpacing: -0.4,
+    lineHeight: 22
+  },
   brandAccent: { color: colors.teal, fontFamily: fonts.extraBold },
-  roleSmall: { color: colors.muted, fontSize: 9, letterSpacing: 1.3, fontFamily: fonts.bold, lineHeight: 11 },
+  dispatchPill: {
+    backgroundColor: colors.tealLight,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: colors.hudBorder
+  },
+  dispatchPillText: {
+    color: colors.tealDark,
+    fontSize: 9,
+    fontFamily: fonts.bold,
+    letterSpacing: 0.8
+  },
+  roleSmall: {
+    color: colors.muted,
+    fontSize: 10,
+    fontFamily: fonts.bold,
+    letterSpacing: 1.1,
+    marginTop: 2
+  },
+  topBarRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+
+  dutyPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1
+  },
+  dutyPillOnline: { backgroundColor: colors.tealLight, borderColor: colors.hudBorder },
+  dutyPillOffline: { backgroundColor: colors.white, borderColor: colors.line },
+  statusDot: { width: 8, height: 8, borderRadius: 4 },
+  statusDotOnline: { backgroundColor: colors.green },
+  statusDotOffline: { backgroundColor: colors.muted },
+  dutyPillText: { fontSize: 11, fontFamily: fonts.bold, letterSpacing: 0.5 },
+  dutyTextOnline: { color: colors.tealDark },
+  dutyTextOffline: { color: colors.muted },
+
   notificationQuiet: {
     width: 44,
     height: 44,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.tealLight,
+    backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: colors.hudBorder,
+    borderColor: colors.line,
+    ...shadows.subtle
   },
   notifBadge: {
     position: 'absolute',
@@ -800,300 +1467,502 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 4,
     borderWidth: 2,
-    borderColor: colors.white,
+    borderColor: colors.white
   },
-  notifBadgeText: { color: colors.white, fontSize: 11, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
+  notifBadgeText: {
+    color: colors.white,
+    fontSize: 10,
+    fontFamily: fonts.extraBold,
+    fontVariant: ['tabular-nums']
+  },
 
-  heroRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 10 },
-  heroCopyWrap: { flex: 1, paddingRight: 6, minWidth: 0 },
-  greeting: { color: colors.ink, fontSize: 26, fontFamily: fonts.extraBold, letterSpacing: -0.7, lineHeight: 30 },
-  heroCopy: { color: colors.muted, fontSize: 13, marginTop: 2, fontFamily: fonts.regular, lineHeight: 18 },
-  avatar: { width: 48, height: 48, borderRadius: 16, backgroundColor: colors.tealLight, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.hudBorder },
-  avatarText: { color: colors.tealDark, fontSize: 18, fontFamily: fonts.bold },
-
-  statusStrip: {
+  heroCard: {
     flexDirection: 'row',
-    alignItems: 'stretch',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: colors.white,
     borderRadius: 20,
+    padding: 16,
     borderWidth: 1,
     borderColor: colors.line,
-    marginBottom: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 6,
+    marginBottom: 12,
+    ...shadows.subtle
   },
-  statusSegment: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 6, minWidth: 0, borderRadius: 16 },
-  statusSegmentSelected: { backgroundColor: colors.tealLight },
-  statusDivider: { borderLeftWidth: 1, borderColor: colors.lineSoft, marginVertical: 2 },
-  statusLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  statusLabel: { color: colors.muted, fontSize: 10, fontFamily: fonts.semiBold, letterSpacing: 0.4, textTransform: 'uppercase' },
-  statusValue: { color: colors.ink, fontSize: 22, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'], lineHeight: 26 },
-  statusValueActive: { color: colors.teal },
-  statusValueWorkload: { fontSize: 15, lineHeight: 20, fontFamily: fonts.bold },
-
-  sectionTitle: { color: colors.ink, fontSize: 18, fontFamily: fonts.bold, letterSpacing: -0.3, marginBottom: 10 },
-  workloadStrip: {
+  heroLeft: { flex: 1, paddingRight: 10, minWidth: 0 },
+  greeting: {
+    color: colors.ink,
+    fontSize: 20,
+    fontFamily: fonts.extraBold,
+    letterSpacing: -0.4,
+    lineHeight: 24,
+    marginBottom: 4
+  },
+  heroSubtitle: {
+    color: colors.muted,
+    fontSize: 12,
+    fontFamily: fonts.medium,
+    lineHeight: 16,
+    marginBottom: 10
+  },
+  heroMetricsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: colors.canvas,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 12,
-    paddingVertical: 9,
-    paddingHorizontal: 12,
-    marginBottom: 16,
+    flexWrap: 'wrap'
   },
-  workloadStripBusy: { borderColor: '#FDE68A', backgroundColor: '#FFFBEB' },
-  workloadStripAtCapacity: { borderColor: '#FECACA', backgroundColor: '#FEF2F2' },
-  workloadIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 9,
+  heroMetricChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: colors.surfaceSunken,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.line
+  },
+  heroMetricText: {
+    color: colors.ink,
+    fontSize: 11,
+    fontFamily: fonts.semiBold,
+    fontVariant: ['tabular-nums']
+  },
+  avatarWrap: {
+    position: 'relative',
+    marginLeft: 8
+  },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: colors.tealLight,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
+    borderColor: colors.hudBorder
   },
-  workloadText: { flex: 1, fontSize: 13, fontFamily: fonts.bold },
-  workloadCount: { color: colors.muted, fontFamily: fonts.medium, fontVariant: ['tabular-nums'] },
+  avatarImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.hudBorder
+  },
+  avatarText: { color: colors.tealDark, fontSize: 18, fontFamily: fonts.bold },
+  avatarPresenceDot: {
+    position: 'absolute',
+    bottom: -1,
+    right: -1,
+    width: 13,
+    height: 13,
+    borderRadius: 7,
+    borderWidth: 2,
+    borderColor: colors.white
+  },
+  presenceOnline: {
+    backgroundColor: colors.green
+  },
+  presenceOffline: {
+    backgroundColor: '#94A3B8'
+  },
 
-  errorCard: {
+  workloadStrip: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1
+  },
+  workloadStripBusy: { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' },
+  workloadStripAtCapacity: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
+  workloadTitle: { fontSize: 13, fontFamily: fonts.bold, marginBottom: 2 },
+  workloadSub: { fontSize: 12, fontFamily: fonts.regular, color: colors.muted, lineHeight: 16 },
+
+  feedTabBar: {
+    flexDirection: 'row',
     backgroundColor: colors.white,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.line,
-    padding: 24,
-    alignItems: 'center',
+    padding: 4,
     marginBottom: 12,
-    ...shadows.subtle,
+    ...shadows.subtle
   },
-  errorIconWrap: {
-    width: 56,
-    height: 56,
-    borderRadius: 18,
-    backgroundColor: colors.danger + '15',
+  feedTabItem: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    gap: 6,
+    height: 44,
+    borderRadius: 12
   },
-  errorTitle: { fontFamily: fonts.bold, fontSize: 16, color: colors.ink, marginBottom: 4 },
-  errorText: { fontFamily: fonts.regular, fontSize: 13, color: colors.muted, textAlign: 'center', marginBottom: 16 },
-  retryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: colors.teal,
-    borderRadius: 12,
-    minHeight: 44,
-    paddingHorizontal: 20,
+  feedTabItemActive: { backgroundColor: colors.tealLight },
+  feedTabLabel: {
+    fontSize: 13,
+    fontFamily: fonts.semiBold,
+    color: colors.muted
   },
-  retryButtonText: { fontFamily: fonts.bold, fontSize: 14, color: colors.white },
-  offlineBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  feedTabLabelActive: {
+    fontFamily: fonts.bold,
+    color: colors.tealDark
+  },
+  tabBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
     backgroundColor: colors.canvas,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5
+  },
+  tabBadgeActive: { backgroundColor: colors.tealDark },
+  tabBadgeText: {
+    fontSize: 11,
+    fontFamily: fonts.bold,
+    color: colors.muted,
+    fontVariant: ['tabular-nums']
+  },
+  tabBadgeTextActive: { color: colors.white },
+
+  queueControlSection: { marginBottom: 12 },
+  searchBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.white,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.line,
-    borderRadius: 12,
-    paddingVertical: 10,
     paddingHorizontal: 12,
-    marginBottom: 12,
+    height: 44,
+    marginBottom: 10
   },
-  offlineBannerText: { flex: 1, fontFamily: fonts.medium, fontSize: 12, color: colors.muted },
-  offlineRetry: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12 },
-  offlineRetryText: { fontFamily: fonts.bold, fontSize: 13, color: colors.teal },
+  searchIcon: { marginRight: 8 },
+  searchInput: {
+    flex: 1,
+    height: '100%',
+    fontFamily: fonts.regular,
+    fontSize: 13,
+    color: colors.ink
+  },
 
-  queueHelper: {
-    fontFamily: fonts?.regular,
+  categoryScroll: { gap: 8, paddingBottom: 6 },
+  categoryChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.line
+  },
+  categoryChipSelected: {
+    backgroundColor: colors.teal,
+    borderColor: colors.teal
+  },
+  categoryChipText: {
+    fontSize: 12,
+    fontFamily: fonts.bold,
+    color: colors.tealDark
+  },
+  categoryChipTextSelected: { color: colors.white },
+
+  queueMetaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 2,
+    marginTop: 4
+  },
+  queueMetaText: { fontSize: 11, fontFamily: fonts.medium, color: colors.muted },
+  queueMetaCount: {
     fontSize: 11,
-    lineHeight: 14,
-    color: colors.muted,
-    marginBottom: 10,
+    fontFamily: fonts.bold,
+    color: colors.tealDark,
+    fontVariant: ['tabular-nums']
   },
 
-  jobLedger: {
+  feedListContainer: { gap: 12 },
+
+  jobCard: {
     backgroundColor: colors.white,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: colors.line,
-    marginBottom: 12,
-    overflow: 'hidden',
-    ...shadows.subtle,
+    padding: 16,
+    ...shadows.subtle
   },
-  jobLedgerRow: { padding: 14 },
-  jobLedgerDivider: { borderTopWidth: 1, borderColor: colors.lineSoft },
-  jobLedgerRowFocus: { backgroundColor: colors.tealLight },
-  ledgerIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  ledgerIconQueue: { backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.hudBorder },
-  jobCardTop: {
+  cardHeader: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 10,
+    gap: 12,
+    marginBottom: 10
+  },
+  applianceAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: colors.tealLight,
+    borderWidth: 1,
+    borderColor: colors.hudBorder,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  cardTitleWrap: { flex: 1, minWidth: 0 },
+  cardTitleTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 2
+  },
+  cardTitle: {
+    flex: 1,
+    fontSize: 15,
+    fontFamily: fonts.bold,
+    color: colors.ink,
+    letterSpacing: -0.2
+  },
+  customerNameText: {
+    fontSize: 12,
+    fontFamily: fonts.medium,
+    color: colors.muted
   },
 
-  jobStatusRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 6,
-  },
-  jobAppliance: {
-    flex: 1,
-    minWidth: 0,
-    fontFamily: fonts?.bold,
-    fontSize: 15,
-    lineHeight: 19,
-    letterSpacing: -0.15,
-    color: colors.ink,
-  },
-  queueTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    minWidth: 0,
-  },
-  distancePill: {
-    flexShrink: 0,
-    maxWidth: '45%',
+  distanceBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
     backgroundColor: colors.tealLight,
-    borderColor: colors.hudBorder,
     borderWidth: 1,
+    borderColor: colors.hudBorder,
     borderRadius: 999,
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    justifyContent: 'center',
+    paddingVertical: 3
   },
-  distancePillText: {
-    fontFamily: fonts?.bold,
+  distanceBadgeText: {
     fontSize: 11,
-    lineHeight: 14,
+    fontFamily: fonts.bold,
     color: colors.tealDark,
-    fontVariant: ['tabular-nums'],
+    fontVariant: ['tabular-nums']
   },
-  jobMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    marginTop: 3,
-  },
-  jobCustomer: {
-    flex: 1,
-    minWidth: 0,
-    fontFamily: fonts?.semiBold,
-    fontSize: 13,
-    lineHeight: 17,
-    color: colors.ink,
-  },
+
   statusPill: {
-    flexShrink: 0,
-    maxWidth: '50%',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: colors.tealLight,
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 3,
     borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.teal + '40',
+    borderWidth: 1
   },
-  statusPillText: {
-    fontFamily: fonts?.bold,
-    fontSize: 10,
-    color: colors.teal,
-  },
-  jobLocation: {
-    flex: 1,
-    minWidth: 0,
-    fontFamily: fonts?.regular,
-    fontSize: 13,
-    lineHeight: 17,
-    color: colors.muted,
-  },
-  jobDate: {
-    flex: 1,
-    minWidth: 0,
-    fontFamily: fonts?.semiBold,
-    fontSize: 13,
-    lineHeight: 17,
-    color: colors.tealDark,
-  },
-  iconCompanion: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-    backgroundColor: colors.tealLight,
-    justifyContent: 'center',
+  statusPillText: { fontSize: 10, fontFamily: fonts.bold },
+
+  privacyShieldRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 5,
+    backgroundColor: colors.surfaceSunken,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    marginBottom: 10
   },
-  jobActionRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+  privacyShieldText: {
+    fontSize: 11,
+    fontFamily: fonts.medium,
+    color: colors.tealDark,
+    flex: 1
   },
-  arrivalRow: {
+
+  pillRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
     gap: 8,
+    marginBottom: 10,
+    flexWrap: 'wrap'
+  },
+  schedulePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.canvas,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4
+  },
+  schedulePillText: {
+    fontSize: 11,
+    fontFamily: fonts.bold,
+    color: colors.tealDark,
+    fontVariant: ['tabular-nums']
+  },
+  payoutPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.green + '12',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4
+  },
+  payoutPillText: {
+    fontSize: 11,
+    fontFamily: fonts.bold,
+    color: colors.green
+  },
+
+  issueBox: {
+    backgroundColor: colors.surfaceSunken,
+    borderRadius: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: colors.lineSoft,
+    marginBottom: 12
+  },
+  issueText: {
+    fontSize: 12,
+    fontFamily: fonts.regular,
+    color: colors.ink,
+    lineHeight: 17
+  },
+
+  stepperContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.surfaceSunken,
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 12
+  },
+  stepItem: { alignItems: 'center', gap: 3 },
+  stepCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  stepCircleDone: { backgroundColor: colors.teal },
+  stepCirclePending: { backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line },
+  stepLabel: { fontSize: 9, fontFamily: fonts.medium, color: colors.muted },
+  stepLabelDone: { color: colors.tealDark, fontFamily: fonts.bold },
+  stepLine: {
     flex: 1,
-    minWidth: 0,
+    height: 2,
+    backgroundColor: colors.line,
+    marginHorizontal: 4,
+    marginTop: -10
   },
+  stepLineDone: { backgroundColor: colors.teal },
+
+  cardDetailsBox: {
+    backgroundColor: colors.canvas,
+    borderRadius: 12,
+    padding: 10,
+    gap: 6,
+    marginBottom: 12
+  },
+  detailRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  detailText: { flex: 1, fontSize: 12, fontFamily: fonts.medium, color: colors.ink },
+  detailTextSchedule: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: fonts.bold,
+    color: colors.tealDark,
+    fontVariant: ['tabular-nums']
+  },
+  problemSnippetBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    paddingTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: colors.lineSoft
+  },
+  problemSnippetText: { flex: 1, fontSize: 11, fontFamily: fonts.regular, color: colors.muted, lineHeight: 16 },
+
+  cardActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap'
+  },
+  actionGroup: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
+
   primaryBtn: {
     flex: 1,
-    minWidth: 0,
-    backgroundColor: colors.teal,
+    minWidth: 120,
+    height: 48,
     borderRadius: 12,
-    minHeight: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    backgroundColor: colors.teal,
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14
+  },
+  primaryBtnText: {
+    fontSize: 13,
+    fontFamily: fonts.bold,
+    color: colors.white
+  },
+  secondaryBtn: {
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: colors.canvas,
+    borderWidth: 1,
+    borderColor: colors.line,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    gap: 6
+  },
+  secondaryBtnText: {
+    fontSize: 13,
+    fontFamily: fonts.bold,
+    color: colors.ink
+  },
+  dangerOutlineBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.danger + '40',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  dangerOutlineText: {
+    fontSize: 12,
+    fontFamily: fonts.bold,
+    color: colors.danger
   },
   completeBtn: {
     flex: 1,
-    minWidth: 0,
+    minWidth: 150,
+    height: 48,
+    borderRadius: 12,
     backgroundColor: colors.green,
-    borderRadius: 12,
-    minHeight: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
     flexDirection: 'row',
-  },
-  primaryBtnText: {
-    fontFamily: fonts?.bold,
-    fontSize: 13,
-    color: colors.white,
-  },
-  dangerOutlineBtn: {
-    flexShrink: 0,
-    paddingHorizontal: 14,
-    minHeight: 48,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.danger + '40',
-    backgroundColor: colors.white,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14
   },
-  dangerOutlineText: {
-    fontFamily: fonts?.bold,
-    fontSize: 13,
-    color: colors.danger,
+  iconCompanion: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: colors.tealLight,
+    borderWidth: 1,
+    borderColor: colors.hudBorder,
+    alignItems: 'center',
+    justifyContent: 'center'
   },
 
   emptyCard: {
@@ -1101,61 +1970,215 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: colors.line,
-    padding: 16,
+    padding: 24,
+    alignItems: 'center',
+    gap: 10,
+    ...shadows.subtle
+  },
+  emptyIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    backgroundColor: colors.tealLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.hudBorder
+  },
+  emptyTextContainer: { alignItems: 'center', gap: 4 },
+  emptyTitle: { fontSize: 16, fontFamily: fonts.bold, color: colors.ink },
+  emptyCopy: {
+    fontSize: 12,
+    fontFamily: fonts.regular,
+    color: colors.muted,
+    textAlign: 'center',
+    lineHeight: 18
+  },
+  emptyActionBtn: {
+    paddingHorizontal: 16,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.tealLight,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  emptyActionBtnText: {
+    fontSize: 12,
+    fontFamily: fonts.bold,
+    color: colors.tealDark
+  },
+
+  errorCard: {
+    backgroundColor: colors.white,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.line,
+    padding: 24,
+    alignItems: 'center',
+    marginBottom: 12,
+    ...shadows.subtle
+  },
+  errorTitle: { fontSize: 16, fontFamily: fonts.bold, color: colors.ink, marginTop: 8 },
+  errorText: {
+    fontSize: 12,
+    fontFamily: fonts.regular,
+    color: colors.muted,
+    textAlign: 'center',
+    marginTop: 4,
+    lineHeight: 17
+  },
+  offlineBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    minHeight: 72,
+    gap: 8,
+    backgroundColor: colors.surfaceSunken,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 12
   },
-  emptyIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: colors.tealLight, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.hudBorder },
-  emptyText: { flex: 1, gap: 2, minWidth: 0 },
-  emptyTitle: { color: colors.ink, fontSize: 14, fontFamily: fonts.bold, marginBottom: 2, lineHeight: 18 },
-  emptyCopy: { color: colors.muted, fontSize: 12, fontFamily: fonts.regular, lineHeight: 16 },
+  offlineBannerText: { flex: 1, fontSize: 11, fontFamily: fonts.medium, color: colors.muted },
+  offlineRetryText: { fontSize: 12, fontFamily: fonts.bold, color: colors.teal },
 
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
+    backgroundColor: 'rgba(16, 42, 67, 0.45)',
+    justifyContent: 'flex-end'
   },
+  detailsSheet: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: 14,
+    paddingHorizontal: 20,
+    paddingBottom: 32,
+    maxHeight: '85%'
+  },
+  sheetHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.line,
+    alignSelf: 'center',
+    marginBottom: 12
+  },
+  sheetHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.line,
+    marginBottom: 12
+  },
+  sheetKicker: {
+    fontSize: 10,
+    fontFamily: fonts.bold,
+    color: colors.tealDark,
+    letterSpacing: 1.2,
+    marginBottom: 2
+  },
+  sheetTitle: {
+    fontSize: 17,
+    fontFamily: fonts.bold,
+    color: colors.ink
+  },
+  sheetCloseBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.canvas,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  sheetSection: { marginBottom: 16 },
+  sheetSectionLabel: {
+    fontSize: 10,
+    fontFamily: fonts.bold,
+    color: colors.muted,
+    letterSpacing: 1,
+    marginBottom: 6
+  },
+  sheetInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 5 },
+  sheetInfoText: { fontSize: 13, fontFamily: fonts.medium, color: colors.ink },
+  sheetBodyText: { fontSize: 13, fontFamily: fonts.regular, color: colors.ink, lineHeight: 19 },
+  sheetActionRow: { paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.line },
+
   modalCard: {
     backgroundColor: colors.white,
-    borderRadius: 20,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     padding: 24,
     width: '100%',
-    maxWidth: 400,
-    ...shadows.subtle,
+    ...shadows.hud
   },
   modalHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
+    alignItems: 'flex-start',
+    marginBottom: 8
   },
-  modalTitle: {
-    fontFamily: fonts?.bold,
-    fontSize: 18,
-    color: colors.ink,
+  modalKicker: {
+    fontSize: 10,
+    fontFamily: fonts.bold,
+    color: colors.tealDark,
+    letterSpacing: 1.2,
+    marginBottom: 2
+  },
+  modalTitle: { fontSize: 18, fontFamily: fonts.bold, color: colors.ink },
+  modalCloseTarget: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.canvas,
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   modalDesc: {
-    fontFamily: fonts?.regular,
-    fontSize: 13,
+    fontSize: 12,
+    fontFamily: fonts.regular,
     color: colors.muted,
-    marginBottom: 16,
+    marginBottom: 18,
+    lineHeight: 18
   },
-  otpInputBox: {
-    backgroundColor: colors.canvas,
-    borderWidth: 1,
+  pinBoxesContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+    marginBottom: 16
+  },
+  pinBox: {
+    width: 54,
+    height: 58,
+    borderRadius: 14,
+    backgroundColor: colors.surfaceSunken,
+    borderWidth: 1.5,
     borderColor: colors.line,
-    borderRadius: 12,
-    height: 52,
-    textAlign: 'center',
-    fontFamily: fonts?.bold,
-    fontSize: 22,
-    color: colors.ink,
-    letterSpacing: 8,
-    marginBottom: 20,
+    alignItems: 'center',
+    justifyContent: 'center'
   },
-  pressedSoft: { opacity: 0.85 },
+  pinBoxFilled: {
+    borderColor: colors.teal,
+    backgroundColor: colors.white
+  },
+  pinBoxActive: {
+    borderColor: colors.tealDark,
+    borderWidth: 2
+  },
+  pinDigit: {
+    fontSize: 24,
+    fontFamily: fonts.extraBold,
+    color: colors.ink,
+    fontVariant: ['tabular-nums']
+  },
+  hiddenPinInput: {
+    position: 'absolute',
+    opacity: 0.01,
+    width: 1,
+    height: 1
+  },
+
+  pressedSoft: { opacity: 0.85, transform: [{ scale: 0.98 }] }
 });
