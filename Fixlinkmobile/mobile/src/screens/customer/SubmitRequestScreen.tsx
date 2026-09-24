@@ -9,7 +9,7 @@ import { PhotoLightbox } from "../../components/RequestPhoto";
 import { submitRepairRequest, fetchPlatformCategories } from "../services/api";
 import { geocodeAddress } from "../services/locationIq";
 import LocationIQMap from "../../components/LocationIQMap";
-import { colors, fonts } from '../../theme';
+import { colors, fonts, shadows } from '../../theme';
 import { getApplianceIcon } from '../../utils/applianceIcons';
 
 // Place types that read as "business/store/landmark" so we can pick a fitting icon
