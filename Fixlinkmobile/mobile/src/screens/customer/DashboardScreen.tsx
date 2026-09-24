@@ -6,14 +6,10 @@ import { fetchCompletedJobs, fetchCustomerRequests, fetchPlatformCategories } fr
 import { colors, fonts } from '../../theme';
 import { getApplianceIcon, getStatusColor, getStatusIcon } from '../../utils/applianceIcons';
 
-// Mirrors RequestProgressScreen ACTIVE_STATUSES verbatim — the single source of
-// truth for "applicable active job". Post-accept only; Pending never shows a hero.
+// Prototype: FixIt Customer Home (orange #F97316 on dark #0D1B2A).
+// Logic preserved: real requests, active hero, stats, recent, categories, tip.
 const ACTIVE_STATUSES = ['accepted', 'confirmed', 'customer ready', 'in progress'];
 
-// Next-action hints mirror exactly the actions RequestDetailsScreen /
-// RequestProgressScreen render for each status. Display-only text inside the
-// row (the row itself navigates to details where the real action lives), so a
-// hint can never imply an action the job state does not allow.
 const getNextAction = (req) => {
   const s = String(req?.status || '').toLowerCase();
   if (s === 'accepted') return { icon: 'checkmark-circle', text: 'Confirm repair' };
@@ -24,6 +20,9 @@ const getNextAction = (req) => {
   return null;
 };
 
+const ORANGE = colors.customer;
+const DARK = colors.dark;
+
 export default function DashboardScreen({ user, notificationCount = 0, onOpenNotifications, onNavigateToSubmit, onNavigateToProgress, onOpenRequest, onTrackJob }) {
   const [trackedRequests, setTrackedRequests] = useState([]);
   const [completedJobs, setCompletedJobs] = useState([]);
@@ -33,6 +32,7 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
   const [tipDismissed, setTipDismissed] = useState(false);
 
   const firstName = (user?.name || 'there').split(' ')[0];
+  const fullName = user?.name || 'there';
   const name = user?.name;
   const uid = user?.uid;
 
@@ -49,8 +49,6 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
     return () => { active = false; clearInterval(interval); };
   }, [name, uid]);
 
-  // Admin-managed service catalog — same dynamic source as SubmitRequestScreen.
-  // Rendered only when loaded; never hardcoded, no reserved space on failure.
   useEffect(() => {
     let active = true;
     fetchPlatformCategories()
@@ -65,11 +63,11 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
   };
 
   const pendingCount = trackedRequests.filter((r) => (r.status || '').toLowerCase() === 'pending').length;
-  const activeCount = trackedRequests.filter((r) => ACTIVE_STATUSES.includes((r.status || '').toLowerCase())).length;
+  const activeJobs = trackedRequests.filter((r) => ACTIVE_STATUSES.includes((r.status || '').toLowerCase()));
+  const activeCount = activeJobs.length;
   const completedCount = completedJobs.length;
+  const heroJob = activeJobs[0] || trackedRequests[0] || null;
 
-  // Category shortcuts reuse the existing Submit Request flow. Preselection is
-  // not supported by SubmitRequestScreen, so navigate plainly — no backend change.
   const handleCategoryTap = () => {
     if (typeof onNavigateToSubmit === 'function') onNavigateToSubmit();
   };
@@ -79,246 +77,198 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
     .slice(0, 2);
 
   const stats = [
-    { key: 'Active', value: activeCount, icon: 'sync', color: colors.teal },
-    { key: 'Pending', value: pendingCount, icon: 'time', color: colors.gold },
-    { key: 'Completed', value: completedCount, icon: 'checkmark-circle', color: colors.green },
+    { key: 'Repairs Done', value: String(completedCount) },
+    { key: 'Active', value: String(activeCount) },
+    { key: 'Pending', value: String(pendingCount) },
   ];
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.teal} />} showsVerticalScrollIndicator={false}>
-      <View style={styles.centerWrap}>
-      <View style={styles.topBar}>
-        <View style={styles.brandLeft}>
-          <Text style={styles.brandSmall}>FIX<Text style={styles.brandAccent}>LINK</Text></Text>
-          <Text style={styles.roleSmall}>HOME SERVICES</Text>
-        </View>
-        <TouchableOpacity
-          style={styles.notificationQuiet}
-          onPress={onOpenNotifications}
-          accessibilityRole="button"
-          accessibilityLabel={notificationCount > 0 ? `Notifications, ${notificationCount} unread` : 'Notifications, no unread'}
-          hitSlop={6}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="notifications-outline" size={21} color={colors.tealDark} />
-          {notificationCount > 0 && (
-            <View style={styles.dot}>
-              <Text style={styles.dotText}>{notificationCount > 9 ? '9+' : notificationCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.heroRow}>
-        <View style={styles.heroCopyWrap}>
-          <Text style={styles.greeting}>Good day, {firstName}</Text>
-          <Text style={styles.heroCopy}>Let’s get your home back in shape.</Text>
-        </View>
-        <View style={styles.avatar}><Text style={styles.avatarText}>{firstName.charAt(0).toUpperCase()}</Text></View>
-      </View>
-
-      <View style={styles.statusStrip}>
-        {stats.map((s, idx) => (
-          <View key={s.key} style={[styles.statusSegment, idx > 0 && styles.statusDivider]}>
-            <View style={styles.statusLabelRow}>
-              <Ionicons name={s.icon} size={12} color={s.color} />
-              <Text style={styles.statusLabel} numberOfLines={1}>{s.key}</Text>
-            </View>
-            <Text style={styles.statusValue}>{s.value}</Text>
+    <ScrollView style={styles.screen} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={ORANGE} />} showsVerticalScrollIndicator={false}>
+      {/* Dark header — prototype MAIN APP */}
+      <View style={styles.header}>
+        <View style={styles.headerRow}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.kicker}>Good afternoon,</Text>
+            <Text style={styles.greeting} numberOfLines={1}>{fullName}</Text>
           </View>
-        ))}
+          <TouchableOpacity
+            style={styles.bell}
+            onPress={onOpenNotifications}
+            accessibilityRole="button"
+            accessibilityLabel={notificationCount > 0 ? `Notifications, ${notificationCount} unread` : 'Notifications, no unread'}
+            hitSlop={8}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="notifications-outline" size={18} color="#FFFFFF" />
+            {notificationCount > 0 ? <View style={styles.bellDot} /> : <View style={styles.bellDotDim} />}
+          </TouchableOpacity>
+        </View>
+
+        {heroJob ? (
+          <View style={styles.activeCard}>
+            <Text style={styles.activeKicker}>Active Repair</Text>
+            <View style={styles.activeRow}>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.activeTitle} numberOfLines={1}>{heroJob.applianceType || 'Repair request'}{heroJob.description ? ` · ${heroJob.description.slice(0, 24)}` : ''}</Text>
+                <Text style={styles.activeSub} numberOfLines={1}>{heroJob.status || 'Pending'}{heroJob.preferredTime ? ` · ETA ${heroJob.preferredTime}` : ''}</Text>
+              </View>
+              <TouchableOpacity style={styles.trackBtn} onPress={() => onOpenRequest(heroJob)} activeOpacity={0.88} accessibilityRole="button" accessibilityLabel="Track active repair">
+                <Text style={styles.trackBtnText}>Track</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: `${heroJob.status && String(heroJob.status).toLowerCase() === 'pending' ? 20 : 65}%` }]} />
+            </View>
+          </View>
+        ) : (
+          <View style={styles.activeCard}>
+            <Text style={styles.activeKicker}>Active Repair</Text>
+            <Text style={styles.activeTitle}>No active repair</Text>
+            <Text style={styles.activeSub}>Submit a request to get started</Text>
+          </View>
+        )}
       </View>
 
-      <Text style={styles.sectionTitle}>What do you need today?</Text>
-      <View style={styles.actionsRow}>
-        <TouchableOpacity style={styles.primaryAction} onPress={onNavigateToSubmit} activeOpacity={0.88} accessibilityRole="button" accessibilityLabel="New request">
-          <View style={styles.actionIcon}><Ionicons name="add" size={22} color={colors.white} /></View>
-          <Text style={styles.primaryActionTitle}>New request</Text>
-          <Text style={styles.primaryActionCopy}>Tell us what needs fixing</Text>
+      <View style={styles.body}>
+        <Text style={styles.sectionKicker}>NEW REPAIR REQUEST</Text>
+        <TouchableOpacity style={styles.submitCard} onPress={onNavigateToSubmit} activeOpacity={0.88} accessibilityRole="button" accessibilityLabel="Submit a repair">
+          <View style={styles.plusTile}>
+            <Ionicons name="add" size={22} color={ORANGE} />
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.submitTitle}>Submit a Repair</Text>
+            <Text style={styles.submitCopy}>Laptop, phone, TV, tablet & more</Text>
+          </View>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.secondaryAction} onPress={onNavigateToProgress} activeOpacity={0.88} accessibilityRole="button" accessibilityLabel="Track a job">
-          <View style={styles.secondaryIcon}><Ionicons name="navigate-outline" size={20} color={colors.teal} /></View>
-          <Text style={styles.secondaryActionTitle}>Track a job</Text>
-          <Text style={styles.secondaryActionCopy}>See live request updates</Text>
-        </TouchableOpacity>
-      </View>
 
-      {categories.length > 0 ? (
-        <View style={styles.catBlock}>
-          <Text style={styles.sectionTitle}>Category</Text>
+        {categories.length > 0 ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catRow}>
             {categories.map((c) => {
               const catName = String(c?.name || '').trim();
               if (!catName) return null;
               return (
-                <TouchableOpacity
-                  key={String(c?.id || catName)}
-                  style={styles.catChip}
-                  onPress={handleCategoryTap}
-                  activeOpacity={0.85}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Request ${catName}`}
-                  accessibilityHint="Opens the submit request flow"
-                >
-                  <Ionicons name={getApplianceIcon(catName)} size={14} color={colors.teal} />
+                <TouchableOpacity key={String(c?.id || catName)} style={styles.catChip} onPress={handleCategoryTap} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={`Request ${catName}`}>
+                  <Ionicons name={getApplianceIcon(catName)} size={13} color={ORANGE} />
                   <Text style={styles.catChipText} numberOfLines={1}>{catName}</Text>
                 </TouchableOpacity>
               );
             })}
           </ScrollView>
+        ) : null}
+
+        <Text style={styles.sectionKicker}>QUICK STATS</Text>
+        <View style={styles.statsRow}>
+          {stats.map((s) => (
+            <View key={s.key} style={styles.statCard}>
+              <Text style={styles.statValue}>{s.value}</Text>
+              <Text style={styles.statLabel}>{s.key}</Text>
+            </View>
+          ))}
         </View>
-      ) : null}
 
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Recent requests</Text>
-        <TouchableOpacity
-          onPress={onNavigateToProgress}
-          accessibilityRole="button"
-          accessibilityLabel="View all requests"
-          hitSlop={6}
-          style={styles.viewAllHit}
-        >
-          <Text style={styles.viewAll}>View all</Text>
-        </TouchableOpacity>
-      </View>
-
-      {loading && recentRequests.length === 0 ? (
-        <View style={styles.loadingBox}><ActivityIndicator color={colors.teal} /></View>
-      ) : recentRequests.length > 0 ? (
-        <View style={styles.recentLedger}>
-          {recentRequests.map((req, idx) => {
-            const color = getStatusColor(req.status);
-            const next = getNextAction(req);
-            return (
-              <TouchableOpacity
-                key={req.id}
-                style={[styles.recentRow, idx > 0 && styles.recentDivider]}
-                onPress={() => onOpenRequest(req)}
-                activeOpacity={0.85}
-                accessibilityRole="button"
-                accessibilityLabel={`${req.applianceType}, ${req.status}`}
-              >
-                <View style={[styles.reqIcon, { backgroundColor: color + '15' }]}>
-                  <Ionicons name={getApplianceIcon(req.applianceType)} size={20} color={color} />
-                </View>
-                <View style={styles.reqCopy}>
-                  <Text style={styles.reqTitle} numberOfLines={1}>{req.applianceType}</Text>
-                  <View style={styles.reqMeta}>
-                    <View style={[styles.pill, { backgroundColor: color + '15', borderColor: color + '40' }]}>
-                      <Ionicons name={getStatusIcon(req.status)} size={10} color={color} />
-                      <Text style={[styles.pillText, { color }]} numberOfLines={1}>{req.status}</Text>
-                    </View>
-                    {req.createdAt ? <Text style={styles.reqDate} numberOfLines={1}>{new Date(req.createdAt).toLocaleDateString()}</Text> : null}
-                  </View>
-                  {next ? (
-                    <View style={styles.nextHint}>
-                      <Ionicons name={next.icon} size={11} color={color} />
-                      <Text style={styles.nextHintText} numberOfLines={1}>{next.text}</Text>
-                    </View>
-                  ) : null}
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={colors.muted} />
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      ) : (
-        <TouchableOpacity style={styles.emptyCard} onPress={onNavigateToSubmit} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel="No requests yet, start your first service request">
-          <View style={styles.emptyIcon}><Ionicons name="receipt-outline" size={22} color={colors.teal} /></View>
-          <View style={styles.emptyText}><Text style={styles.emptyTitle}>No requests yet</Text><Text style={styles.emptyCopy}>Start your first service request to see it here.</Text></View>
-          <Ionicons name="chevron-forward" size={18} color={colors.muted} />
-        </TouchableOpacity>
-      )}
-
-      {!tipDismissed && (
-        <View style={styles.tipHint}>
-          <Ionicons name="sparkles-outline" size={16} color={colors.gold} />
-          <View style={{ flex: 1, gap: 2 }}>
-            <Text style={styles.tipTitle}>Quick tip</Text>
-            <Text style={styles.tipCopy}>Add a photo to your request so technicians can prepare before they arrive.</Text>
-          </View>
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel="Dismiss tip"
-            onPress={() => setTipDismissed(true)}
-            hitSlop={8}
-            style={styles.tipDismiss}
-          >
-            <Ionicons name="close" size={14} color={colors.muted} />
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionKicker}>RECENT ACTIVITY</Text>
+          <TouchableOpacity onPress={onNavigateToProgress} hitSlop={6} accessibilityRole="button" accessibilityLabel="View all requests">
+            <Text style={styles.viewAll}>View all</Text>
           </TouchableOpacity>
         </View>
-      )}
+
+        {loading && recentRequests.length === 0 ? (
+          <View style={styles.loadingBox}><ActivityIndicator color={ORANGE} /></View>
+        ) : recentRequests.length > 0 ? (
+          <View style={{ gap: 8 }}>
+            {recentRequests.map((req) => {
+              const color = getStatusColor(req.status);
+              const next = getNextAction(req);
+              return (
+                <TouchableOpacity key={req.id} style={styles.recentCard} onPress={() => onOpenRequest(req)} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={`${req.applianceType}, ${req.status}`}>
+                  <View style={styles.recentIcon}>
+                    <Ionicons name={getApplianceIcon(req.applianceType)} size={18} color="#6B7280" />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={styles.recentTitle} numberOfLines={1}>{req.applianceType}</Text>
+                    <Text style={styles.recentMeta} numberOfLines={1}>{req.createdAt ? new Date(req.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}</Text>
+                    {next ? <Text style={styles.nextHint} numberOfLines={1}>{next.text}</Text> : null}
+                  </View>
+                  <View style={[styles.pill, { backgroundColor: color + '15', borderColor: color + '40' }]}>
+                    <Text style={[styles.pillText, { color }]}>{req.status}</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        ) : (
+          <TouchableOpacity style={styles.recentCard} onPress={onNavigateToSubmit} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel="No requests yet">
+            <View style={styles.recentIcon}>
+              <Ionicons name="receipt-outline" size={18} color="#6B7280" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.recentTitle}>No requests yet</Text>
+              <Text style={styles.recentMeta}>Start your first service request</Text>
+            </View>
+          </TouchableOpacity>
+        )}
+
+        {!tipDismissed && (
+          <View style={styles.tipHint}>
+            <Ionicons name="sparkles-outline" size={16} color="#D97706" />
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={styles.tipTitle}>Quick tip</Text>
+              <Text style={styles.tipCopy}>Add a photo to your request so technicians can prepare before they arrive.</Text>
+            </View>
+            <TouchableOpacity onPress={() => setTipDismissed(true)} hitSlop={8} style={styles.tipDismiss} accessibilityRole="button" accessibilityLabel="Dismiss tip">
+              <Ionicons name="close" size={14} color="#6B7280" />
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.canvas },
-  content: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 28, alignItems: 'center' },
-  centerWrap: { width: '100%', maxWidth: 480, alignSelf: 'center' },
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, gap: 10 },
-  brandLeft: { flex: 1, minWidth: 0, gap: 1 },
-  brandSmall: { color: colors.ink, fontSize: 16, fontFamily: fonts.extraBold, letterSpacing: -0.3, lineHeight: 18 },
-  brandAccent: { color: colors.teal, fontFamily: fonts.extraBold },
-  roleSmall: { color: colors.muted, fontSize: 9, letterSpacing: 1.3, fontFamily: fonts.bold, lineHeight: 11 },
-  notificationQuiet: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.hudBorder },
-  dot: { position: 'absolute', top: 4, right: 4, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: colors.error, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, borderWidth: 2, borderColor: colors.white },
-  dotText: { color: colors.white, fontSize: 11, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] as const },
-
-  heroRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, gap: 10 },
-  heroCopyWrap: { flex: 1, paddingRight: 6, minWidth: 0 },
-  greeting: { color: colors.ink, fontSize: 26, fontFamily: fonts.extraBold, letterSpacing: -0.7, lineHeight: 30 },
-  heroCopy: { color: colors.muted, fontSize: 13, marginTop: 2, fontFamily: fonts.regular, lineHeight: 18 },
-  avatar: { width: 48, height: 48, borderRadius: 16, backgroundColor: colors.tealLight, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.hudBorder },
-  avatarText: { color: colors.tealDark, fontSize: 18, fontFamily: fonts.bold },
-
-  statusStrip: { flexDirection: 'row', backgroundColor: colors.white, borderRadius: 20, borderWidth: 1, borderColor: colors.line, marginBottom: 20, paddingVertical: 14, paddingHorizontal: 6 },
-  statusSegment: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 6, minWidth: 0 },
-  statusDivider: { borderLeftWidth: 1, borderColor: colors.lineSoft },
-  statusLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  statusLabel: { color: colors.muted, fontSize: 10, fontFamily: fonts.semiBold, letterSpacing: 0.4, textTransform: 'uppercase' as const },
-  statusValue: { color: colors.ink, fontSize: 22, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] as const, lineHeight: 26 },
-
-  sectionTitle: { color: colors.ink, fontSize: 18, fontFamily: fonts.bold, letterSpacing: -0.3, marginBottom: 10 },
-  actionsRow: { flexDirection: 'row', gap: 10, marginBottom: 28 },
-  primaryAction: { flex: 1, minWidth: 0, minHeight: 128, backgroundColor: colors.teal, borderRadius: 20, padding: 14, overflow: 'hidden', boxShadow: '0 4px 10px rgba(15,118,110,0.18)', elevation: 3 },
-  secondaryAction: { flex: 1, minWidth: 0, minHeight: 128, backgroundColor: colors.white, borderRadius: 20, padding: 14, borderWidth: 1, borderColor: colors.line, overflow: 'hidden' },
-  actionIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center', marginBottom: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
-  secondaryIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: colors.tealLight, alignItems: 'center', justifyContent: 'center', marginBottom: 10, borderWidth: 1, borderColor: colors.hudBorder },
-  primaryActionTitle: { color: colors.white, fontSize: 16, fontFamily: fonts.bold, marginBottom: 2, letterSpacing: -0.2 },
-  secondaryActionTitle: { color: colors.ink, fontSize: 16, fontFamily: fonts.bold, marginBottom: 2, letterSpacing: -0.2 },
-  primaryActionCopy: { color: '#C7F1EC', fontSize: 12, lineHeight: 16, fontFamily: fonts.medium },
-  secondaryActionCopy: { color: colors.muted, fontSize: 12, lineHeight: 16, fontFamily: fonts.regular },
-
-  catBlock: { marginBottom: 22 },
-  catRow: { gap: 8, paddingRight: 4, alignItems: 'center' },
-  catChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 999, paddingVertical: 10, paddingHorizontal: 12, minHeight: 44, maxWidth: 220 },
-  catChipText: { color: colors.ink, fontSize: 12, fontFamily: fonts.semiBold, flexShrink: 1 },
-
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, gap: 10 },
-  viewAllHit: { minHeight: 44, minWidth: 44, justifyContent: 'center', alignItems: 'flex-end', paddingHorizontal: 4 },
-  viewAll: { color: colors.teal, fontFamily: fonts.bold, fontSize: 13, lineHeight: 18 },
-  loadingBox: { backgroundColor: colors.white, borderRadius: 20, borderWidth: 1, borderColor: colors.line, paddingVertical: 28, alignItems: 'center', marginBottom: 14 },
-  recentLedger: { backgroundColor: colors.white, borderRadius: 20, borderWidth: 1, borderColor: colors.line, marginBottom: 14, overflow: 'hidden' },
-  recentRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 14, minHeight: 72 },
-  recentDivider: { borderTopWidth: 1, borderColor: colors.lineSoft },
-  reqIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  reqCopy: { flex: 1, gap: 4, minWidth: 0 },
-  reqTitle: { color: colors.ink, fontSize: 15, fontFamily: fonts.bold, letterSpacing: -0.15, lineHeight: 18 },
-  reqMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' as const },
-  pill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, borderWidth: 1, maxWidth: '100%' },
-  pillText: { fontSize: 10, fontFamily: fonts.bold, letterSpacing: 0.2, textTransform: 'capitalize' as const },
-  reqDate: { color: colors.muted, fontSize: 11, fontFamily: fonts.medium, flexShrink: 1, fontVariant: ['tabular-nums'] as const },
-  nextHint: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  nextHintText: { color: colors.muted, fontSize: 11, fontFamily: fonts.medium, flexShrink: 1, lineHeight: 14 },
-  emptyCard: { backgroundColor: colors.white, borderRadius: 20, borderWidth: 1, borderColor: colors.line, padding: 16, flexDirection: 'row', alignItems: 'center', marginBottom: 14, gap: 12, minHeight: 72 },
-  emptyIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: colors.tealLight, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.hudBorder },
-  emptyText: { flex: 1, gap: 2, minWidth: 0 },
-  emptyTitle: { color: colors.ink, fontSize: 14, fontFamily: fonts.bold, marginBottom: 2, lineHeight: 18 },
-  emptyCopy: { color: colors.muted, fontSize: 12, fontFamily: fonts.regular, lineHeight: 16 },
-
-  tipHint: { backgroundColor: '#FFF8E7', borderRadius: 20, paddingVertical: 6, paddingLeft: 12, paddingRight: 6, flexDirection: 'row', gap: 10, alignItems: 'center', borderWidth: 1, borderColor: '#FDE68A', marginTop: 6 },
+  screen: { flex: 1, backgroundColor: '#F9FAFB' },
+  content: { paddingBottom: 28 },
+  header: { backgroundColor: DARK, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 32, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, gap: 10 },
+  kicker: { color: '#9CA3AF', fontSize: 12, fontFamily: fonts.regular },
+  greeting: { color: '#FFFFFF', fontSize: 21, fontFamily: fonts.extraBold, letterSpacing: -0.3, marginTop: 2 },
+  bell: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.10)', alignItems: 'center', justifyContent: 'center' },
+  bellDot: { position: 'absolute', top: 8, right: 9, width: 8, height: 8, borderRadius: 4, backgroundColor: ORANGE, borderWidth: 2, borderColor: DARK },
+  bellDotDim: { position: 'absolute', top: 8, right: 9, width: 8, height: 8, borderRadius: 4, backgroundColor: 'transparent' },
+  activeCard: { backgroundColor: 'rgba(255,255,255,0.10)', borderRadius: 16, padding: 16 },
+  activeKicker: { color: '#D1D5DB', fontSize: 12, fontFamily: fonts.regular, marginBottom: 6 },
+  activeRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  activeTitle: { color: '#FFFFFF', fontSize: 14, fontFamily: fonts.bold },
+  activeSub: { color: ORANGE, fontSize: 12, fontFamily: fonts.medium, marginTop: 2 },
+  trackBtn: { backgroundColor: ORANGE, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 },
+  trackBtnText: { color: '#FFFFFF', fontSize: 12, fontFamily: fonts.bold },
+  progressTrack: { marginTop: 12, height: 6, backgroundColor: 'rgba(255,255,255,0.20)', borderRadius: 999, overflow: 'hidden' },
+  progressFill: { height: '100%', backgroundColor: ORANGE, borderRadius: 999 },
+  body: { paddingHorizontal: 20, paddingTop: 20, gap: 12 },
+  sectionKicker: { color: '#6B7280', fontSize: 11, fontFamily: fonts.bold, letterSpacing: 1.2 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
+  viewAll: { color: ORANGE, fontFamily: fonts.bold, fontSize: 13 },
+  submitCard: { backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: ORANGE, borderStyle: 'dashed', padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16 },
+  plusTile: { width: 48, height: 48, borderRadius: 12, backgroundColor: colors.customerMist, alignItems: 'center', justifyContent: 'center' },
+  submitTitle: { color: '#111827', fontSize: 14, fontFamily: fonts.bold },
+  submitCopy: { color: '#6B7280', fontSize: 12, fontFamily: fonts.regular, marginTop: 2 },
+  catRow: { gap: 8, paddingVertical: 2 },
+  catChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#F3F4F6', borderRadius: 999, paddingVertical: 10, paddingHorizontal: 12, minHeight: 44 },
+  catChipText: { color: '#111827', fontSize: 12, fontFamily: fonts.semiBold },
+  statsRow: { flexDirection: 'row', gap: 12 },
+  statCard: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: '#F3F4F6' },
+  statValue: { color: '#111827', fontSize: 24, fontFamily: fonts.extraBold },
+  statLabel: { color: '#6B7280', fontSize: 10, fontFamily: fonts.regular, marginTop: 2, textAlign: 'center' },
+  recentCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: '#F3F4F6' },
+  recentIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
+  recentTitle: { color: '#111827', fontSize: 14, fontFamily: fonts.bold },
+  recentMeta: { color: '#6B7280', fontSize: 12, fontFamily: fonts.regular, marginTop: 2 },
+  nextHint: { color: '#9CA3AF', fontSize: 11, fontFamily: fonts.medium, marginTop: 2 },
+  pill: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, borderWidth: 1 },
+  pillText: { fontSize: 10, fontFamily: fonts.bold },
+  loadingBox: { backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#F3F4F6', paddingVertical: 28, alignItems: 'center' },
+  tipHint: { backgroundColor: '#FFF8E7', borderRadius: 16, paddingVertical: 6, paddingLeft: 12, paddingRight: 6, flexDirection: 'row', gap: 10, alignItems: 'center', borderWidth: 1, borderColor: '#FDE68A', marginTop: 6 },
   tipTitle: { color: '#8A5B00', fontFamily: fonts.bold, fontSize: 12, lineHeight: 15 },
   tipCopy: { color: '#9A711E', fontSize: 12, lineHeight: 16, fontFamily: fonts.regular },
   tipDismiss: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },

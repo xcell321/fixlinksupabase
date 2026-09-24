@@ -15,6 +15,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import Skeleton from '../../components/Skeleton';
+import TechJobDetailScreen from './TechJobDetailScreen';
 import { PhotoThumb, PhotoLightbox } from '../../components/RequestPhoto';
 import {
   acceptRepairRequest,
@@ -476,6 +477,13 @@ export default function AvailableJobsScreen({
     );
   }
 
+  // Live detail job: refresh from feed state so arrival/start update the screen.
+  const allJobs = [...acceptedJobs, ...jobs];
+  const liveDetailJob = selectedJobForDetails
+    ? (allJobs.find((j) => String(j.id) === String(selectedJobForDetails.id)) ?? selectedJobForDetails)
+    : null;
+  const detailIsAssigned = liveDetailJob ? acceptedJobs.some((j) => String(j.id) === String(liveDetailJob.id)) : false;
+
   return (
     <ScrollView
       style={styles.screen}
@@ -485,45 +493,37 @@ export default function AvailableJobsScreen({
         <RefreshControl
           refreshing={refreshing}
           onRefresh={handleRefresh}
-          tintColor={colors.teal}
-          colors={[colors.teal]}
+          tintColor={colors.tech}
+          colors={[colors.tech]}
         />
       }
     >
+      {liveDetailJob ? (
+        <TechJobDetailScreen
+          job={liveDetailJob}
+          techCoords={techCoords}
+          isQueue={!detailIsAssigned}
+          acceptingJobId={acceptingJobId}
+          actionLoadingId={actionLoadingId}
+          onBack={() => setSelectedJobForDetails(null)}
+          onAccept={handleAcceptJob}
+          onDecline={handleDeclineJob}
+          onArrival={handleArrival}
+          onNoShow={handleNoShow}
+          onStart={handleStartJob}
+          onComplete={openOtpModal}
+          onMessage={(job) => onNavigateToChat && onNavigateToChat(job)}
+          onPreviewPhoto={(url) => setPreviewUrl(url)}
+        />
+      ) : (
       <View style={styles.centerWrap}>
-        {/* Top Operational Bar */}
-        <View style={styles.topBar}>
-          <View style={styles.brandLeft}>
-            <View style={styles.brandTitleRow}>
-              <Text style={styles.brandSmall}>
-                FIX<Text style={styles.brandAccent}>LINK</Text>
-              </Text>
-              <View style={styles.dispatchPill}>
-                <Text style={styles.dispatchPillText}>DISPATCH HUB</Text>
-              </View>
+        {/* Prototype TechJobs dark header */}
+        <View style={styles.protoHeader}>
+          <View style={styles.protoHeaderRow}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.protoKicker}>Good afternoon,</Text>
+              <Text style={styles.protoName} numberOfLines={1}>{technicianName}</Text>
             </View>
-            <Text style={styles.roleSmall}>PROXIMITY-MATCHED SERVICE</Text>
-          </View>
-
-          <View style={styles.topBarRight}>
-            {/* Online / Duty status toggle button */}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Duty status: ${isOnline ? 'Online' : 'Offline'}. Tap to toggle.`}
-              onPress={toggleDutyStatus}
-              style={({ pressed }) => [
-                styles.dutyPill,
-                isOnline ? styles.dutyPillOnline : styles.dutyPillOffline,
-                pressed && styles.pressedSoft
-              ]}
-            >
-              <View style={[styles.statusDot, isOnline ? styles.statusDotOnline : styles.statusDotOffline]} />
-              <Text style={[styles.dutyPillText, isOnline ? styles.dutyTextOnline : styles.dutyTextOffline]}>
-                {isOnline ? 'ONLINE' : 'PAUSED'}
-              </Text>
-            </Pressable>
-
-            {/* Notifications button */}
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={
@@ -533,9 +533,9 @@ export default function AvailableJobsScreen({
               }
               onPress={onOpenNotifications}
               hitSlop={8}
-              style={({ pressed }) => [styles.notificationQuiet, pressed && styles.pressedSoft]}
+              style={({ pressed }) => [styles.protoBell, pressed && styles.pressedSoft]}
             >
-              <Ionicons name="notifications-outline" size={20} color={colors.tealDark} />
+              <Ionicons name="notifications-outline" size={18} color="#FFFFFF" />
               {notificationCount > 0 && (
                 <View style={styles.notifBadge}>
                   <Text style={styles.notifBadgeText}>{notificationCount > 9 ? '9+' : notificationCount}</Text>
@@ -543,81 +543,17 @@ export default function AvailableJobsScreen({
               )}
             </Pressable>
           </View>
-        </View>
-
-        {/* Hero Greeting and Profile Card */}
-        <View style={styles.heroCard}>
-          <View style={styles.heroLeft}>
-            <Text style={styles.greeting} numberOfLines={1}>
-              Good day, {technicianName}
-            </Text>
-            <Text style={styles.heroSubtitle} numberOfLines={1}>
-              {isOnline ? 'Ready for incoming service requests' : 'Dispatch is currently paused'}
-            </Text>
-
-            <View style={styles.heroMetricsRow}>
-              <View style={styles.heroMetricChip}>
-                <Ionicons name="flash-outline" size={13} color={colors.teal} />
-                <Text style={styles.heroMetricText}>
-                  {filteredQueueJobs.length} {filteredQueueJobs.length === 1 ? 'lead available' : 'leads available'}
-                </Text>
-              </View>
-
-              {acceptedJobs.length > 0 && (
-                <View style={styles.heroMetricChip}>
-                  <Ionicons name="construct-outline" size={13} color={colors.gold} />
-                  <Text style={styles.heroMetricText}>
-                    {acceptedJobs.length} in progress
-                  </Text>
-                </View>
-              )}
+          <View style={styles.protoStatsRow}>
+            <View style={styles.protoStat}>
+              <Text style={styles.protoStatValue}>{filteredQueueJobs.length}</Text>
+              <Text style={styles.protoStatLabel}>Available</Text>
+            </View>
+            <View style={styles.protoStat}>
+              <Text style={styles.protoStatValue}>{acceptedJobs.length}</Text>
+              <Text style={styles.protoStatLabel}>Assigned</Text>
             </View>
           </View>
-
-          <View style={styles.avatarWrap}>
-            {technician?.profileImage ? (
-              <Image source={{ uri: technician.profileImage }} style={styles.avatarImage} />
-            ) : (
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{avatarInitial}</Text>
-              </View>
-            )}
-            <View
-              style={[
-                styles.avatarPresenceDot,
-                isOnline ? styles.presenceOnline : styles.presenceOffline,
-              ]}
-            />
-          </View>
         </View>
-
-        {/* Workload Warning Banner: shown if busy or at capacity */}
-        {workloadStatus !== 'available' && (
-          <View
-            style={[
-              styles.workloadStrip,
-              workloadStatus === 'at_capacity' ? styles.workloadStripAtCapacity : styles.workloadStripBusy
-            ]}
-            accessibilityRole="text"
-            accessibilityLabel={`${workloadHue.label}: ${activeCount} active jobs.`}
-          >
-            <Ionicons
-              name={workloadStatus === 'at_capacity' ? 'alert-circle' : 'time'}
-              size={18}
-              color={workloadHue.color}
-            />
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.workloadTitle, { color: workloadHue.color }]}>
-                {workloadStatus === 'at_capacity' ? 'Workload Limit Reached' : 'High Workload Alert'}
-              </Text>
-              <Text style={styles.workloadSub}>
-                {workloadStatus === 'at_capacity'
-                  ? '6 active jobs in flight. Complete an active repair before accepting more requests.'
-                  : `${activeCount} active jobs ongoing. You have ${workloadSummary.remainingCapacity} slots remaining.`}
-              </Text>
-            </View>
-          </View>
-        )}
 
         {/* Segmented Feed Tabs */}
         <View style={styles.feedTabBar} accessibilityRole="tablist">
@@ -635,10 +571,10 @@ export default function AvailableJobsScreen({
             <Ionicons
               name="radio"
               size={16}
-              color={feedTab === 'queue' ? colors.tealDark : colors.muted}
+              color={feedTab === 'queue' ? colors.techDark : colors.muted}
             />
             <Text style={[styles.feedTabLabel, feedTab === 'queue' && styles.feedTabLabelActive]}>
-              Available Leads
+              Available
             </Text>
             <View style={[styles.tabBadge, feedTab === 'queue' && styles.tabBadgeActive]}>
               <Text style={[styles.tabBadgeText, feedTab === 'queue' && styles.tabBadgeTextActive]}>
@@ -661,10 +597,10 @@ export default function AvailableJobsScreen({
             <Ionicons
               name="construct"
               size={16}
-              color={feedTab === 'active' ? colors.tealDark : colors.muted}
+              color={feedTab === 'active' ? colors.techDark : colors.muted}
             />
             <Text style={[styles.feedTabLabel, feedTab === 'active' && styles.feedTabLabelActive]}>
-              Active Jobs
+              Assigned
             </Text>
             <View style={[styles.tabBadge, feedTab === 'active' && styles.tabBadgeActive]}>
               <Text style={[styles.tabBadgeText, feedTab === 'active' && styles.tabBadgeTextActive]}>
@@ -710,78 +646,13 @@ export default function AvailableJobsScreen({
           </View>
         ) : null}
 
-        {/* Queue Filter Bar: Category chips + search */}
-        {feedTab === 'queue' && (
-          <View style={styles.queueControlSection}>
-            {/* Search Input Box */}
-            <View style={styles.searchBarContainer}>
-              <Ionicons name="search" size={16} color={colors.muted} style={styles.searchIcon} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search by appliance, customer, or location..."
-                placeholderTextColor={colors.muted}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                clearButtonMode="while-editing"
-              />
-              {searchQuery.length > 0 && (
-                <Pressable onPress={() => setSearchQuery('')} hitSlop={8} style={{ paddingRight: 8 }}>
-                  <Ionicons name="close-circle" size={16} color={colors.muted} />
-                </Pressable>
-              )}
-            </View>
-
-            {/* Category Filter Chips */}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.categoryScroll}
-            >
-              {CATEGORY_CHIPS.map((chip) => {
-                const isSelected = selectedCategory === chip.id;
-                return (
-                  <Pressable
-                    key={chip.id}
-                    onPress={() => setSelectedCategory(chip.id)}
-                    style={({ pressed }) => [
-                      styles.categoryChip,
-                      isSelected && styles.categoryChipSelected,
-                      pressed && styles.pressedSoft
-                    ]}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: isSelected }}
-                    accessibilityLabel={`Filter by ${chip.label}`}
-                  >
-                    <Ionicons
-                      name={chip.icon}
-                      size={14}
-                      color={isSelected ? colors.white : colors.tealDark}
-                      style={{ marginRight: 5 }}
-                    />
-                    <Text style={[styles.categoryChipText, isSelected && styles.categoryChipTextSelected]}>
-                      {chip.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-
-            <View style={styles.queueMetaRow}>
-              <Text style={styles.queueMetaText}>
-                Showing verified leads within {NEARBY_QUEUE_RADIUS_KM} km
-              </Text>
-              <Text style={styles.queueMetaCount}>{filteredQueueJobs.length} available</Text>
-            </View>
-          </View>
-        )}
-
         {/* Active Jobs Feed Content */}
         {feedTab === 'active' && (
           <View style={styles.feedListContainer}>
             {acceptedJobs.length === 0 ? (
               <View style={styles.emptyCard}>
                 <View style={styles.emptyIcon}>
-                  <Ionicons name="checkmark-done-circle-outline" size={28} color={colors.teal} />
+                  <Ionicons name="checkmark-done-circle-outline" size={28} color={colors.tech} />
                 </View>
                 <View style={styles.emptyTextContainer}>
                   <Text style={styles.emptyTitle}>No Active Jobs</Text>
@@ -813,7 +684,7 @@ export default function AvailableJobsScreen({
                         <Ionicons
                           name={getApplianceIcon(job.applianceType) as IconName}
                           size={22}
-                          color={colors.tealDark}
+                          color={colors.techDark}
                         />
                       </View>
                       <View style={styles.cardTitleWrap}>
@@ -898,13 +769,13 @@ export default function AvailableJobsScreen({
                     {/* Address and Schedule Details */}
                     <View style={styles.cardDetailsBox}>
                       <View style={styles.detailRow}>
-                        <Ionicons name="location" size={14} color={colors.teal} />
+                        <Ionicons name="location" size={14} color={colors.tech} />
                         <Text style={styles.detailText} numberOfLines={1}>
                           {job.location || 'Bogo City, Cebu'}
                         </Text>
                       </View>
                       <View style={styles.detailRow}>
-                        <Ionicons name="calendar-outline" size={14} color={colors.tealDark} />
+                        <Ionicons name="calendar-outline" size={14} color={colors.techDark} />
                         <Text style={styles.detailTextSchedule} numberOfLines={1}>
                           {formatJobSchedule(job)}
                         </Text>
@@ -1003,6 +874,16 @@ export default function AvailableJobsScreen({
                         </Pressable>
                       )}
 
+                      {/* Detail Launcher */}
+                      <Pressable
+                        style={styles.iconCompanion}
+                        onPress={() => setSelectedJobForDetails(job)}
+                        accessibilityRole="button"
+                        accessibilityLabel="Open job details"
+                      >
+                        <Ionicons name="eye-outline" size={20} color={colors.techDark} />
+                      </Pressable>
+
                       {/* Map Launcher */}
                       {onNavigateToMap && (
                         <Pressable
@@ -1011,7 +892,7 @@ export default function AvailableJobsScreen({
                           accessibilityRole="button"
                           accessibilityLabel="Open GPS navigation map"
                         >
-                          <Ionicons name="map-outline" size={20} color={colors.tealDark} />
+                          <Ionicons name="map-outline" size={20} color={colors.techDark} />
                         </Pressable>
                       )}
 
@@ -1023,7 +904,7 @@ export default function AvailableJobsScreen({
                           accessibilityRole="button"
                           accessibilityLabel="Open customer chat"
                         >
-                          <Ionicons name="chatbubble-ellipses-outline" size={20} color={colors.tealDark} />
+                          <Ionicons name="chatbubble-ellipses-outline" size={20} color={colors.techDark} />
                         </Pressable>
                       )}
                     </View>
@@ -1040,7 +921,7 @@ export default function AvailableJobsScreen({
             {filteredQueueJobs.length === 0 ? (
               <View style={styles.emptyCard}>
                 <View style={styles.emptyIcon}>
-                  <Ionicons name="radio-outline" size={28} color={colors.teal} />
+                  <Ionicons name="radio-outline" size={28} color={colors.tech} />
                 </View>
                 <View style={styles.emptyTextContainer}>
                   <Text style={styles.emptyTitle}>Queue is Clear</Text>
@@ -1068,7 +949,7 @@ export default function AvailableJobsScreen({
                       <Ionicons
                         name={getApplianceIcon(job.applianceType) as IconName}
                         size={22}
-                        color={colors.tealDark}
+                        color={colors.techDark}
                       />
                     </View>
                     <View style={styles.cardTitleWrap}>
@@ -1082,7 +963,7 @@ export default function AvailableJobsScreen({
                             accessibilityRole="text"
                             accessibilityLabel={`${Number(job.distanceKm).toFixed(1)} kilometers away`}
                           >
-                            <Ionicons name="navigate" size={10} color={colors.tealDark} />
+                            <Ionicons name="navigate" size={10} color={colors.techDark} />
                             <Text style={styles.distanceBadgeText}>
                               {`${Number(job.distanceKm).toFixed(1)} km`}
                             </Text>
@@ -1097,26 +978,20 @@ export default function AvailableJobsScreen({
 
                   {/* Privacy Location Shield Notice */}
                   <View style={styles.privacyShieldRow}>
-                    <Ionicons name="shield-outline" size={13} color={colors.tealDark} />
+                    <Ionicons name="shield-outline" size={13} color={colors.techDark} />
                     <Text style={styles.privacyShieldText} numberOfLines={1}>
                       {job.location || 'Bogo Catchment'} (Street masked until accepted)
                     </Text>
                   </View>
 
-                  {/* Schedule and Payout Pill Row */}
+                  {/* Schedule Pill Row (no payments in FixLink) */}
                   <View style={styles.pillRow}>
                     <View style={styles.schedulePill}>
-                      <Ionicons name="time-outline" size={12} color={colors.tealDark} />
+                      <Ionicons name="time-outline" size={12} color={colors.techDark} />
                       <Text style={styles.schedulePillText} numberOfLines={1}>
                         {formatJobSchedule(job)}
                       </Text>
                     </View>
-                    {job.estimatedPayout && (
-                      <View style={styles.payoutPill}>
-                        <Ionicons name="cash-outline" size={12} color={colors.green} />
-                        <Text style={styles.payoutPillText}>{job.estimatedPayout}</Text>
-                      </View>
-                    )}
                   </View>
 
                   {/* Issue Description Box */}
@@ -1184,112 +1059,7 @@ export default function AvailableJobsScreen({
           </View>
         )}
       </View>
-
-      {/* Job Details Bottom Sheet Modal */}
-      <Modal
-        visible={selectedJobForDetails !== null}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setSelectedJobForDetails(null)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.detailsSheet}>
-            <View style={styles.sheetHandle} />
-            <View style={styles.sheetHeaderRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.sheetKicker}>REPAIR SPECIFICATIONS</Text>
-                <Text style={styles.sheetTitle} numberOfLines={1}>
-                  {selectedJobForDetails?.applianceType || 'Repair Request'}
-                </Text>
-              </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Close details modal"
-                hitSlop={12}
-                onPress={() => setSelectedJobForDetails(null)}
-                style={styles.sheetCloseBtn}
-              >
-                <Ionicons name="close" size={20} color={colors.ink} />
-              </Pressable>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
-              <View style={styles.sheetSection}>
-                <Text style={styles.sheetSectionLabel}>CUSTOMER AND PROXIMITY</Text>
-                <View style={styles.sheetInfoRow}>
-                  <Ionicons name="person" size={15} color={colors.tealDark} />
-                  <Text style={styles.sheetInfoText}>
-                    {selectedJobForDetails?.customerName || 'Verified Homeowner'}
-                  </Text>
-                </View>
-                <View style={styles.sheetInfoRow}>
-                  <Ionicons name="navigate" size={15} color={colors.tealDark} />
-                  <Text style={styles.sheetInfoText}>
-                    {selectedJobForDetails?.distanceKm != null
-                      ? `${Number(selectedJobForDetails.distanceKm).toFixed(1)} km away`
-                      : 'In local service zone'}
-                  </Text>
-                </View>
-                <View style={styles.sheetInfoRow}>
-                  <Ionicons name="location" size={15} color={colors.tealDark} />
-                  <Text style={styles.sheetInfoText}>
-                    {selectedJobForDetails?.location || 'Bogo City, Cebu'}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.sheetSection}>
-                <Text style={styles.sheetSectionLabel}>REPORTED PROBLEM</Text>
-                <Text style={styles.sheetBodyText}>
-                  {selectedJobForDetails?.description || 'No additional issue notes provided by customer.'}
-                </Text>
-              </View>
-
-              {selectedJobForDetails?.photoUrl && (
-                <View style={styles.sheetSection}>
-                  <Text style={styles.sheetSectionLabel}>ATTACHED DAMAGE PHOTO</Text>
-                  <PhotoThumb
-                    photoUrl={selectedJobForDetails.photoUrl}
-                    onPress={() => setPreviewUrl(selectedJobForDetails?.photoUrl ?? null)}
-                  />
-                </View>
-              )}
-
-              <View style={styles.sheetSection}>
-                <Text style={styles.sheetSectionLabel}>SCHEDULE AND SETTLEMENT</Text>
-                <View style={styles.sheetInfoRow}>
-                  <Ionicons name="calendar" size={15} color={colors.tealDark} />
-                  <Text style={styles.sheetInfoText}>
-                    {selectedJobForDetails ? formatJobSchedule(selectedJobForDetails) : ''}
-                  </Text>
-                </View>
-                <View style={styles.sheetInfoRow}>
-                  <Ionicons name="wallet-outline" size={15} color={colors.green} />
-                  <Text style={styles.sheetInfoText}>Cash on Service (Direct settlement upon completion)</Text>
-                </View>
-              </View>
-            </ScrollView>
-
-            <View style={styles.sheetActionRow}>
-              {selectedJobForDetails && (
-                <Pressable
-                  style={styles.primaryBtn}
-                  onPress={() => {
-                    const jobToAccept = selectedJobForDetails;
-                    setSelectedJobForDetails(null);
-                    handleAcceptJob(jobToAccept);
-                  }}
-                  accessibilityRole="button"
-                  accessibilityLabel="Accept job from details"
-                >
-                  <Ionicons name="checkmark-circle" size={16} color={colors.white} style={{ marginRight: 6 }} />
-                  <Text style={styles.primaryBtnText}>Accept This Request</Text>
-                </Pressable>
-              )}
-            </View>
-          </View>
-        </View>
-      </Modal>
+      )}
 
       {/* 4-Digit OTP Completion Handshake Modal */}
       <Modal
@@ -1385,7 +1155,18 @@ export default function AvailableJobsScreen({
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.canvas },
   content: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 48 },
-  centerWrap: { width: '100%', maxWidth: 640, alignSelf: 'center' },
+  centerWrap: { width: '100%', maxWidth: 640,
+alignSelf: 'center' },
+  // Prototype TechJobs dark header
+  protoHeader: { backgroundColor: '#0D1B2A', paddingHorizontal: 20, paddingTop: 24, paddingBottom: 24, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, marginHorizontal: -16, marginTop: -12, marginBottom: 16 },
+  protoHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 10 },
+  protoKicker: { color: '#9CA3AF', fontSize: 12, fontFamily: fonts.regular },
+  protoName: { color: '#FFFFFF', fontSize: 21, fontFamily: fonts.extraBold, letterSpacing: -0.3, marginTop: 2 },
+  protoBell: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.10)', alignItems: 'center', justifyContent: 'center' },
+  protoStatsRow: { flexDirection: 'row', gap: 12 },
+  protoStat: { flex: 1, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14, paddingVertical: 12, alignItems: 'center' },
+  protoStatValue: { color: '#FFFFFF', fontSize: 22, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
+  protoStatLabel: { color: '#9CA3AF', fontSize: 11, fontFamily: fonts.medium, marginTop: 2 },
 
   topBar: {
     flexDirection: 'row',
@@ -1402,9 +1183,9 @@ const styles = StyleSheet.create({
     letterSpacing: -0.4,
     lineHeight: 22
   },
-  brandAccent: { color: colors.teal, fontFamily: fonts.extraBold },
+  brandAccent: { color: colors.tech, fontFamily: fonts.extraBold },
   dispatchPill: {
-    backgroundColor: colors.tealLight,
+    backgroundColor: colors.techSoft,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
@@ -1412,7 +1193,7 @@ const styles = StyleSheet.create({
     borderColor: colors.hudBorder
   },
   dispatchPillText: {
-    color: colors.tealDark,
+    color: colors.techDark,
     fontSize: 9,
     fontFamily: fonts.bold,
     letterSpacing: 0.8
@@ -1435,13 +1216,13 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1
   },
-  dutyPillOnline: { backgroundColor: colors.tealLight, borderColor: colors.hudBorder },
+  dutyPillOnline: { backgroundColor: colors.techSoft, borderColor: colors.hudBorder },
   dutyPillOffline: { backgroundColor: colors.white, borderColor: colors.line },
   statusDot: { width: 8, height: 8, borderRadius: 4 },
   statusDotOnline: { backgroundColor: colors.green },
   statusDotOffline: { backgroundColor: colors.muted },
   dutyPillText: { fontSize: 11, fontFamily: fonts.bold, letterSpacing: 0.5 },
-  dutyTextOnline: { color: colors.tealDark },
+  dutyTextOnline: { color: colors.techDark },
   dutyTextOffline: { color: colors.muted },
 
   notificationQuiet: {
@@ -1535,7 +1316,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 16,
-    backgroundColor: colors.tealLight,
+    backgroundColor: colors.techSoft,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -1548,7 +1329,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.hudBorder
   },
-  avatarText: { color: colors.tealDark, fontSize: 18, fontFamily: fonts.bold },
+  avatarText: { color: colors.techDark, fontSize: 18, fontFamily: fonts.bold },
   avatarPresenceDot: {
     position: 'absolute',
     bottom: -1,
@@ -1599,7 +1380,7 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 12
   },
-  feedTabItemActive: { backgroundColor: colors.tealLight },
+  feedTabItemActive: { backgroundColor: colors.techSoft },
   feedTabLabel: {
     fontSize: 13,
     fontFamily: fonts.semiBold,
@@ -1607,7 +1388,7 @@ const styles = StyleSheet.create({
   },
   feedTabLabelActive: {
     fontFamily: fonts.bold,
-    color: colors.tealDark
+    color: colors.techDark
   },
   tabBadge: {
     minWidth: 20,
@@ -1618,7 +1399,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 5
   },
-  tabBadgeActive: { backgroundColor: colors.tealDark },
+  tabBadgeActive: { backgroundColor: colors.techDark },
   tabBadgeText: {
     fontSize: 11,
     fontFamily: fonts.bold,
@@ -1660,13 +1441,13 @@ const styles = StyleSheet.create({
     borderColor: colors.line
   },
   categoryChipSelected: {
-    backgroundColor: colors.teal,
-    borderColor: colors.teal
+    backgroundColor: colors.tech,
+    borderColor: colors.tech
   },
   categoryChipText: {
     fontSize: 12,
     fontFamily: fonts.bold,
-    color: colors.tealDark
+    color: colors.techDark
   },
   categoryChipTextSelected: { color: colors.white },
 
@@ -1681,7 +1462,7 @@ const styles = StyleSheet.create({
   queueMetaCount: {
     fontSize: 11,
     fontFamily: fonts.bold,
-    color: colors.tealDark,
+    color: colors.techDark,
     fontVariant: ['tabular-nums']
   },
 
@@ -1705,7 +1486,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: colors.tealLight,
+    backgroundColor: colors.techSoft,
     borderWidth: 1,
     borderColor: colors.hudBorder,
     alignItems: 'center',
@@ -1736,7 +1517,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: colors.tealLight,
+    backgroundColor: colors.techSoft,
     borderWidth: 1,
     borderColor: colors.hudBorder,
     borderRadius: 999,
@@ -1746,7 +1527,7 @@ const styles = StyleSheet.create({
   distanceBadgeText: {
     fontSize: 11,
     fontFamily: fonts.bold,
-    color: colors.tealDark,
+    color: colors.techDark,
     fontVariant: ['tabular-nums']
   },
 
@@ -1774,7 +1555,7 @@ const styles = StyleSheet.create({
   privacyShieldText: {
     fontSize: 11,
     fontFamily: fonts.medium,
-    color: colors.tealDark,
+    color: colors.techDark,
     flex: 1
   },
 
@@ -1797,24 +1578,9 @@ const styles = StyleSheet.create({
   schedulePillText: {
     fontSize: 11,
     fontFamily: fonts.bold,
-    color: colors.tealDark,
+    color: colors.techDark,
     fontVariant: ['tabular-nums']
   },
-  payoutPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: colors.green + '12',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4
-  },
-  payoutPillText: {
-    fontSize: 11,
-    fontFamily: fonts.bold,
-    color: colors.green
-  },
-
   issueBox: {
     backgroundColor: colors.surfaceSunken,
     borderRadius: 10,
@@ -1848,10 +1614,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center'
   },
-  stepCircleDone: { backgroundColor: colors.teal },
+  stepCircleDone: { backgroundColor: colors.tech },
   stepCirclePending: { backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line },
   stepLabel: { fontSize: 9, fontFamily: fonts.medium, color: colors.muted },
-  stepLabelDone: { color: colors.tealDark, fontFamily: fonts.bold },
+  stepLabelDone: { color: colors.techDark, fontFamily: fonts.bold },
   stepLine: {
     flex: 1,
     height: 2,
@@ -1859,7 +1625,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
     marginTop: -10
   },
-  stepLineDone: { backgroundColor: colors.teal },
+  stepLineDone: { backgroundColor: colors.tech },
 
   cardDetailsBox: {
     backgroundColor: colors.canvas,
@@ -1874,7 +1640,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     fontFamily: fonts.bold,
-    color: colors.tealDark,
+    color: colors.techDark,
     fontVariant: ['tabular-nums']
   },
   problemSnippetBox: {
@@ -1900,7 +1666,7 @@ const styles = StyleSheet.create({
     minWidth: 120,
     height: 48,
     borderRadius: 12,
-    backgroundColor: colors.teal,
+    backgroundColor: colors.tech,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1958,7 +1724,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 12,
-    backgroundColor: colors.tealLight,
+    backgroundColor: colors.techSoft,
     borderWidth: 1,
     borderColor: colors.hudBorder,
     alignItems: 'center',
@@ -1979,7 +1745,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 18,
-    backgroundColor: colors.tealLight,
+    backgroundColor: colors.techSoft,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -1998,14 +1764,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     height: 38,
     borderRadius: 19,
-    backgroundColor: colors.tealLight,
+    backgroundColor: colors.techSoft,
     alignItems: 'center',
     justifyContent: 'center'
   },
   emptyActionBtnText: {
     fontSize: 12,
     fontFamily: fonts.bold,
-    color: colors.tealDark
+    color: colors.techDark
   },
 
   errorCard: {
@@ -2040,7 +1806,7 @@ const styles = StyleSheet.create({
     marginBottom: 12
   },
   offlineBannerText: { flex: 1, fontSize: 11, fontFamily: fonts.medium, color: colors.muted },
-  offlineRetryText: { fontSize: 12, fontFamily: fonts.bold, color: colors.teal },
+  offlineRetryText: { fontSize: 12, fontFamily: fonts.bold, color: colors.tech },
 
   modalOverlay: {
     flex: 1,
@@ -2076,7 +1842,7 @@ const styles = StyleSheet.create({
   sheetKicker: {
     fontSize: 10,
     fontFamily: fonts.bold,
-    color: colors.tealDark,
+    color: colors.techDark,
     letterSpacing: 1.2,
     marginBottom: 2
   },
@@ -2123,7 +1889,7 @@ const styles = StyleSheet.create({
   modalKicker: {
     fontSize: 10,
     fontFamily: fonts.bold,
-    color: colors.tealDark,
+    color: colors.techDark,
     letterSpacing: 1.2,
     marginBottom: 2
   },
@@ -2160,11 +1926,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center'
   },
   pinBoxFilled: {
-    borderColor: colors.teal,
+    borderColor: colors.tech,
     backgroundColor: colors.white
   },
   pinBoxActive: {
-    borderColor: colors.tealDark,
+    borderColor: colors.techDark,
     borderWidth: 2
   },
   pinDigit: {

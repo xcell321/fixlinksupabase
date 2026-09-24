@@ -8,6 +8,18 @@ import {
 
 export const colors = {
   ink: '#102A43',
+  // Prototype (FigMake FixIt) — normative for UI reskin. Keep legacy teal for compat.
+  dark: '#0D1B2A',
+  customer: '#F97316',
+  customerDark: '#EA580C',
+  customerSoft: '#FFF7ED',
+  customerMist: '#FFEDD5',
+  tech: '#2563EB',
+  techDark: '#1D4ED8',
+  techSoft: '#EFF6FF',
+  techMist: '#DBEAFE',
+  appBg: '#F9FAFB',
+  cardBorder: '#F3F4F6',
   teal: '#0F766E',
   tealDark: '#075E59',
   tealLight: '#E6F6F3',

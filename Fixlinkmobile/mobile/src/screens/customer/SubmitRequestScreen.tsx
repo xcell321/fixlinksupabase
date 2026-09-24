@@ -1,4 +1,4 @@
-﻿// @ts-nocheck - migrated from .js, preserve working state; types to be refined incrementally
+// @ts-nocheck - migrated from .js, preserve working state; types to be refined incrementally
 import React, { useState, useEffect, useRef } from "react";
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, ScrollView, Modal, FlatList, ActivityIndicator, Image } from "react-native";
 import { Ionicons } from '@expo/vector-icons';
@@ -7,7 +7,8 @@ import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from "../../components/DateTimePicker";
 import { PhotoLightbox } from "../../components/RequestPhoto";
 import { submitRepairRequest, fetchPlatformCategories } from "../services/api";
-import { geocodeAddress, autocompleteLocation } from "../services/locationIq";
+import { geocodeAddress } from "../services/locationIq";
+import LocationIQMap from "../../components/LocationIQMap";
 import { colors, fonts } from '../../theme';
 import { getApplianceIcon } from '../../utils/applianceIcons';
 
@@ -49,9 +50,14 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
   const [stepErrors, setStepErrors] = useState({});
   const [selectedCategoryName, setSelectedCategoryName] = useState("");
   const [selectedDevice, setSelectedDevice] = useState("");
+  const [brandModel, setBrandModel] = useState("");
   const [drillCategory, setDrillCategory] = useState(null);
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
+  const [street, setStreet] = useState("");
+  const [city, setCity] = useState("");
+  const [zipCode, setZipCode] = useState("");
+  const [notes, setNotes] = useState("");
   const [coords, setCoords] = useState(null);
   const [categoryOptions, setCategoryOptions] = useState([]);
   const [date, setDate] = useState(new Date());
@@ -62,19 +68,15 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
   const [modalVisible, setModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [locating, setLocating] = useState(false);
-  const [suggestions, setSuggestions] = useState([]);
-  const [searchingLocation, setSearchingLocation] = useState(false);
-  const [locationLocked, setLocationLocked] = useState(false);
-  const [suggestionsModalVisible, setSuggestionsModalVisible] = useState(false);
   const [photo, setPhoto] = useState(null);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoViewerVisible, setPhotoViewerVisible] = useState(false);
-  const searchTimerRef = useRef(null);
   const scrollRef = useRef(null);
+
+  const composedLocation = [street.trim(), city.trim(), zipCode.trim()].filter(Boolean).join(', ');
 
   useEffect(() => {
     fetchPlatformCategories().then(setCategoryOptions).catch(() => setCategoryOptions([]));
-    return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current); };
   }, []);
 
   const applianceOptions = categoryOptions.length
@@ -82,7 +84,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
     : APPLIANCE_OPTIONS;
 
   const displayAppliance = selectedDevice
-    ? `${selectedCategoryName} — ${selectedDevice}`
+    ? `${selectedCategoryName} � ${selectedDevice}`
     : selectedCategoryName || "Select appliance type";
 
   const selectedCategoryObj = categoryOptions.find((c) => String(c.name || '').trim() === selectedCategoryName) || null;
@@ -114,68 +116,24 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
       const lat = locationData.coords.latitude;
       const lon = locationData.coords.longitude;
       setCoords({ latitude: lat, longitude: lon });
-      setLocationLocked(true);
-      setSuggestions([]);
-      setSuggestionsModalVisible(false);
-      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
       if (stepErrors.location) setStepErrors((p) => { const n = { ...p }; delete n.location; return n; });
 
       let geocode = await Location.reverseGeocodeAsync({
         latitude: lat,
         longitude: lon
       });
-      
+
       if (geocode && geocode.length > 0) {
         const address = geocode[0];
-        const formattedAddress = `${address.street || ''} ${address.city || ''} ${address.region || ''}`.trim();
-        setLocation(formattedAddress || `Lat: ${lat.toFixed(4)}, Lon: ${lon.toFixed(4)}`);
-      } else {
-        setLocation(`Lat: ${lat.toFixed(4)}, Lon: ${lon.toFixed(4)}`);
+        if (address.street) setStreet(address.street);
+        if (address.city) setCity(address.city);
+        if (address.postalCode) setZipCode(address.postalCode);
       }
     } catch (e) {
       Alert.alert('Error', 'Failed to fetch location details.');
     } finally {
       setLocating(false);
     }
-  };
-
-  // Debounced type-ahead: as the customer types a city, barangay, street, store
-  // or landmark, suggest real places from the map and pin the exact one.
-  const handleLocationChange = (text) => {
-    setLocation(text);
-    setCoords(null);
-    setLocationLocked(false);
-    setSuggestionsModalVisible(false);
-    if (stepErrors.location) setStepErrors((p) => { const n = { ...p }; delete n.location; return n; });
-    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-
-    const clean = text.trim();
-    if (clean.length < 3) {
-      setSuggestions([]);
-      setSearchingLocation(false);
-      return;
-    }
-
-    setSearchingLocation(true);
-    searchTimerRef.current = setTimeout(async () => {
-      const results = await autocompleteLocation(clean);
-      setSuggestions(results);
-      setSearchingLocation(false);
-      if (results.length > 0) {
-        setSuggestionsModalVisible(true);
-      }
-    }, 350);
-  };
-
-  const selectSuggestion = (suggestion) => {
-    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-    setLocation(suggestion.fullName || suggestion.label);
-    setCoords({ latitude: suggestion.latitude, longitude: suggestion.longitude });
-    setLocationLocked(true);
-    setSuggestions([]);
-    setSearchingLocation(false);
-    setSuggestionsModalVisible(false);
-    if (stepErrors.location) setStepErrors((p) => { const n = { ...p }; delete n.location; return n; });
   };
 
   // Optional problem photo: helps the technician see the issue before
@@ -295,8 +253,8 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
       }
     }
     if (step === 4) {
-      if (!location.trim()) {
-        next.location = 'Enter the service address or use Locate Me.';
+      if (!street.trim()) {
+        next.location = 'Enter the street address.';
         valid = false;
       } else {
         delete next.location;
@@ -314,7 +272,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
       const d = new Date(date); d.setHours(0,0,0,0);
       return d >= today;
     }
-    if (step === 4) return !!location.trim();
+    if (step === 4) return !!street.trim();
     return true;
   };
 
@@ -336,6 +294,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
   };
 
   const handleSubmit = async () => {
+    const fullLocation = composedLocation + (notes.trim() ? ` (${notes.trim()})` : '');
     // Final guard: validate all steps inline before network call
     const allValid = [1,2,3,4].every((s) => {
       if (s === 1 && !selectedCategoryName.trim()) return false;
@@ -345,7 +304,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
         const d = new Date(date); d.setHours(0,0,0,0);
         if (d < today) return false;
       }
-      if (s === 4 && !location.trim()) return false;
+      if (s === 4 && !street.trim()) return false;
       return true;
     });
     if (!allValid) {
@@ -356,7 +315,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
       const today = new Date(); today.setHours(0,0,0,0);
       const d = new Date(date); d.setHours(0,0,0,0);
       if (d < today) next.date = 'Choose today or a future date.';
-      if (!location.trim()) next.location = 'Enter the service address or use Locate Me.';
+      if (!street.trim()) next.location = 'Enter the street address.';
       setStepErrors(next);
       if (!selectedCategoryName.trim()) setCurrentStep(1);
       else if (!description.trim()) setCurrentStep(2);
@@ -365,7 +324,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
       return;
     }
 
-    if (!selectedCategoryName || !description || !location) {
+    if (!selectedCategoryName || !description || !street.trim()) {
       // fallback generic alert for any edge path, but inline is primary
       const missing = !selectedCategoryName ? 'appliance' : !description ? 'description' : 'location';
       setStepErrors((p) => ({ ...p, [missing]: 'This field is required.' }));
@@ -374,10 +333,10 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
     setLoading(true);
     try {
       let finalCoords = coords;
-      // If customer manually typed address without clicking Locate Me, geocode using LocationIQ
-      if (!finalCoords && location) {
+      // Geocode the typed address so the technician can navigate to it
+      if (!finalCoords && composedLocation) {
         try {
-          const geocoded = await geocodeAddress(location);
+          const geocoded = await geocodeAddress(composedLocation);
           if (geocoded) {
             finalCoords = { latitude: geocoded.latitude, longitude: geocoded.longitude };
           }
@@ -390,14 +349,15 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
       const finalPreferredTime = selectedTimeSlot || date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
 
       const finalApplianceType = selectedDevice || selectedCategoryName;
+      const finalDescription = brandModel.trim() ? `[${brandModel.trim()}] ${description}` : description;
 
       await submitRepairRequest({
         customerName: currentUser?.name || customerName,
         customerUid: currentUser?.uid,
         applianceType: finalApplianceType,
         category: selectedCategoryName,
-        description,
-        location,
+        description: finalDescription,
+        location: fullLocation,
         ...(finalCoords?.latitude && { latitude: finalCoords.latitude }),
         ...(finalCoords?.longitude && { longitude: finalCoords.longitude }),
         preferredDate: formattedDate,
@@ -416,17 +376,17 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
 
       setSelectedCategoryName("");
       setSelectedDevice("");
+      setBrandModel("");
       setDrillCategory(null);
       setDescription("");
       setPhoto(null);
       setPhotoViewerVisible(false);
       setLocation("");
+      setStreet("");
+      setCity("");
+      setZipCode("");
+      setNotes("");
       setCoords(null);
-      setLocationLocked(false);
-      setSuggestions([]);
-      setSearchingLocation(false);
-      setSuggestionsModalVisible(false);
-      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
       setDate(new Date());
       setSelectedTimeSlot('Afternoon (1PM-5PM)');
       setIsCustomTime(false);
@@ -443,58 +403,28 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
     if (currentStep === 1) {
       return (
         <View style={styles.stepBody}>
-
-          <View style={styles.inputGroup}>
-            <View style={styles.labelRow}>
-              <Text style={styles.inputLabel}>Appliance</Text>
-              <Text style={styles.requiredMark}> *</Text>
+          {!!selectedDevice && (
+            <View style={styles.selectedMetaRow}>
+              <View style={styles.miniPill}>
+                <Ionicons name="checkmark-circle" size={12} color={colors.customer} />
+                <Text style={styles.miniPillText} numberOfLines={1}>{selectedCategoryName}</Text>
+              </View>
+              <View style={[styles.miniPill, styles.miniPillDevice]}>
+                <Ionicons name="construct-outline" size={11} color={colors.ink} />
+                <Text style={[styles.miniPillText, { color: colors.ink }]} numberOfLines={1}>{selectedDevice}</Text>
+              </View>
             </View>
-            <TouchableOpacity
-              style={[styles.selectInput, !!stepErrors.category && styles.inputError]}
-              onPress={() => setModalVisible(true)}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-              accessibilityLabel="Select appliance type"
-              accessibilityHint="Opens appliance picker"
-              hitSlop={6}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 10 }}>
-                <View style={[styles.inputIconTile, !!selectedCategoryName && styles.inputIconTileActive]}>
-                  <Ionicons name={selectedCategoryName ? (getApplianceIcon(selectedCategoryName) as never) : 'hardware-chip-outline'} size={16} color={selectedCategoryName ? colors.teal : colors.muted} />
-                </View>
-                <Text numberOfLines={1} style={[styles.selectInputText, !selectedCategoryName && { color: colors.muted }]}>
-                  {displayAppliance}
-                </Text>
-              </View>
-              <Ionicons name="chevron-down" size={16} color={colors.muted} />
-            </TouchableOpacity>
-            {!!selectedCategoryName && (
-              <View style={styles.selectedMetaRow}>
-                <View style={styles.miniPill}>
-                  <Ionicons name="checkmark-circle" size={12} color={colors.teal} />
-                  <Text style={styles.miniPillText} numberOfLines={1}>{selectedCategoryName}</Text>
-                </View>
-                {!!selectedDevice && (
-                  <View style={[styles.miniPill, styles.miniPillDevice]}>
-                    <Ionicons name="construct-outline" size={11} color={colors.ink} />
-                    <Text style={[styles.miniPillText, { color: colors.ink }]} numberOfLines={1}>{selectedDevice}</Text>
-                  </View>
-                )}
-              </View>
-            )}
-            {!!stepErrors.category && <Text style={styles.errorText} accessibilityLiveRegion="polite">{stepErrors.category}</Text>}
-          </View>
+          )}
 
-          {/* Scannable helper: show 3 quick category chips to reduce overwhelm; full list lives in the sheet */}
+          {/* Prototype 2x2 device grid (dynamic admin categories) + full list sheet */}
           <View style={styles.quickPickWrap}>
-            <Text style={styles.quickPickLabel}>Quick picks</Text>
-            <View style={styles.quickChipRow}>
-              {applianceOptions.slice(0, 6).map((name) => {
+            <View style={styles.deviceGrid}>
+              {applianceOptions.slice(0, 4).map((name) => {
                 const isActive = selectedCategoryName === name;
                 return (
                   <TouchableOpacity
                     key={name}
-                    style={[styles.quickChip, isActive && styles.quickChipActive]}
+                    style={[styles.deviceCard, isActive && styles.deviceCardActive]}
                     onPress={() => {
                       const cat = categoryOptions.find((c) => String(c.name || '').trim() === name);
                       if (cat) pickCategory(cat);
@@ -506,15 +436,18 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
                     accessibilityLabel={`Select ${name}`}
                     hitSlop={8}
                   >
-                    <Ionicons name={getApplianceIcon(name) as never} size={12} color={isActive ? colors.teal : colors.muted} />
-                    <Text style={[styles.quickChipText, isActive && styles.quickChipTextActive]} numberOfLines={1}>{name}</Text>
+                    <View style={[styles.deviceIconTile, isActive && styles.deviceIconTileActive]}>
+                      <Ionicons name={getApplianceIcon(name) as never} size={24} color={isActive ? colors.customer : '#6B7280'} />
+                    </View>
+                    <Text style={styles.deviceCardText} numberOfLines={2}>{name}</Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
+            {!!stepErrors.category && <Text style={styles.errorText} accessibilityLiveRegion="polite">{stepErrors.category}</Text>}
             <TouchableOpacity style={styles.viewAllCategoriesRow} onPress={() => setModalVisible(true)} activeOpacity={0.7}>
               <Text style={styles.viewAllCategoriesText}>Browse all {applianceOptions.length} categories</Text>
-              <Ionicons name="chevron-forward" size={14} color={colors.teal} />
+              <Ionicons name="chevron-forward" size={14} color={colors.customer} />
             </TouchableOpacity>
           </View>
         </View>
@@ -524,6 +457,24 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
     if (currentStep === 2) {
       return (
         <View style={styles.stepBody}>
+
+          <View style={styles.inputGroup}>
+            <View style={styles.labelRow}>
+              <Text style={styles.inputLabel}>Device brand & model</Text>
+            </View>
+            <View style={styles.textInputContainer}>
+              <Ionicons name="hardware-chip-outline" size={18} color={colors.muted} />
+              <TextInput
+                style={styles.textInputSingle}
+                placeholder="e.g. Dell XPS 15 9530"
+                placeholderTextColor={colors.muted}
+                value={brandModel}
+                onChangeText={setBrandModel}
+                accessibilityLabel="Device brand and model"
+                maxLength={80}
+              />
+            </View>
+          </View>
 
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
@@ -559,7 +510,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
             <View style={styles.labelRow}>
               <Text style={styles.inputLabel}>Problem photo <Text style={styles.optionalLabel}>(optional)</Text></Text>
               <View style={styles.photoBadge}>
-                <Ionicons name="shield-checkmark-outline" size={10} color={colors.teal} />
+                <Ionicons name="shield-checkmark-outline" size={10} color={colors.customer} />
                 <Text style={styles.photoBadgeText}>Seen before accept</Text>
               </View>
             </View>
@@ -575,7 +526,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
                   </View>
                   <View style={styles.photoPreviewActions}>
                     <TouchableOpacity style={styles.photoSecondaryButton} onPress={handlePhotoAction} activeOpacity={0.7} disabled={photoBusy} accessibilityRole="button" accessibilityLabel="Replace photo" hitSlop={6}>
-                      <Ionicons name="refresh-outline" size={14} color={colors.teal} />
+                      <Ionicons name="refresh-outline" size={14} color={colors.customer} />
                       <Text style={styles.photoSecondaryText}>Replace</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.photoSecondaryButton} onPress={() => setPhoto(null)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Remove photo" hitSlop={6}>
@@ -588,15 +539,15 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
             ) : (
               <TouchableOpacity style={styles.photoPicker} onPress={handlePhotoAction} activeOpacity={0.7} disabled={photoBusy} accessibilityRole="button" accessibilityLabel="Add a photo of the problem" hitSlop={8}>
                 {photoBusy ? (
-                  <ActivityIndicator size="small" color={colors.teal} />
+                  <ActivityIndicator size="small" color={colors.customer} />
                 ) : (
                   <>
                     <View style={styles.photoPickerIcon}>
-                      <Ionicons name="camera-outline" size={20} color={colors.teal} />
+                      <Ionicons name="camera-outline" size={20} color={colors.customer} />
                     </View>
                     <View style={styles.photoPickerCopy}>
                       <Text style={styles.photoPickerTitle}>Add a photo of the problem</Text>
-                      <Text style={styles.photoPickerSub}>Camera or gallery • JPG / PNG up to 5MB</Text>
+                      <Text style={styles.photoPickerSub}>Camera or gallery � JPG / PNG up to 5MB</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={16} color={colors.muted} />
                   </>
@@ -627,7 +578,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
                 <View style={[styles.inputIconTile, styles.inputIconTileActive]}>
-                  <Ionicons name="calendar-outline" size={16} color={colors.teal} />
+                  <Ionicons name="calendar-outline" size={16} color={colors.customer} />
                 </View>
                 <Text style={styles.selectInputText} numberOfLines={1}>
                   {date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
@@ -644,13 +595,14 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
             <View style={styles.labelRow}>
               <Text style={styles.inputLabel}>Preferred time window</Text>
             </View>
-            <View style={styles.slotContainer}>
+            {/* Prototype slot rows with radio circles */}
+            <View style={styles.slotList}>
               {TIME_SLOTS.map((slot) => {
                 const isActive = selectedTimeSlot === slot && !isCustomTime;
                 return (
                   <TouchableOpacity
                     key={slot}
-                    style={[styles.slotChip, isActive && styles.slotChipActive]}
+                    style={[styles.slotRow, isActive && styles.slotRowActive]}
                     onPress={() => {
                       setSelectedTimeSlot(slot);
                       setIsCustomTime(false);
@@ -661,12 +613,15 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
                     accessibilityState={{ selected: isActive }}
                     hitSlop={8}
                   >
-                    <Text style={[styles.slotChipText, isActive && styles.slotChipTextActive]}>{slot}</Text>
+                    <View style={[styles.slotRadio, isActive && styles.slotRadioActive]}>
+                      {isActive ? <Ionicons name="checkmark" size={14} color="#FFFFFF" /> : <Ionicons name="calendar-outline" size={14} color="#9CA3AF" />}
+                    </View>
+                    <Text style={styles.slotRowText}>{slot}</Text>
                   </TouchableOpacity>
                 );
               })}
               <TouchableOpacity
-                style={[styles.slotChip, isCustomTime && styles.slotChipActive]}
+                style={[styles.slotRow, isCustomTime && styles.slotRowActive]}
                 onPress={() => {
                   setMode('time');
                   setShowDatePicker(true);
@@ -676,24 +631,24 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
                 accessibilityLabel="Choose exact time"
                 hitSlop={8}
               >
-                <View style={styles.slotExactInner}>
-                  <Ionicons name="time-outline" size={14} color={isCustomTime ? colors.teal : colors.muted} />
-                  <Text style={[styles.slotChipText, isCustomTime && styles.slotChipTextActive]}>
-                    {isCustomTime ? selectedTimeSlot : 'Exact Time...'}
-                  </Text>
+                <View style={[styles.slotRadio, isCustomTime && styles.slotRadioActive]}>
+                  {isCustomTime ? <Ionicons name="checkmark" size={14} color="#FFFFFF" /> : <Ionicons name="time-outline" size={14} color="#9CA3AF" />}
                 </View>
+                <Text style={styles.slotRowText}>
+                  {isCustomTime ? selectedTimeSlot : 'Exact Time...'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
 
           <View style={styles.locationConfirmCard}>
             <View style={styles.locationConfirmIcon}>
-              <Ionicons name="calendar-outline" size={16} color={colors.teal} />
+              <Ionicons name="calendar-outline" size={16} color={colors.customer} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.locationConfirmTitle}>Appointment set</Text>
               <Text style={styles.locationConfirmSub} numberOfLines={2}>
-                {date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} • {selectedTimeSlot}
+                {date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} � {selectedTimeSlot}
               </Text>
             </View>
             <Ionicons name="shield-checkmark" size={16} color={colors.green} />
@@ -715,97 +670,92 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
       );
     }
 
-    // Step 4
+    // Step 4 — reference Repair Location: map preview + street + city/ZIP + notes
+    const clearLocationError = () => { if (stepErrors.location) setStepErrors((p) => { const n = { ...p }; delete n.location; return n; }); };
     return (
       <View style={styles.stepBody}>
-        <View style={styles.inputGroup}>
-          <View style={styles.labelRow}>
-            <Text style={styles.inputLabel}>Service location</Text>
-            <Text style={styles.requiredMark}> *</Text>
-            {locationLocked && coords ? (
-              <View style={[styles.miniPill, { marginLeft: 8, backgroundColor: colors.tealLight, borderColor: colors.hudBorder }]}>
-                <Ionicons name="navigate" size={10} color={colors.teal} />
-                <Text style={[styles.miniPillText, { color: colors.teal }]}>Pinned</Text>
-              </View>
-            ) : null}
-          </View>
-
-          <View style={styles.locationFieldWrap}>
-            <View style={styles.locationContainer}>
-              <View style={[styles.selectInput, { flex: 3, minWidth: 170, marginBottom: 0 }, !!stepErrors.location && styles.inputError]}>
-                <Ionicons name="location-outline" size={18} color={!!stepErrors.location ? colors.danger : colors.muted} />
-                <TextInput
-                  style={[styles.selectInputText, { paddingVertical: 0, flex: 1 }]}
-                  placeholder="Type a barangay, city, street or store"
-                  placeholderTextColor={colors.muted}
-                  value={location}
-                  onChangeText={handleLocationChange}
-                  accessibilityLabel="Service location"
-                  autoCorrect={false}
-                />
-                {searchingLocation ? (
-                  <ActivityIndicator size="small" color={colors.teal} />
-                ) : locationLocked ? (
-                  <Ionicons name="checkmark-circle" size={18} color={colors.green} />
-                ) : null}
-              </View>
-              <TouchableOpacity style={styles.locateButton} onPress={handleLocate} activeOpacity={0.8} disabled={locating} accessibilityRole="button" accessibilityLabel="Use my current location" hitSlop={6}>
-                {locating ? (
-                  <ActivityIndicator color={colors.white} size="small" />
-                ) : (
-                  <>
-                    <Ionicons name="locate" size={16} color={colors.white} />
-                    <Text style={styles.locateButtonText}>Locate</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
-
-            {/* Type-ahead status + results are shown in a full scrollable sheet */}
-            {(searchingLocation || (suggestions.length === 0 && location.trim().length >= 3 && !locationLocked) || (suggestions.length > 0 && !suggestionsModalVisible)) && (
-              <View style={styles.suggestionsPanel}>
-                {searchingLocation ? (
-                  <View style={styles.suggestionStatusRow}>
-                    <ActivityIndicator size="small" color={colors.teal} />
-                    <Text style={styles.suggestionStatusText}>Searching places…</Text>
-                  </View>
-                ) : suggestions.length > 0 && !suggestionsModalVisible ? (
-                  <TouchableOpacity style={styles.suggestionStatusRow} onPress={() => setSuggestionsModalVisible(true)} activeOpacity={0.7}>
-                    <Ionicons name="list" size={15} color={colors.teal} />
-                    <Text style={[styles.suggestionStatusText, { color: colors.teal, fontFamily: fonts.semiBold }]}>
-                      {suggestions.length} place{suggestions.length !== 1 ? 's' : ''} found — tap to view & choose
-                    </Text>
-                    <Ionicons name="chevron-up" size={16} color={colors.teal} />
-                  </TouchableOpacity>
-                ) : (
-                  <View style={styles.suggestionStatusRow}>
-                    <Ionicons name="search-outline" size={15} color={colors.muted} />
-                    <Text style={styles.suggestionStatusText}>No exact match yet — keep typing or we'll still try to resolve this address.</Text>
-                  </View>
-                )}
-              </View>
-            )}
-          </View>
-          {!!stepErrors.location ? (
-            <Text style={styles.errorText}>{stepErrors.location}</Text>
+        <Text style={styles.stepSectionTitle}>Repair Location</Text>
+        <View style={styles.mapBox}>
+          {coords ? (
+            <LocationIQMap
+              customerCoords={{ latitude: coords.latitude, longitude: coords.longitude, name: 'Service location' }}
+              currentUserRole="customer"
+              isAccepted={false}
+              style={{ height: 144 }}
+            />
           ) : (
-            <Text style={styles.helperText}>
-              {locationLocked ? 'Exact location pinned — the technician sees this only after accepting.' : 'Your exact address stays private until a technician accepts.'}
-            </Text>
-          )}
-
-          {locationLocked && coords && (
-            <View style={styles.locationConfirmCard}>
-              <View style={styles.locationConfirmIcon}>
-                <Ionicons name="map-outline" size={16} color={colors.teal} />
+            <View style={styles.mapPlaceholder}>
+              <View style={styles.mapPin}>
+                <Ionicons name="location" size={20} color="#FFFFFF" />
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.locationConfirmTitle}>Service location confirmed</Text>
-                <Text style={styles.locationConfirmSub} numberOfLines={2}>{location}</Text>
-              </View>
-              <Ionicons name="shield-checkmark" size={16} color={colors.green} />
             </View>
           )}
+        </View>
+        <TouchableOpacity style={styles.locateRow} onPress={handleLocate} disabled={locating} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Use my current location">
+          {locating ? (
+            <ActivityIndicator size="small" color={colors.customer} />
+          ) : (
+            <Ionicons name="locate-outline" size={15} color={colors.customer} />
+          )}
+          <Text style={styles.locateRowText}>{locating ? 'Locating...' : 'Use my current location'}</Text>
+        </TouchableOpacity>
+        <View style={styles.inputGroup}>
+          <Text style={styles.refLabel}>Street Address</Text>
+          <View style={[styles.textInputContainer, !!stepErrors.location && styles.inputError]}>
+            <TextInput
+              style={styles.textInputSingle}
+              placeholder="142 Oak Street, Apt 3B"
+              placeholderTextColor={colors.muted}
+              value={street}
+              onChangeText={(t) => { setStreet(t); setCoords(null); clearLocationError(); }}
+              accessibilityLabel="Street address"
+              autoCorrect={false}
+            />
+          </View>
+          {!!stepErrors.location && <Text style={styles.errorText}>{stepErrors.location}</Text>}
+        </View>
+        <View style={styles.twoColGrid}>
+          <View style={[styles.inputGroup, styles.twoColCell]}>
+            <Text style={styles.refLabel}>City</Text>
+            <View style={styles.textInputContainer}>
+              <TextInput
+                style={styles.textInputSingle}
+                placeholder="Bogo City"
+                placeholderTextColor={colors.muted}
+                value={city}
+                onChangeText={(t) => { setCity(t); setCoords(null); }}
+                accessibilityLabel="City"
+                autoCorrect={false}
+              />
+            </View>
+          </View>
+          <View style={[styles.inputGroup, styles.twoColCell]}>
+            <Text style={styles.refLabel}>ZIP Code</Text>
+            <View style={styles.textInputContainer}>
+              <TextInput
+                style={styles.textInputSingle}
+                placeholder="6005"
+                placeholderTextColor={colors.muted}
+                value={zipCode}
+                onChangeText={setZipCode}
+                accessibilityLabel="ZIP code"
+                keyboardType="number-pad"
+              />
+            </View>
+          </View>
+        </View>
+        <View style={styles.inputGroup}>
+          <Text style={styles.refLabel}>Additional Notes</Text>
+          <View style={styles.textInputContainer}>
+            <TextInput
+              style={styles.textInputSingle}
+              placeholder="Landmark, gate code, leave at door, etc."
+              placeholderTextColor={colors.muted}
+              value={notes}
+              onChangeText={setNotes}
+              accessibilityLabel="Additional notes"
+            />
+          </View>
         </View>
       </View>
     );
@@ -819,11 +769,11 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
       </View>
 
       <View style={styles.card}>
-        {/* Stepper header — distilled: ONE clear track (dots + labels). Kicker keeps step context; badge + segmented bar removed as duplicate signals. */}
+        {/* Stepper header � distilled: ONE clear track (dots + labels). Kicker keeps step context; badge + segmented bar removed as duplicate signals. */}
         <View style={styles.stepperHeader}>
           <View style={styles.stepperTopRow}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.stepKicker} accessibilityRole="text">STEP {currentStep} OF {TOTAL_STEPS} • {STEPS[currentStep - 1].label.toUpperCase()}</Text>
+              <Text style={styles.stepKicker} accessibilityRole="text">STEP {currentStep} OF {TOTAL_STEPS} � {STEPS[currentStep - 1].label.toUpperCase()}</Text>
               <Text style={styles.stepTitle}>{STEPS[currentStep - 1].title}</Text>
               <Text style={styles.stepSubtitle}>{STEPS[currentStep - 1].subtitle}</Text>
             </View>
@@ -953,11 +903,11 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
                     >
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
                         <View style={[styles.modalItemIcon, isSelected && styles.modalItemIconSelected]}>
-                          <Ionicons name={getApplianceIcon(item) as never} size={15} color={isSelected ? colors.teal : colors.muted} />
+                          <Ionicons name={getApplianceIcon(item) as never} size={15} color={isSelected ? colors.customer : colors.muted} />
                         </View>
                         <Text style={[styles.modalItemText, isSelected && styles.modalItemTextSelected]}>{item}</Text>
                       </View>
-                      {isSelected ? <Ionicons name="checkmark-circle" size={18} color={colors.teal} /> : <Ionicons name="chevron-forward" size={16} color={colors.muted} />}
+                      {isSelected ? <Ionicons name="checkmark-circle" size={18} color={colors.customer} /> : <Ionicons name="chevron-forward" size={16} color={colors.muted} />}
                     </TouchableOpacity>
                   );
                 }}
@@ -982,14 +932,14 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
                     >
                       <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                         <View style={[styles.modalItemIcon, isSelected && styles.modalItemIconSelected]}>
-                          <Ionicons name={getApplianceIcon(item) as never} size={16} color={isSelected ? colors.teal : colors.muted} />
+                          <Ionicons name={getApplianceIcon(item) as never} size={16} color={isSelected ? colors.customer : colors.muted} />
                         </View>
                         <View style={{ flex: 1 }}>
                           <Text style={[styles.modalItemText, isSelected && styles.modalItemTextSelected]}>{item}</Text>
-                          {deviceCount > 0 ? <Text style={styles.modalItemHint}>{deviceCount} device{deviceCount !== 1 ? 's' : ''} • tap to choose</Text> : null}
+                          {deviceCount > 0 ? <Text style={styles.modalItemHint}>{deviceCount} device{deviceCount !== 1 ? 's' : ''} � tap to choose</Text> : null}
                         </View>
                       </View>
-                      {isSelected ? <Ionicons name="checkmark-circle" size={18} color={colors.teal} /> : <Ionicons name="chevron-forward" size={16} color={colors.muted} />}
+                      {isSelected ? <Ionicons name="checkmark-circle" size={18} color={colors.customer} /> : <Ionicons name="chevron-forward" size={16} color={colors.muted} />}
                     </TouchableOpacity>
                   );
                 }}
@@ -999,59 +949,6 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
         </View>
       </Modal>
 
-      {/* Place Finder sheet — scrollable list of every matching location */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={suggestionsModalVisible}
-        onRequestClose={() => setSuggestionsModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.suggestionsModalView}>
-            <View style={styles.modalHeader}>
-              <View style={styles.modalBackIcon} />
-              <View style={{ flex: 1, alignItems: 'center' }}>
-                <Text style={styles.sectionTitle}>Places found</Text>
-                <Text style={styles.modalSubtitle}>
-                  {suggestions.length} matching location{suggestions.length !== 1 ? 's' : ''} — tap one to pin it
-                </Text>
-              </View>
-              <TouchableOpacity onPress={() => setSuggestionsModalVisible(false)} style={styles.modalCloseIcon} hitSlop={8}>
-                <Ionicons name="close" size={20} color={colors.ink} />
-              </TouchableOpacity>
-            </View>
-
-            <FlatList
-              data={suggestions}
-              keyExtractor={(item) => `${item.latitude},${item.longitude}`}
-              style={styles.suggestionsList}
-              showsVerticalScrollIndicator
-              keyboardShouldPersistTaps="handled"
-              keyboardDismissMode="on-drag"
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.suggestionRow}
-                  onPress={() => selectSuggestion(item)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.suggestionIconWrap}>
-                    <Ionicons name={suggestionIconFor(item.type)} size={16} color={colors.teal} />
-                  </View>
-                  <View style={styles.suggestionCopy}>
-                    <Text style={styles.suggestionLabel} numberOfLines={2}>{item.label}</Text>
-                    <Text style={styles.suggestionSub} numberOfLines={2}>{item.sublabel}</Text>
-                  </View>
-                  <Ionicons name="add-circle-outline" size={18} color={colors.teal} />
-                </TouchableOpacity>
-              )}
-            />
-
-            <View style={styles.suggestionFooter}>
-              <Text style={styles.suggestionFooterText}>Every place in the Philippines is searchable — keep typing to narrow down.</Text>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       <PhotoLightbox
         visible={photoViewerVisible}
@@ -1069,38 +966,38 @@ const styles = StyleSheet.create({
   scrollContent: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 36, backgroundColor: colors.canvas, alignItems: 'center' as const },
   centerWrap: { width: '100%' as const, maxWidth: 480, alignSelf: 'center' as const },
   sectionHeaderContainer: { marginBottom: 14, marginTop: 6 },
-  kicker: { color: colors.teal, fontSize: 10, letterSpacing: 1.4, fontFamily: fonts.extraBold, marginBottom: 2, textTransform: 'uppercase' as const },
+  kicker: { color: colors.customer, fontSize: 10, letterSpacing: 1.4, fontFamily: fonts.extraBold, marginBottom: 2, textTransform: 'uppercase' as const },
   screenKicker: { color: colors.muted, fontSize: 10, letterSpacing: 1.4, fontFamily: fonts.extraBold, textTransform: 'uppercase' as const },
   sectionTitle: { fontSize: 20, fontFamily: fonts.extraBold, color: colors.ink, letterSpacing: -0.3, lineHeight: 25 },
   sectionSubtitle: { fontSize: 14, fontFamily: fonts.regular, color: colors.muted, lineHeight: 20, marginTop: 6 },
 
   card: { backgroundColor: colors.white, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: colors.line, boxShadow: '0 6px 14px rgba(16,42,67,0.06)', elevation: 3, gap: 0 },
 
-  // Stepper — tight within, generous separation between sections (spacing thesis)
+  // Stepper � tight within, generous separation between sections (spacing thesis)
   stepperHeader: { gap: 14, paddingBottom: 4 },
   stepperTopRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
-  stepKicker: { color: colors.teal, fontSize: 10, letterSpacing: 1.2, fontFamily: fonts.extraBold, textTransform: 'uppercase' as const },
+  stepKicker: { color: colors.customer, fontSize: 10, letterSpacing: 1.2, fontFamily: fonts.extraBold, textTransform: 'uppercase' as const },
   stepTitle: { fontSize: 20, fontFamily: fonts.extraBold, color: colors.ink, letterSpacing: -0.3, marginTop: 6, lineHeight: 25 },
   stepSubtitle: { fontSize: 14, fontFamily: fonts.regular, color: colors.muted, lineHeight: 20, marginTop: 2 },
   stepCountBadge: { minWidth: 44, height: 28, borderRadius: 14, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
   stepCountText: { fontSize: 12, fontFamily: fonts.bold, color: colors.ink, fontVariant: ['tabular-nums'] as const },
   progressTrack: { flexDirection: 'row', gap: 6, marginTop: 2 },
   progressSegment: { flex: 1, height: 6, borderRadius: 999, backgroundColor: colors.lineSoft, borderWidth: 1, borderColor: colors.line },
-  progressSegmentActive: { backgroundColor: colors.teal, borderColor: colors.teal },
-  progressSegmentCompleted: { backgroundColor: colors.teal, borderColor: colors.teal, opacity: 0.85 },
+  progressSegmentActive: { backgroundColor: colors.customer, borderColor: colors.customer },
+  progressSegmentCompleted: { backgroundColor: colors.customer, borderColor: colors.customer, opacity: 0.85 },
   stepDotsRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 0, marginTop: 6, paddingHorizontal: 4, overflow: 'visible' as const },
   dotCell: { flex: 1, alignItems: 'center', position: 'relative' as const, gap: 6, minWidth: 0, overflow: 'visible' as const },
   dot: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.line, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
-  dotActive: { backgroundColor: colors.teal, borderColor: colors.teal },
-  dotCompleted: { backgroundColor: colors.teal, borderColor: colors.teal },
+  dotActive: { backgroundColor: colors.customer, borderColor: colors.customer },
+  dotCompleted: { backgroundColor: colors.customer, borderColor: colors.customer },
   dotUpcoming: { backgroundColor: colors.white, borderColor: colors.line },
   dotText: { fontSize: 12, fontFamily: fonts.bold, color: colors.muted, fontVariant: ['tabular-nums'] as const },
   dotTextActive: { color: colors.white },
   dotTextUpcoming: { color: colors.muted },
   dotLabel: { fontSize: 10, fontFamily: fonts.semiBold, color: colors.muted, letterSpacing: 0.3, textAlign: 'center' as const, lineHeight: 14, marginTop: 1 },
-  dotLabelActive: { color: colors.teal, fontFamily: fonts.bold },
+  dotLabelActive: { color: colors.customer, fontFamily: fonts.bold },
   dotConnector: { position: 'absolute' as const, top: 14, left: '62%', right: '-38%', height: 2, backgroundColor: colors.line, zIndex: 0 },
-  dotConnectorCompleted: { backgroundColor: colors.teal, opacity: 0.9 },
+  dotConnectorCompleted: { backgroundColor: colors.customer, opacity: 0.9 },
   divider: { height: 1, backgroundColor: colors.lineSoft, marginTop: 14, marginBottom: 14 },
 
   stepBody: { gap: 14, marginTop: 2 },
@@ -1118,27 +1015,34 @@ const styles = StyleSheet.create({
   inputError: { borderColor: colors.danger, borderWidth: 1.5 },
 
   inputIconTile: { width: 28, height: 28, borderRadius: 9, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
-  inputIconTileActive: { backgroundColor: colors.tealLight, borderColor: colors.hudBorder },
+  inputIconTileActive: { backgroundColor: colors.customerSoft, borderColor: colors.hudBorder },
 
-  // quick picks — grouped tight (8) within, generous (16) from next input
+  // quick picks � grouped tight (8) within, generous (16) from next input
+  // Prototype 2x2 device grid
   quickPickWrap: { gap: 10, marginTop: 6 },
+  deviceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  deviceCard: { width: '48%', flexGrow: 1, borderRadius: 16, borderWidth: 2, borderColor: '#E5E7EB', backgroundColor: '#F9FAFB', padding: 16, alignItems: 'center', gap: 12, minHeight: 128, justifyContent: 'center' },
+  deviceCardActive: { borderColor: colors.customer, backgroundColor: colors.customerSoft },
+  deviceIconTile: { width: 48, height: 48, borderRadius: 12, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#F3F4F6' },
+  deviceIconTileActive: { backgroundColor: colors.customerMist, borderColor: colors.customer },
+  deviceCardText: { fontSize: 13, fontFamily: fonts.semiBold, color: '#374151', textAlign: 'center' },
   quickPickLabel: { fontSize: 10, fontFamily: fonts.extraBold, color: colors.muted, letterSpacing: 1, textTransform: 'uppercase' as const },
   quickChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'flex-start' },
   quickChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 12, borderRadius: 999, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, maxWidth: '48%', minHeight: 48 },
-  quickChipActive: { backgroundColor: colors.tealLight, borderColor: colors.teal },
+  quickChipActive: { backgroundColor: colors.customerSoft, borderColor: colors.customer },
   quickChipText: { fontSize: 12, fontFamily: fonts.semiBold, color: colors.muted, flexShrink: 1 },
-  quickChipTextActive: { color: colors.teal },
+  quickChipTextActive: { color: colors.customer },
   viewAllCategoriesRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingTop: 2 },
-  viewAllCategoriesText: { fontSize: 12, fontFamily: fonts.bold, color: colors.teal },
+  viewAllCategoriesText: { fontSize: 12, fontFamily: fonts.bold, color: colors.customer },
 
   // selected meta
   selectedMetaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
-  miniPill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: colors.hudBorder, backgroundColor: colors.tealLight },
+  miniPill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: colors.hudBorder, backgroundColor: colors.customerSoft },
   miniPillDevice: { backgroundColor: colors.white, borderColor: colors.line },
-  miniPillText: { fontSize: 11, fontFamily: fonts.semiBold, color: colors.teal },
+  miniPillText: { fontSize: 11, fontFamily: fonts.semiBold, color: colors.customer },
 
-  photoPicker: { minHeight: 72, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.teal, borderStyle: 'dashed', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  photoPickerIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: colors.tealLight, alignItems: 'center', justifyContent: 'center' },
+  photoPicker: { minHeight: 72, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.customer, borderStyle: 'dashed', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  photoPickerIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: colors.customerSoft, alignItems: 'center', justifyContent: 'center' },
   photoPickerCopy: { flex: 1 },
   photoPickerTitle: { fontSize: 14, fontFamily: fonts.semiBold, color: colors.ink },
   photoPickerSub: { fontSize: 11, fontFamily: fonts.regular, color: colors.muted, marginTop: 2 },
@@ -1150,9 +1054,9 @@ const styles = StyleSheet.create({
   photoHint: { fontSize: 11, fontFamily: fonts.regular, color: colors.muted, lineHeight: 15 },
   photoPreviewActions: { flexDirection: 'row', flexWrap: 'wrap' as const, gap: 8, marginTop: 6 },
   photoSecondaryButton: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, minHeight: 44 },
-  photoSecondaryText: { fontSize: 12, fontFamily: fonts.semiBold, color: colors.teal },
-  photoBadge: { marginLeft: 8, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 999, backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.hudBorder },
-  photoBadgeText: { fontSize: 10, fontFamily: fonts.semiBold, color: colors.teal, letterSpacing: 0.2 },
+  photoSecondaryText: { fontSize: 12, fontFamily: fonts.semiBold, color: colors.customer },
+  photoBadge: { marginLeft: 8, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 999, backgroundColor: colors.customerSoft, borderWidth: 1, borderColor: colors.hudBorder },
+  photoBadgeText: { fontSize: 10, fontFamily: fonts.semiBold, color: colors.customer, letterSpacing: 0.2 },
   
   selectInput: { height: 52, backgroundColor: colors.surfaceSunken, borderWidth: 1, borderColor: colors.line, borderRadius: 14, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   selectInputText: { fontSize: 14, fontFamily: fonts.medium, color: colors.ink, flex: 1 },
@@ -1162,18 +1066,26 @@ const styles = StyleSheet.create({
   charRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, gap: 8 },
   charCount: { fontSize: 11, fontFamily: fonts.medium, color: colors.muted, fontVariant: ['tabular-nums'] as const },
 
-  slotContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 2 },
+  // Prototype slot rows with radio circles
+  textInputContainer: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 14, backgroundColor: '#F9FAFB', gap: 10, minHeight: 52 },
+  textInputSingle: { flex: 1, color: colors.ink, fontSize: 14, fontFamily: fonts.medium, paddingVertical: 12 },
+  slotList: { gap: 8, marginTop: 2 },
+  slotRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderRadius: 16, borderWidth: 2, borderColor: '#E5E7EB', backgroundColor: '#F9FAFB' },
+  slotRowActive: { borderColor: colors.customer, backgroundColor: colors.customerSoft },
+  slotRadio: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' },
+  slotRadioActive: { backgroundColor: colors.customer, borderColor: colors.customer },
+  slotRowText: { fontSize: 14, fontFamily: fonts.semiBold, color: '#374151' },
   slotChip: { flex: 1, minWidth: 140, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.canvas, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  slotChipActive: { backgroundColor: colors.tealLight, borderColor: colors.teal },
+  slotChipActive: { backgroundColor: colors.customerSoft, borderColor: colors.customer },
   slotChipText: { fontSize: 12, fontFamily: fonts.semiBold, color: colors.muted, textAlign: 'center' as const, lineHeight: 16 },
-  slotChipTextActive: { color: colors.teal },
+  slotChipTextActive: { color: colors.customer },
   slotExactInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   timeHintRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
   timeHintText: { fontSize: 11, fontFamily: fonts.regular, color: colors.muted, flex: 1, lineHeight: 14 },
   
   locationContainer: { flexDirection: 'row', flexWrap: 'wrap' as const, alignItems: 'center', gap: 10 },
   locationFieldWrap: { position: 'relative', zIndex: 20 },
-  locateButton: { backgroundColor: colors.teal, height: 52, paddingHorizontal: 16, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 6, boxShadow: '0 4px 10px rgba(15,118,110,0.18)', elevation: 3, minWidth: 92, flex: 1, justifyContent: 'center' },
+  locateButton: { backgroundColor: colors.customer, height: 52, paddingHorizontal: 16, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 6, boxShadow: '0 4px 10px rgba(15,118,110,0.18)', elevation: 3, minWidth: 92, flex: 1, justifyContent: 'center' },
   locateButtonText: { color: colors.white, fontSize: 13, fontFamily: fonts.bold },
 
   suggestionsPanel: { position: 'absolute', top: 58, left: 0, right: 0, backgroundColor: colors.white, borderRadius: 14, borderWidth: 1, borderColor: colors.line, zIndex: 30, elevation: 8, boxShadow: '0 6px 12px rgba(16,42,67,0.15)', overflow: 'hidden' },
@@ -1182,14 +1094,14 @@ const styles = StyleSheet.create({
   suggestionStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 14 },
   suggestionStatusText: { flex: 1, color: colors.muted, fontSize: 12, fontFamily: fonts.medium },
   suggestionRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: colors.line },
-  suggestionIconWrap: { width: 30, height: 30, borderRadius: 10, backgroundColor: colors.tealLight, alignItems: 'center', justifyContent: 'center' },
+  suggestionIconWrap: { width: 30, height: 30, borderRadius: 10, backgroundColor: colors.customerSoft, alignItems: 'center', justifyContent: 'center' },
   suggestionCopy: { flex: 1 },
   suggestionLabel: { color: colors.ink, fontSize: 13, fontFamily: fonts.semiBold },
   suggestionSub: { color: colors.muted, fontSize: 11, marginTop: 2, fontFamily: fonts.regular, paddingBottom: 1 },
   suggestionFooter: { paddingHorizontal: 14, paddingVertical: 10, backgroundColor: colors.canvas, borderTopWidth: 1, borderTopColor: colors.line },
   suggestionFooterText: { color: colors.muted, fontSize: 11, fontFamily: fonts.regular, textAlign: 'center' },
 
-  locationConfirmCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.hudBorder, borderRadius: 12, padding: 12, marginTop: 10 },
+  locationConfirmCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.customerSoft, borderWidth: 1, borderColor: colors.hudBorder, borderRadius: 12, padding: 12, marginTop: 10 },
   locationConfirmIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.hudBorder, alignItems: 'center', justifyContent: 'center' },
   locationConfirmTitle: { fontSize: 12, fontFamily: fonts.bold, color: colors.ink },
   locationConfirmSub: { fontSize: 11, fontFamily: fonts.regular, color: colors.muted, marginTop: 2, lineHeight: 14 },
@@ -1199,7 +1111,7 @@ const styles = StyleSheet.create({
   navRow: { flexDirection: 'row', gap: 12, marginTop: 20, alignItems: 'center' },
   secondaryButton: { flex: 1, minWidth: 0, height: 48, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   secondaryButtonText: { color: colors.ink, fontSize: 14, fontFamily: fonts.bold, letterSpacing: 0.2 },
-  primaryButton: { backgroundColor: colors.teal, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, boxShadow: '0 4px 10px rgba(15,118,110,0.18)', elevation: 3, paddingHorizontal: 18 },
+  primaryButton: { backgroundColor: colors.customer, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, boxShadow: '0 4px 10px rgba(15,118,110,0.18)', elevation: 3, paddingHorizontal: 18 },
   primaryButtonFlex: { flex: 1, minWidth: 0 },
   primaryButtonMuted: { opacity: 0.55 },
   primaryButtonText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold, letterSpacing: 0.4 },
@@ -1213,11 +1125,11 @@ const styles = StyleSheet.create({
   modalCloseIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.canvas, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.line },
   modalSubtitle: { color: colors.muted, fontSize: 11, fontFamily: fonts.medium, marginTop: 3, textAlign: 'center' as const },
   modalItem: { paddingVertical: 12, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: colors.lineSoft, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderRadius: 12, marginBottom: 2 },
-  modalItemSelected: { backgroundColor: colors.tealLight, paddingHorizontal: 10, borderBottomColor: 'transparent', borderWidth: 1, borderColor: colors.hudBorder },
+  modalItemSelected: { backgroundColor: colors.customerSoft, paddingHorizontal: 10, borderBottomColor: 'transparent', borderWidth: 1, borderColor: colors.hudBorder },
   modalItemIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
   modalItemIconSelected: { backgroundColor: colors.white, borderColor: colors.hudBorder },
   modalItemText: { fontSize: 14, fontFamily: fonts.medium, color: colors.ink },
-  modalItemTextSelected: { color: colors.teal, fontFamily: fonts.bold },
+  modalItemTextSelected: { color: colors.customer, fontFamily: fonts.bold },
   modalItemHint: { fontSize: 11, fontFamily: fonts.regular, color: colors.muted, marginTop: 2 },
   modalItemCount: { fontSize: 11, fontFamily: fonts.semiBold, color: colors.muted, marginRight: 8 }
 });

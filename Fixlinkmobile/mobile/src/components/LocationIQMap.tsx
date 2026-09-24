@@ -10,6 +10,7 @@ export interface LocationIQMapProps {
   routeCoordinates?: number[][];
   currentUserRole?: string;
   isAccepted?: boolean;
+  jobPins?: Array<{ latitude: number; longitude: number; label?: string }>;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -29,6 +30,7 @@ export default function LocationIQMap({
   routeCoordinates = [],
   currentUserRole = 'technician',
   isAccepted = false,
+  jobPins = [],
   style,
 }: LocationIQMapProps): React.JSX.Element {
   const webViewRef = useRef<{ injectJavaScript: (js: string) => void } | null>(null);
@@ -46,7 +48,7 @@ export default function LocationIQMap({
       return;
     }
     if (!webViewRef.current) return;
-    const { type, ...rest } = command as { type: string; lat?: number; lng?: number; name?: string; address?: string; coords?: unknown };
+    const { type, ...rest } = command as { type: string; lat?: number; lng?: number; name?: string; address?: string; coords?: unknown; pins?: unknown };
     if (type === 'tech') {
       webViewRef.current.injectJavaScript(
         `if (typeof window.updateTechMarker === 'function') { window.updateTechMarker(${rest.lat}, ${rest.lng}, ${JSON.stringify(rest.name ?? 'Technician')}); }`,
@@ -58,6 +60,10 @@ export default function LocationIQMap({
     } else if (type === 'route') {
       webViewRef.current.injectJavaScript(
         `if (typeof window.updateRoutePolyline === 'function') { window.updateRoutePolyline(${JSON.stringify(rest.coords)}); }`,
+      );
+    } else if (type === 'pins') {
+      webViewRef.current.injectJavaScript(
+        `if (typeof window.updateJobPins === 'function') { window.updateJobPins(${JSON.stringify(rest.pins)}); }`,
       );
     }
   };
@@ -77,6 +83,9 @@ export default function LocationIQMap({
     }
     if (routeCoordinates?.length) {
       runMapCommand({ type: 'route', coords: routeCoordinates });
+    }
+    if (jobPins?.length) {
+      runMapCommand({ type: 'pins', pins: jobPins });
     }
   };
 
@@ -105,7 +114,9 @@ export default function LocationIQMap({
     const custAddress: string = customerCoords?.address ? JSON.stringify(customerCoords.address) : '""';
     const isTech: boolean = currentUserRole === 'technician';
     const canLocateOther: boolean = Boolean(isAccepted);
+    const routeColor: string = isTech ? '#2563EB' : '#F97316';
     const routeJson: string = JSON.stringify(routeCoordinates ?? []);
+    const pinsJson: string = JSON.stringify(Array.isArray(jobPins) ? jobPins : []);
     return `
       <!DOCTYPE html>
       <html>
@@ -117,14 +128,15 @@ export default function LocationIQMap({
           * { box-sizing: border-box; margin: 0; padding: 0; }
           html, body, #map { width: 100%; height: 100%; overflow: hidden; background: #eef2f5; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
           .pulse-wrapper { position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
-          .pulse-ring { position: absolute; width: 44px; height: 44px; border-radius: 50%; background: rgba(15, 118, 110, 0.35); animation: pulse-animation 1.8s infinite ease-out; }
-          .pulse-dot { position: relative; z-index: 2; width: 32px; height: 32px; border-radius: 50%; background: #0F766E; border: 3px solid #ffffff; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; }
+          .pulse-ring { position: absolute; width: 44px; height: 44px; border-radius: 50%; background: rgba(37, 99, 235, 0.30); animation: pulse-animation 1.8s infinite ease-out; }
+          .pulse-dot { position: relative; z-index: 2; width: 32px; height: 32px; border-radius: 50%; background: #2563EB; border: 3px solid #ffffff; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; }
           .pulse-dot svg { width: 16px; height: 16px; display: block; }
           .pulse-inner { width: 10px; height: 10px; border-radius: 50%; background: #ffffff; opacity: 0.95; }
           .customer-pin-wrapper { position: relative; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; }
-          .customer-pin { width: 34px; height: 34px; border-radius: 50%; background: #D97706; border: 3px solid #ffffff; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; }
+          .customer-pin { width: 34px; height: 34px; border-radius: 50%; background: #F97316; border: 3px solid #ffffff; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; }
           .customer-pin svg { width: 16px; height: 16px; display: block; }
           .customer-pin-dot { width: 10px; height: 10px; border-radius: 50%; background: #ffffff; opacity: 0.98; }
+          .job-pin-badge { background: #2563EB; color: #ffffff; font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 999px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); border: 2px solid #ffffff; white-space: nowrap; }
           @keyframes pulse-animation { 0% { transform: scale(0.6); opacity: 0.9; } 100% { transform: scale(1.6); opacity: 0; } }
           .leaflet-popup-content-wrapper { border-radius: 12px; padding: 4px; box-shadow: 0 6px 16px rgba(0,0,0,0.18); }
           .custom-popup { font-size: 13px; color: #102A43; line-height: 1.4; }
@@ -142,25 +154,34 @@ export default function LocationIQMap({
           const map = L.map('map', { center: initialCenter, zoom: 14, zoomControl: false, attributionControl: false });
           L.tileLayer('${tileUrl}', { maxZoom: 19, subdomains: 'abc' }).addTo(map);
           L.control.zoom({ position: 'bottomleft' }).addTo(map);
-          let techMarker = null; let custMarker = null; let routePolyline = null;
+          let techMarker = null; let custMarker = null; let routePolyline = null; let jobPinMarkers = [];
+          const jobPinIcon = function(label) { return L.divIcon({ className: 'custom-div-icon', html: '<div class="job-pin-badge">' + (label || 'Job') + '</div>', iconSize: [52, 24], iconAnchor: [26, 12] }); };
+          window.updateJobPins = function(pins) { try { jobPinMarkers.forEach(function(m) { map.removeLayer(m); }); jobPinMarkers = []; (pins || []).forEach(function(p) { if (p && isFinite(p.latitude) && isFinite(p.longitude)) { var mk = L.marker([p.latitude, p.longitude], { icon: jobPinIcon(p.label) }); if (p.label) mk.bindPopup('<div class="custom-popup"><strong>' + p.label + '</strong></div>'); mk.addTo(map); jobPinMarkers.push(mk); } }); } catch (err) {} };
           const techIcon = L.divIcon({ className: 'custom-div-icon', html: '<div class="pulse-wrapper"><div class="pulse-ring"></div><div class="pulse-dot"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/><path d="M5 21l1.5-4.5"/><path d="M9 14l1 1"/></svg></div></div>', iconSize: [44, 44], iconAnchor: [22, 22] });
           const custIcon = L.divIcon({ className: 'custom-div-icon', html: '<div class="customer-pin-wrapper"><div class="customer-pin"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg></div></div>', iconSize: [42, 42], iconAnchor: [21, 21] });
           const isAccepted = ${canLocateOther ? 'true' : 'false'}; const isCurrentUserTech = ${isTech ? 'true' : 'false'};
           const techCoords = ${techLat && techLng ? `[${techLat}, ${techLng}]` : 'null'}; const custCoords = ${custLat && custLng ? `[${custLat}, ${custLng}]` : 'null'}; const rawRoute = ${routeJson};
           if (techCoords && (isCurrentUserTech || isAccepted)) { techMarker = L.marker(techCoords, { icon: techIcon }).addTo(map); const label = isCurrentUserTech ? "You (Technician)" : ("Technician: " + ${techName}); techMarker.bindPopup('<div class="custom-popup"><strong>' + label + '</strong><span class="subtext">Live Location</span></div>'); }
           if (custCoords && (!isCurrentUserTech || isAccepted)) { custMarker = L.marker(custCoords, { icon: custIcon }).addTo(map); const custLabel = !isCurrentUserTech ? "Your Location" : ("Customer: " + ${custName}); const addrHtml = ${custAddress} ? '<br><span class="subtext">' + ${custAddress} + '</span>' : ''; custMarker.bindPopup('<div class="custom-popup"><strong>' + custLabel + '</strong>' + addrHtml + '</div>'); }
-          if (isAccepted && rawRoute && rawRoute.length > 0) { routePolyline = L.polyline(rawRoute, { color: '#0F766E', weight: 5, opacity: 0.85, smoothFactor: 1 }).addTo(map); }
+          if (isAccepted && rawRoute && rawRoute.length > 0) { routePolyline = L.polyline(rawRoute, { color: '${routeColor}', weight: 5, opacity: 0.85, smoothFactor: 1 }).addTo(map); }
+          window.updateJobPins(${pinsJson});
           window.fitMarkers = function() { try { const bounds = []; if (techMarker && (isCurrentUserTech || isAccepted)) bounds.push(techMarker.getLatLng()); if (custMarker && (!isCurrentUserTech || isAccepted)) bounds.push(custMarker.getLatLng()); if (routePolyline && routePolyline.getLatLngs().length > 0) { map.fitBounds(routePolyline.getBounds(), { padding: [45, 45], maxZoom: 16 }); } else if (bounds.length > 1) { map.fitBounds(L.latLngBounds(bounds), { padding: [55, 55], maxZoom: 16 }); } else if (bounds.length === 1) { map.setView(bounds[0], 15); } } catch (err) {} };
           setTimeout(window.fitMarkers, 350);
           window.updateCustomerMarker = function(lat, lng, name, address) { try { const latLng = [lat, lng]; if (!custMarker) { custMarker = L.marker(latLng, { icon: custIcon }).addTo(map); window.fitMarkers(); } else { custMarker.setLatLng(latLng); } const custLabel = !isCurrentUserTech ? "Your Location" : ("Customer: " + (name || "Customer")); const addrHtml = address ? '<br><span class="subtext">' + address + '</span>' : ''; custMarker.bindPopup('<div class="custom-popup"><strong>' + custLabel + '</strong>' + addrHtml + '</div>'); } catch (err) {} };
           window.updateTechMarker = function(lat, lng, name) { try { const latLng = [lat, lng]; if (!techMarker) { techMarker = L.marker(latLng, { icon: techIcon }).addTo(map); window.fitMarkers(); } else { techMarker.setLatLng(latLng); } const label = isCurrentUserTech ? "You (Technician)" : ("Technician: " + (name || "Technician")); techMarker.bindPopup('<div class="custom-popup"><strong>' + label + '</strong><span class="subtext">Live Location</span></div>'); } catch (err) {} };
-          window.updateRoutePolyline = function(coords) { try { if (routePolyline) { map.removeLayer(routePolyline); routePolyline = null; } if (coords && coords.length > 0) { routePolyline = L.polyline(coords, { color: '#0F766E', weight: 5, opacity: 0.85, smoothFactor: 1 }).addTo(map); } } catch (err) {} };
-          window.addEventListener('message', function (event) { const data = event.data || {}; if (!data || data.source !== 'fixlink-map-host') return; try { if (data.type === 'tech') { window.updateTechMarker(Number(data.lat), Number(data.lng), data.name); } else if (data.type === 'customer') { window.updateCustomerMarker(Number(data.lat), Number(data.lng), data.name, data.address); } else if (data.type === 'route') { window.updateRoutePolyline(data.coords); } } catch (err) {} });
+          window.updateRoutePolyline = function(coords) { try { if (routePolyline) { map.removeLayer(routePolyline); routePolyline = null; } if (coords && coords.length > 0) { routePolyline = L.polyline(coords, { color: '${routeColor}', weight: 5, opacity: 0.85, smoothFactor: 1 }).addTo(map); } } catch (err) {} };
+          window.addEventListener('message', function (event) { const data = event.data || {}; if (!data || data.source !== 'fixlink-map-host') return; try { if (data.type === 'tech') { window.updateTechMarker(Number(data.lat), Number(data.lng), data.name); } else if (data.type === 'customer') { window.updateCustomerMarker(Number(data.lat), Number(data.lng), data.name, data.address); } else if (data.type === 'route') { window.updateRoutePolyline(data.coords); } else if (data.type === 'pins') { window.updateJobPins(data.pins); } } catch (err) {} });
         </script>
       </body>
       </html>
     `;
-  }, [initialCenter, customerCoords, technicianCoords, currentUserRole, isAccepted, routeCoordinates]);
+  }, [initialCenter, customerCoords, technicianCoords, currentUserRole, isAccepted, routeCoordinates, jobPins]);
+
+  useEffect(() => {
+    if (jobPins) {
+      runMapCommand({ type: 'pins', pins: jobPins });
+    }
+  }, [jobPins]);
 
   useEffect(() => {
     if (technicianCoords?.latitude && technicianCoords?.longitude) {

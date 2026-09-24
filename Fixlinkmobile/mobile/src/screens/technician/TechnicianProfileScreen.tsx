@@ -276,7 +276,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
     return (
       <View style={styles.centerScreen}>
         <View style={styles.emptyIconWrap}>
-          <Ionicons name="person-circle-outline" size={32} color={colors.teal} />
+          <Ionicons name="person-circle-outline" size={32} color={colors.tech} />
         </View>
         <Text style={styles.emptyTitle}>Profile unavailable</Text>
         <Text style={styles.emptyText}>{loadError ?? 'This profile could not be loaded.'}</Text>
@@ -302,6 +302,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
   const visibleReviews = showAllReviews ? reviews : reviews.slice(0, 2);
   const hasMoreReviews = reviews.length > 2;
   const verification = getVerificationBadge(profile.verified);
+  const [ptab, setPtab] = useState<'info' | 'skills' | 'reviews' | 'portfolio'>('info');
 
   return (
     <ScrollView contentContainerStyle={styles.screen} showsVerticalScrollIndicator={false}>
@@ -322,26 +323,26 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
           </View>
         )}
 
-        {/* 1. IDENTITY + CONTACT: Primary Profile Card */}
-        <View style={styles.coverCard}>
+        {/* 1. IDENTITY + CONTACT: Prototype dark header card */}
+        <View style={styles.coverCardDark}>
           <View style={styles.coverTop}>
             {profile.profileImage ? (
               <Image source={{ uri: profile.profileImage }} style={styles.avatarImage} />
             ) : (
-              <View style={styles.avatar}>
+              <View style={styles.avatarTech}>
                 <Text style={styles.avatarText}>{(profile.name || 'T').charAt(0).toUpperCase()}</Text>
               </View>
             )}
 
             <View style={styles.coverIdentity}>
               <View style={styles.coverNameRow}>
-                <Text style={styles.coverName} numberOfLines={2}>{profile.name || 'Technician'}</Text>
+                <Text style={styles.coverNameDark} numberOfLines={2}>{profile.name || 'Technician'}</Text>
               </View>
 
               <View style={styles.badgeRow}>
                 {verification.isVerified ? (
                   <View style={styles.verifiedBadge}>
-                    <Ionicons name="shield-checkmark" size={13} color={colors.teal} />
+                    <Ionicons name="shield-checkmark" size={13} color={colors.tech} />
                     <Text style={styles.verifiedBadgeText}>{verification.label}</Text>
                   </View>
                 ) : (
@@ -356,12 +357,12 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
                 {rating > 0 ? (
                   <>
                     <StarRow value={rating} size={13} />
-                    <Text style={styles.coverRatingText}>
+                    <Text style={styles.coverRatingTextDark}>
                       {rating.toFixed(1)} · {reviews.length} review{reviews.length === 1 ? '' : 's'}
                     </Text>
                   </>
                 ) : (
-                  <Text style={styles.coverRatingTextMuted}>No reviews yet</Text>
+                  <Text style={styles.coverRatingTextMutedDark}>No reviews yet</Text>
                 )}
               </View>
 
@@ -371,37 +372,37 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
                   accessibilityLabel="Edit profile details"
                   hitSlop={8}
                   onPress={() => setEditing(true)}
-                  style={({ pressed }) => [styles.editProfileButton, pressed && styles.pressedSoft]}
+                  style={({ pressed }) => [styles.editProfileButtonDark, pressed && styles.pressedSoft]}
                 >
-                  <Ionicons name="pencil-outline" size={13} color={colors.teal} />
-                  <Text style={styles.editProfileButtonText}>Edit Profile</Text>
+                  <Ionicons name="pencil-outline" size={13} color="#FFFFFF" />
+                  <Text style={styles.editProfileButtonTextDark}>Edit Profile</Text>
                 </Pressable>
               )}
             </View>
           </View>
 
           {/* Contact Details List */}
-          <View style={styles.coverDivider} />
+          <View style={styles.coverDividerDark} />
           <View style={styles.coverContactList}>
             <View style={styles.coverContactRow}>
-              <View style={styles.coverContactIcon}>
-                <Ionicons name="call-outline" size={14} color={colors.teal} />
+              <View style={styles.coverContactIconDark}>
+                <Ionicons name="call-outline" size={14} color="#FFFFFF" />
               </View>
               <View style={styles.coverContactTextWrap}>
-                <Text style={styles.coverContactMeta}>PHONE</Text>
-                <Text style={styles.coverContactText} selectable>
+                <Text style={styles.coverContactMetaDark}>PHONE</Text>
+                <Text style={styles.coverContactTextDark} selectable>
                   {profile.phone ? profile.phone : 'Not provided'}
                 </Text>
               </View>
             </View>
 
             <View style={styles.coverContactRow}>
-              <View style={styles.coverContactIcon}>
-                <Ionicons name="location-outline" size={14} color={colors.teal} />
+              <View style={styles.coverContactIconDark}>
+                <Ionicons name="location-outline" size={14} color="#FFFFFF" />
               </View>
               <View style={styles.coverContactTextWrap}>
-                <Text style={styles.coverContactMeta}>SERVICE ADDRESS</Text>
-                <Text style={styles.coverContactText} numberOfLines={2}>
+                <Text style={styles.coverContactMetaDark}>SERVICE ADDRESS</Text>
+                <Text style={styles.coverContactTextDark} numberOfLines={2}>
                   {profile.address ? profile.address : 'Not provided'}
                 </Text>
               </View>
@@ -413,7 +414,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
         <View style={styles.statsCard}>
           <View style={styles.statCol}>
             <View style={styles.statIconBadge}>
-              <Ionicons name="checkmark-circle-outline" size={15} color={colors.teal} />
+              <Ionicons name="checkmark-circle-outline" size={15} color={colors.tech} />
             </View>
             <Text style={styles.statNum}>{profile.completedJobs ?? 0}</Text>
             <Text style={styles.statLabel}>JOBS DONE</Text>
@@ -433,15 +434,32 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
 
           <View style={styles.statCol}>
             <View style={styles.statIconBadge}>
-              <Ionicons name="ribbon-outline" size={15} color={colors.teal} />
+              <Ionicons name="ribbon-outline" size={15} color={colors.tech} />
             </View>
             <Text style={styles.statNum}>{formatExperience(profile.yearsExperience)}</Text>
             <Text style={styles.statLabel}>EXPERIENCE</Text>
           </View>
         </View>
 
+        {/* Prototype tabs: info / skills / reviews / portfolio */}
+        <View style={styles.protoTabs}>
+          {(['info', 'skills', 'reviews', 'portfolio'] as const).map((t) => (
+            <Pressable
+              key={t}
+              onPress={() => setPtab(t)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: ptab === t }}
+              accessibilityLabel={`${t} tab`}
+              style={({ pressed }) => [styles.protoTab, pressed && { opacity: 0.85 }]}
+            >
+              <Text style={[styles.protoTabText, ptab === t && styles.protoTabTextActive]}>{t === 'info' ? 'Info' : t.charAt(0).toUpperCase() + t.slice(1)}</Text>
+              {ptab === t && <View style={styles.protoTabUnderline} />}
+            </Pressable>
+          ))}
+        </View>
+
         {/* 3. EDITOR: Inline Form with Leading Icons & Sunken Inputs */}
-        {editing && (
+        {ptab === 'info' && editing && (
           <View style={styles.editCard}>
             <View style={styles.editHeader}>
               <Text style={styles.editKicker}>EDIT PROFILE</Text>
@@ -497,7 +515,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
               </View>
               {geoStatus === 'detecting' && (
                 <View style={styles.geoRow}>
-                  <ActivityIndicator size="small" color={colors.teal} />
+                  <ActivityIndicator size="small" color={colors.tech} />
                   <Text style={[styles.geoHint, styles.geoPending]}>Detecting coordinates via LocationIQ...</Text>
                 </View>
               )}
@@ -595,10 +613,11 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
         )}
 
         {/* 4. PROFESSIONAL SUMMARY */}
+        {ptab === 'info' && (
         <View style={styles.cardSurface}>
           <View style={styles.cardSurfaceHeader}>
             <View style={styles.cardSurfaceIconWell}>
-              <Ionicons name="document-text-outline" size={16} color={colors.teal} />
+              <Ionicons name="document-text-outline" size={16} color={colors.tech} />
             </View>
             <View style={styles.cardSurfaceTitleWrap}>
               <Text style={styles.sectionEyebrow}>PROFESSIONAL SUMMARY</Text>
@@ -613,8 +632,10 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
             </Text>
           )}
         </View>
+        )}
 
         {/* 5. REVIEWS: Customer Feedback & Rating */}
+        {ptab === 'reviews' && (
         <View style={styles.boundedCard}>
           <View style={styles.boundedHeader}>
             <View>
@@ -666,7 +687,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
                   <Text style={styles.viewAllText}>
                     {showAllReviews ? 'Show fewer reviews' : `View all ${reviews.length} reviews`}
                   </Text>
-                  <Ionicons name={showAllReviews ? 'chevron-up' : 'chevron-forward'} size={14} color={colors.teal} />
+                  <Ionicons name={showAllReviews ? 'chevron-up' : 'chevron-forward'} size={14} color={colors.tech} />
                 </Pressable>
               )}
             </>
@@ -677,12 +698,14 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
             </View>
           )}
         </View>
+        )}
 
         {/* 6. SPECIALIZATIONS & SKILLS */}
+        {ptab === 'skills' && (
         <View style={styles.cardSurface}>
           <View style={styles.cardSurfaceHeader}>
             <View style={styles.cardSurfaceIconWell}>
-              <Ionicons name="construct-outline" size={16} color={colors.teal} />
+              <Ionicons name="construct-outline" size={16} color={colors.tech} />
             </View>
             <View style={styles.cardSurfaceTitleWrap}>
               <Text style={styles.sectionEyebrow}>SPECIALIZATIONS</Text>
@@ -698,7 +721,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
             <View style={styles.skillWrap}>
               {skills.map((skill) => (
                 <View key={skill} style={styles.skillChip}>
-                  <Ionicons name="checkmark" size={12} color={colors.teal} style={styles.skillChipIcon} />
+                  <Ionicons name="checkmark" size={12} color={colors.tech} style={styles.skillChipIcon} />
                   <Text style={styles.skillChipText} numberOfLines={1}>{skill}</Text>
                 </View>
               ))}
@@ -707,12 +730,14 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
             <Text style={styles.mutedBody}>No skills listed yet.</Text>
           )}
         </View>
+        )}
 
         {/* 7. SERVICE AREA & COVERAGE */}
+        {ptab === 'info' && (
         <View style={styles.cardSurface}>
           <View style={styles.cardSurfaceHeader}>
             <View style={styles.cardSurfaceIconWell}>
-              <Ionicons name="navigate-outline" size={16} color={colors.teal} />
+              <Ionicons name="navigate-outline" size={16} color={colors.tech} />
             </View>
             <View style={styles.cardSurfaceTitleWrap}>
               <Text style={styles.sectionEyebrow}>SERVICE AREA</Text>
@@ -726,13 +751,13 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
 
           <View style={styles.serviceTelemetryRow}>
             <View style={styles.telemetryPill}>
-              <Ionicons name="radio-outline" size={13} color={colors.teal} />
+              <Ionicons name="radio-outline" size={13} color={colors.tech} />
               <Text style={styles.telemetryPillText}>20 km radius</Text>
             </View>
 
             {profile.latitude != null && profile.longitude != null ? (
               <View style={styles.telemetryPill}>
-                <Ionicons name="locate-outline" size={13} color={colors.teal} />
+                <Ionicons name="locate-outline" size={13} color={colors.tech} />
                 <Text style={styles.telemetryPillText}>
                   {Number(profile.latitude).toFixed(4)}, {Number(profile.longitude).toFixed(4)}
                 </Text>
@@ -745,13 +770,14 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
             )}
           </View>
         </View>
+        )}
 
         {/* 8. SCHEDULE (read-only customer view) */}
-        {readOnly && (
+        {ptab === 'info' && readOnly && (
           <View style={styles.cardSurface}>
             <View style={styles.cardSurfaceHeader}>
               <View style={styles.cardSurfaceIconWell}>
-                <Ionicons name="calendar-outline" size={16} color={colors.teal} />
+                <Ionicons name="calendar-outline" size={16} color={colors.tech} />
               </View>
               <View style={styles.cardSurfaceTitleWrap}>
                 <Text style={styles.sectionEyebrow}>SCHEDULE</Text>
@@ -761,7 +787,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
 
             {scheduleLoading ? (
               <View style={styles.emptyRow}>
-                <ActivityIndicator size="small" color={colors.teal} />
+                <ActivityIndicator size="small" color={colors.tech} />
                 <Text style={styles.mutedSmall}>Loading schedule...</Text>
               </View>
             ) : schedule.length > 0 ? (
@@ -769,7 +795,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
                 {schedule.map((item, i) => (
                   <View key={`${item.status}-${i}`} style={[styles.schedItem, i === schedule.length - 1 && styles.schedItemLast]}>
                     <View style={styles.schedLine}>
-                      <Ionicons name="calendar-outline" size={14} color={colors.teal} accessible={false} />
+                      <Ionicons name="calendar-outline" size={14} color={colors.tech} accessible={false} />
                       <Text style={styles.schedDate} numberOfLines={1}>{formatScheduleDate(item)}</Text>
                       <View style={styles.schedStatusBadge}>
                         <Text style={styles.schedStatus} numberOfLines={1}>{item.status}</Text>
@@ -793,7 +819,8 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
           </View>
         )}
 
-        {/* 9. PORTFOLIO / WORK SHOWCASE: preserved exactly as requested */}
+        {/* 9. PORTFOLIO / WORK SHOWCASE */}
+        {ptab === 'portfolio' && (
         <View style={styles.boundedCard}>
           <View style={styles.portfolioHeader}>
             <View style={styles.portfolioHeaderCopy}>
@@ -867,6 +894,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
             <Text style={styles.portfolioHint}>Show your best work: completed repairs build trust faster than any description.</Text>
           )}
         </View>
+        )}
 
         {/* 10. HELP & ACCOUNT ACTIONS */}
         <View style={styles.footerBreak}>
@@ -880,7 +908,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
               style={({ pressed }) => [styles.helpRow, pressed && styles.pressedSoft]}
             >
               <View style={styles.helpIconWrap}>
-                <Ionicons name="help-circle-outline" size={18} color={colors.teal} />
+                <Ionicons name="help-circle-outline" size={18} color={colors.tech} />
               </View>
               <View style={styles.helpCopy}>
                 <Text style={styles.helpTitle}>Help & How It Works</Text>
@@ -926,30 +954,49 @@ const styles = StyleSheet.create({
   readOnlyNavTitle: { color: colors.muted, fontSize: 10, letterSpacing: 1.5, fontFamily: fonts.bold, flexShrink: 1, textAlign: 'right' },
 
   // 1. COVER: Primary Profile Card
-  coverCard: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 22, padding: 18, marginBottom: 14, ...shadows.card },
+  coverCard: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 22, padding: 18, marginBottom: 14,
+...shadows.card },
+  // Prototype dark identity header
+  coverCardDark: { backgroundColor: '#0D1B2A', borderRadius: 22, padding: 18, marginBottom: 14 },
+  avatarTech: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center' },
+  coverNameDark: { color: '#FFFFFF', fontSize: 19, fontFamily: fonts.extraBold, letterSpacing: -0.2 },
+  coverRatingTextDark: { color: '#D1D5DB', fontSize: 12, fontFamily: fonts.medium },
+  coverRatingTextMutedDark: { color: '#9CA3AF', fontSize: 12, fontFamily: fonts.medium },
+  editProfileButtonDark: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#2563EB', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, marginTop: 10, alignSelf: 'flex-start' },
+  editProfileButtonTextDark: { color: '#FFFFFF', fontSize: 12, fontFamily: fonts.bold },
+  coverDividerDark: { height: 1, backgroundColor: 'rgba(255,255,255,0.12)', marginVertical: 14 },
+  coverContactIconDark: { width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.10)', alignItems: 'center', justifyContent: 'center' },
+  coverContactMetaDark: { color: '#9CA3AF', fontSize: 10, fontFamily: fonts.bold, letterSpacing: 1 },
+  coverContactTextDark: { color: '#FFFFFF', fontSize: 13, fontFamily: fonts.semiBold, marginTop: 2 },
+  // Prototype tab bar: info / skills / reviews / portfolio
+  protoTabs: { flexDirection: 'row', backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.line, paddingHorizontal: 20, paddingTop: 8, gap: 8, marginBottom: 16, marginHorizontal: -20, paddingBottom: 0 },
+  protoTab: { paddingBottom: 10, paddingHorizontal: 8, alignItems: 'center' },
+  protoTabText: { color: '#9CA3AF', fontSize: 12, fontFamily: fonts.semiBold },
+  protoTabTextActive: { color: '#2563EB' },
+  protoTabUnderline: { height: 2, backgroundColor: '#2563EB', alignSelf: 'stretch', marginTop: 6, borderRadius: 1 },
   coverTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
-  avatar: { width: 68, height: 68, borderRadius: 20, backgroundColor: colors.teal, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
+  avatar: { width: 68, height: 68, borderRadius: 20, backgroundColor: colors.tech, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
   avatarImage: { width: 68, height: 68, borderRadius: 20, flexShrink: 0 },
   avatarText: { color: colors.white, fontSize: 28, fontFamily: fonts.bold },
   coverIdentity: { flex: 1, gap: 6, minWidth: 0 },
   coverNameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   coverName: { color: colors.ink, fontSize: 20, fontFamily: fonts.bold, lineHeight: 24, letterSpacing: -0.3 },
   badgeRow: { flexDirection: 'row', alignItems: 'center' },
-  verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.hudBorder, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
-  verifiedBadgeText: { color: colors.teal, fontSize: 11, fontFamily: fonts.bold },
+  verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.techSoft, borderWidth: 1, borderColor: colors.hudBorder, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
+  verifiedBadgeText: { color: colors.tech, fontSize: 11, fontFamily: fonts.bold },
   pendingBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
   pendingBadgeText: { color: colors.gold, fontSize: 11, fontFamily: fonts.bold },
   coverRatingRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   coverRatingText: { color: colors.muted, fontSize: 11, fontFamily: fonts.semiBold, fontVariant: ['tabular-nums'] },
   coverRatingTextMuted: { color: colors.muted, fontSize: 11, fontFamily: fonts.medium, fontStyle: 'italic' },
   starRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  editProfileButton: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 4, minHeight: 34, paddingHorizontal: 12, borderRadius: 999, backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.hudBorder },
-  editProfileButtonText: { color: colors.teal, fontSize: 12, fontFamily: fonts.bold },
+  editProfileButton: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 4, minHeight: 34, paddingHorizontal: 12, borderRadius: 999, backgroundColor: colors.techSoft, borderWidth: 1, borderColor: colors.hudBorder },
+  editProfileButtonText: { color: colors.tech, fontSize: 12, fontFamily: fonts.bold },
 
   coverDivider: { height: 1, backgroundColor: colors.lineSoft, marginTop: 16, marginBottom: 14 },
   coverContactList: { gap: 10 },
   coverContactRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  coverContactIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.hudBorder, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  coverContactIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: colors.techSoft, borderWidth: 1, borderColor: colors.hudBorder, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   coverContactTextWrap: { flex: 1 },
   coverContactMeta: { color: colors.muted, fontSize: 9, fontFamily: fonts.bold, letterSpacing: 1 },
   coverContactText: { color: colors.ink, fontSize: 13, fontFamily: fonts.semiBold, lineHeight: 18, marginTop: 1 },
@@ -965,7 +1012,7 @@ const styles = StyleSheet.create({
   // 3. EDIT PROFILE CARD
   editCard: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.hudBorder, borderRadius: 22, padding: 18, marginBottom: 24, ...shadows.cardStrong },
   editHeader: { marginBottom: 16, gap: 3 },
-  editKicker: { color: colors.teal, fontSize: 10, letterSpacing: 1.4, fontFamily: fonts.bold },
+  editKicker: { color: colors.tech, fontSize: 10, letterSpacing: 1.4, fontFamily: fonts.bold },
   editTitle: { color: colors.ink, fontSize: 17, fontFamily: fonts.bold },
   groupLabel: { color: colors.ink, fontSize: 11, fontFamily: fonts.extraBold, letterSpacing: 0.8, marginBottom: 12, marginTop: 8, textTransform: 'uppercase' },
   inputGroup: { gap: 6, marginBottom: 14 },
@@ -979,32 +1026,32 @@ const styles = StyleSheet.create({
   geoRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6, paddingHorizontal: 4 },
   geoHint: { fontSize: 11, lineHeight: 15, fontFamily: fonts.medium, fontVariant: ['tabular-nums'], flexShrink: 1 },
   geoPending: { color: colors.muted },
-  geoOk: { color: colors.tealDark },
+  geoOk: { color: colors.techDark },
   geoWarn: { color: colors.error },
   editActions: { flexDirection: 'row', gap: 10, marginTop: 16 },
   cancelButton: { flex: 1, minHeight: 48, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' },
   cancelButtonText: { color: colors.muted, fontSize: 14, fontFamily: fonts.bold },
-  saveButton: { flex: 2, minHeight: 48, borderRadius: 14, backgroundColor: colors.teal, alignItems: 'center', justifyContent: 'center', ...shadows.card },
+  saveButton: { flex: 2, minHeight: 48, borderRadius: 14, backgroundColor: colors.tech, alignItems: 'center', justifyContent: 'center', ...shadows.card },
   saveButtonText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
 
   // Shared Card Surface (About, Skills, Service Area, Schedule)
   cardSurface: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 20, padding: 18, marginBottom: 18, ...shadows.card },
   cardSurfaceHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
-  cardSurfaceIconWell: { width: 34, height: 34, borderRadius: 10, backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.hudBorder, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  cardSurfaceIconWell: { width: 34, height: 34, borderRadius: 10, backgroundColor: colors.techSoft, borderWidth: 1, borderColor: colors.hudBorder, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   cardSurfaceTitleWrap: { flex: 1 },
   cardSurfaceTitle: { color: colors.ink, fontSize: 16, fontFamily: fonts.bold, letterSpacing: -0.2 },
-  sectionEyebrow: { color: colors.teal, fontSize: 10, letterSpacing: 1.4, fontFamily: fonts.bold, marginBottom: 2 },
+  sectionEyebrow: { color: colors.tech, fontSize: 10, letterSpacing: 1.4, fontFamily: fonts.bold, marginBottom: 2 },
   summaryBody: { color: colors.ink, fontSize: 14, lineHeight: 22, fontFamily: fonts.regular },
   mutedBody: { color: colors.muted, fontSize: 13, fontFamily: fonts.regular, fontStyle: 'italic', lineHeight: 20 },
   mutedSmall: { color: colors.muted, fontSize: 12, fontFamily: fonts.regular, fontStyle: 'italic', flexShrink: 1, lineHeight: 16 },
 
   // Count Badge
-  countBadge: { backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.hudBorder, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
-  countBadgeText: { color: colors.teal, fontSize: 11, fontFamily: fonts.bold },
+  countBadge: { backgroundColor: colors.techSoft, borderWidth: 1, borderColor: colors.hudBorder, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
+  countBadgeText: { color: colors.tech, fontSize: 11, fontFamily: fonts.bold },
 
   // Skills
   skillWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  skillChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.hudBorder, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
+  skillChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.techSoft, borderWidth: 1, borderColor: colors.hudBorder, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
   skillChipIcon: { flexShrink: 0 },
   skillChipText: { color: colors.ink, fontSize: 12, fontFamily: fonts.semiBold },
 
@@ -1022,14 +1069,14 @@ const styles = StyleSheet.create({
   schedItemLast: { borderBottomWidth: 0, paddingBottom: 0 },
   schedLine: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   schedDate: { color: colors.ink, fontSize: 13, fontFamily: fonts.semiBold, fontVariant: ['tabular-nums'], flexShrink: 1 },
-  schedStatusBadge: { marginLeft: 'auto', backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.hudBorder, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
-  schedStatus: { color: colors.teal, fontSize: 10, fontFamily: fonts.bold },
+  schedStatusBadge: { marginLeft: 'auto', backgroundColor: colors.techSoft, borderWidth: 1, borderColor: colors.hudBorder, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
+  schedStatus: { color: colors.tech, fontSize: 10, fontFamily: fonts.bold },
   schedTime: { color: colors.muted, fontSize: 12, fontFamily: fonts.medium, flexShrink: 1 },
 
   // Bounded cards (Reviews + Portfolio)
   boundedCard: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 20, padding: 18, marginBottom: 18, ...shadows.card },
   boundedHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14, gap: 12 },
-  boundedEyebrow: { color: colors.teal, fontSize: 10, letterSpacing: 1.4, fontFamily: fonts.bold, marginBottom: 2 },
+  boundedEyebrow: { color: colors.tech, fontSize: 10, letterSpacing: 1.4, fontFamily: fonts.bold, marginBottom: 2 },
   boundedTitle: { color: colors.ink, fontSize: 17, fontFamily: fonts.bold, letterSpacing: -0.2 },
   boundedMeta: { color: colors.muted, fontSize: 11, fontFamily: fonts.semiBold, marginTop: 4, flexShrink: 0 },
 
@@ -1048,13 +1095,13 @@ const styles = StyleSheet.create({
   reviewComment: { color: colors.ink, fontSize: 13, lineHeight: 19, fontFamily: fonts.regular },
   reviewNoComment: { color: colors.muted, fontSize: 12, fontFamily: fonts.regular, fontStyle: 'italic' },
   viewAllButton: { marginTop: 14, minHeight: 44, borderRadius: 12, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  viewAllText: { color: colors.teal, fontSize: 13, fontFamily: fonts.bold },
+  viewAllText: { color: colors.tech, fontSize: 13, fontFamily: fonts.bold },
   emptyRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },
 
   // Portfolio (Preserved as requested)
   portfolioHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 },
   portfolioHeaderCopy: { flex: 1, minWidth: 0 },
-  addPhotosButton: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36, paddingHorizontal: 14, borderRadius: 999, backgroundColor: colors.teal, ...shadows.card, flexShrink: 0 },
+  addPhotosButton: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36, paddingHorizontal: 14, borderRadius: 999, backgroundColor: colors.tech, ...shadows.card, flexShrink: 0 },
   addPhotosText: { color: colors.white, fontSize: 13, fontFamily: fonts.bold, letterSpacing: 0.1 },
   selectedPreview: { marginBottom: 14, gap: 10 },
   photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
@@ -1064,14 +1111,14 @@ const styles = StyleSheet.create({
   uploadAction: { marginTop: 2 },
 
   // Shared buttons
-  primaryButtonSolid: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.teal, borderRadius: 14, paddingHorizontal: 18, minHeight: 48, ...shadows.card },
+  primaryButtonSolid: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.tech, borderRadius: 14, paddingHorizontal: 18, minHeight: 48, ...shadows.card },
   primaryButtonText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
 
   // Footer: Help + Logout
   footerBreak: { marginTop: 8, gap: 12, paddingBottom: 12 },
   footerDivider: { height: 1, backgroundColor: colors.lineSoft, marginBottom: 8 },
   helpRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 16, paddingHorizontal: 16, minHeight: 56, ...shadows.subtle },
-  helpIconWrap: { width: 34, height: 34, borderRadius: 10, backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.hudBorder, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  helpIconWrap: { width: 34, height: 34, borderRadius: 10, backgroundColor: colors.techSoft, borderWidth: 1, borderColor: colors.hudBorder, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   helpCopy: { flex: 1, minWidth: 0 },
   helpTitle: { color: colors.ink, fontSize: 13, fontFamily: fonts.bold },
   helpSub: { color: colors.muted, fontSize: 11, fontFamily: fonts.regular, marginTop: 2 },
@@ -1080,7 +1127,7 @@ const styles = StyleSheet.create({
 
   // Loading / Error
   skeletonAvatar: { width: 68, height: 68, borderRadius: 20 },
-  emptyIconWrap: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.tealLight, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line },
+  emptyIconWrap: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.techSoft, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line },
   emptyTitle: { color: colors.ink, fontSize: 16, fontFamily: fonts.bold, textAlign: 'center' },
   emptyText: { color: colors.muted, fontSize: 13, fontFamily: fonts.regular, textAlign: 'center', lineHeight: 18, paddingHorizontal: 12 },
 });
