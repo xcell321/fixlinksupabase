@@ -416,33 +416,39 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
             </View>
           )}
 
-          {/* Full-width device cards - stacked vertically like Image 2 */}
+          {/* 2x2 device grid - 4 cards only, like Figma design */}
           <View style={styles.quickPickWrap}>
-            {applianceOptions.map((name) => {
-              const isActive = selectedCategoryName === name;
-              return (
-                <TouchableOpacity
-                  key={name}
-                  style={[styles.deviceCard, isActive && styles.deviceCardActive]}
-                  onPress={() => {
-                    const cat = categoryOptions.find((c) => String(c.name || '').trim() === name);
-                    if (cat) pickCategory(cat);
-                    else { setSelectedCategoryName(name); setSelectedDevice(''); }
-                    if (stepErrors.category) setStepErrors((p) => { const n = { ...p }; delete n.category; return n; });
-                  }}
-                  activeOpacity={0.7}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Select ${name}`}
-                  hitSlop={8}
-                >
-                  <View style={[styles.deviceIconTile, isActive && styles.deviceIconTileActive]}>
-                    <Ionicons name={getApplianceIcon(name) as never} size={32} color={isActive ? colors.customer : colors.muted} />
-                  </View>
-                  <Text style={styles.deviceCardText} numberOfLines={2}>{name}</Text>
-                </TouchableOpacity>
-              );
-            })}
+            <View style={styles.deviceGrid}>
+              {applianceOptions.slice(0, 4).map((name) => {
+                const isActive = selectedCategoryName === name;
+                return (
+                  <TouchableOpacity
+                    key={name}
+                    style={[styles.deviceCard, isActive && styles.deviceCardActive]}
+                    onPress={() => {
+                      const cat = categoryOptions.find((c) => String(c.name || '').trim() === name);
+                      if (cat) pickCategory(cat);
+                      else { setSelectedCategoryName(name); setSelectedDevice(''); }
+                      if (stepErrors.category) setStepErrors((p) => { const n = { ...p }; delete n.category; return n; });
+                    }}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Select ${name}`}
+                    hitSlop={8}
+                  >
+                    <View style={[styles.deviceIconTile, isActive && styles.deviceIconTileActive]}>
+                      <Ionicons name={getApplianceIcon(name) as never} size={32} color={isActive ? colors.customer : colors.muted} />
+                    </View>
+                    <Text style={styles.deviceCardText} numberOfLines={2}>{name}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
             {!!stepErrors.category && <Text style={styles.errorText} accessibilityLiveRegion="polite">{stepErrors.category}</Text>}
+            <TouchableOpacity style={styles.viewAllCategoriesRow} onPress={() => setModalVisible(true)} activeOpacity={0.7}>
+              <Text style={styles.viewAllCategoriesText}>Browse all {applianceOptions.length} categories</Text>
+              <Ionicons name="chevron-forward" size={14} color={colors.customer} />
+            </TouchableOpacity>
           </View>
         </View>
       );
@@ -1013,13 +1019,13 @@ const styles = StyleSheet.create({
 
   // quick picks � grouped tight (8) within, generous (16) from next input
   // Prototype 2x2 device grid
-  quickPickWrap: { gap: 16, marginTop: 12 },
-  deviceGrid: { flexDirection: 'column', gap: 16, width: '100%' },
-  deviceCard: { width: '100%', borderRadius: 16, borderWidth: 2, borderColor: colors.line, backgroundColor: colors.canvas, padding: 24, alignItems: 'center', gap: 16, minHeight: 160, justifyContent: 'center', ...shadows.subtle },
+  quickPickWrap: { gap: 14, marginTop: 12 },
+  deviceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, width: '100%' },
+  deviceCard: { width: '48%', borderRadius: 14, borderWidth: 2, borderColor: colors.line, backgroundColor: colors.canvas, padding: 16, alignItems: 'center', gap: 12, minHeight: 130, justifyContent: 'center', ...shadows.subtle },
   deviceCardActive: { borderColor: colors.customer, backgroundColor: colors.customerSoft, ...shadows.card },
-  deviceIconTile: { width: 72, height: 72, borderRadius: 18, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.lineSoft },
+  deviceIconTile: { width: 56, height: 56, borderRadius: 14, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.lineSoft },
   deviceIconTileActive: { backgroundColor: colors.customerMist, borderColor: colors.customer },
-  deviceCardText: { fontSize: 16, fontFamily: fonts.bold, color: colors.ink, textAlign: 'center', lineHeight: 21 },
+  deviceCardText: { fontSize: 13, fontFamily: fonts.semiBold, color: colors.ink, textAlign: 'center', lineHeight: 17 },
   quickPickLabel: { fontSize: 10, fontFamily: fonts.extraBold, color: colors.muted, letterSpacing: 1, textTransform: 'uppercase' as const },
   quickChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, alignItems: 'flex-start' },
   quickChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 999, borderWidth: 1.5, borderColor: colors.line, backgroundColor: colors.white, maxWidth: '48%', minHeight: 48 },
