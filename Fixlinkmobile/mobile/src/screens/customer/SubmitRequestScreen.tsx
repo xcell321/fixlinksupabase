@@ -128,13 +128,41 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
         if (address.street) setStreet(address.street);
         if (address.city) setCity(address.city);
         if (address.postalCode) setZipCode(address.postalCode);
+        if (address.street || address.city) setCoords({ latitude: lat, longitude: lon });
       }
+      // Also try LocationIQ extra for more accurate Bogo barangay
+      try {
+        const iq = await geocodeAddress(`${lat},${lon}`);
+        if (iq) setCoords({ latitude: iq.latitude, longitude: iq.longitude });
+      } catch {}
     } catch (e) {
       Alert.alert('Error', 'Failed to fetch location details.');
     } finally {
       setLocating(false);
     }
   };
+
+  // Auto-detect all location inputs when entering Step 4
+  useEffect(() => {
+    if (currentStep === 4 && !street.trim() && !city.trim()) {
+      handleLocate();
+    }
+  }, [currentStep]);
+
+  // Auto-geocode as user types street/city/zip to keep map in sync
+  useEffect(() => {
+    if (currentStep !== 4) return;
+    const q = composedLocation;
+    if (!q || q.length < 5) return;
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const res = await geocodeAddress(q);
+        if (!cancelled && res) setCoords({ latitude: res.latitude, longitude: res.longitude });
+      } catch {}
+    }, 700);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [composedLocation, currentStep]);
 
   // Optional problem photo: helps the technician see the issue before
   // accepting. Kept local until submit; uploaded as multipart `photo`.
