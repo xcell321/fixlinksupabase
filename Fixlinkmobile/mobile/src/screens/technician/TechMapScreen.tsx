@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import LocationIQMap from '../../components/LocationIQMap';
+import TechnicianLocationMap from '../../components/TechnicianLocationMap';
 import { fetchRepairRequests } from '../services/api';
 import { colors, fonts } from '../../theme';
 import { type JobItem } from '../../utils/availableJobsHelpers';
@@ -67,9 +67,8 @@ export default function TechMapScreen({ technician, onOpenJob }: TechMapScreenPr
           {loading ? (
             <View style={styles.mapLoading}><ActivityIndicator color={BLUE} /></View>
           ) : (
-            <LocationIQMap
+            <TechnicianLocationMap
               technicianCoords={techCoords ? { ...techCoords, name: 'You' } : undefined}
-              currentUserRole="technician"
               isAccepted={false}
               jobPins={pins}
               style={{ height: 220 }}

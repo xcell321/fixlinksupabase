@@ -8,7 +8,7 @@ import DateTimePicker from "../../components/DateTimePicker";
 import { PhotoLightbox } from "../../components/RequestPhoto";
 import { submitRepairRequest, fetchPlatformCategories } from "../services/api";
 import { geocodeAddress } from "../services/locationIq";
-import LocationIQMap from "../../components/LocationIQMap";
+import CustomerLocationMap from "../../components/CustomerLocationMap";
 import { colors, fonts, shadows } from '../../theme';
 import { getApplianceIcon } from '../../utils/applianceIcons';
 
@@ -679,9 +679,8 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
         <Text style={styles.stepSectionTitle}>Repair Location</Text>
         <View style={styles.mapBox}>
           {coords ? (
-            <LocationIQMap
+            <CustomerLocationMap
               customerCoords={{ latitude: coords.latitude, longitude: coords.longitude, name: 'Service location' }}
-              currentUserRole="customer"
               isAccepted={false}
               style={{ height: 144 }}
             />

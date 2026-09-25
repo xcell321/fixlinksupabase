@@ -3,7 +3,7 @@ import React from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { PhotoThumb } from '../../components/RequestPhoto';
-import LocationIQMap from '../../components/LocationIQMap';
+import TechnicianLocationMap from '../../components/TechnicianLocationMap';
 import { colors, fonts, shadows } from '../../theme';
 import { formatJobSchedule, canMarkArrival, canStartRepair, type JobItem } from '../../utils/availableJobsHelpers';
 
@@ -92,10 +92,9 @@ export default function TechJobDetailScreen({
           <Text style={styles.cardTitle}>Job Map</Text>
           {hasCoords ? (
             <>
-              <LocationIQMap
+              <TechnicianLocationMap
                 technicianCoords={techCoords?.latitude != null ? { latitude: techCoords.latitude, longitude: techCoords.longitude, name: 'You' } : undefined}
                 customerCoords={{ latitude: lat, longitude: lng, name: job.customerName || 'Customer', address: job.location || '' }}
-                currentUserRole="technician"
                 isAccepted={!isQueue}
                 style={{ height: 140, borderRadius: 12, overflow: 'hidden' }}
               />
