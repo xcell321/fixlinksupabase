@@ -112,12 +112,12 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
   const [ptab, setPtab] = useState<'info' | 'skills' | 'reviews' | 'portfolio'>('info');
 
   useEffect(() => {
+    let cancelled = false;
     if (!editing || !draft.address.trim()) {
       setDetectedCoords(null);
       setGeoStatus('idle');
-      return;
+      return () => { cancelled = true; };
     }
-    let cancelled = false;
     setGeoStatus('detecting');
     const timer = setTimeout(async () => {
       try {
@@ -957,23 +957,23 @@ const styles = StyleSheet.create({
   coverCard: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 22, padding: 18, marginBottom: 14,
 ...shadows.card },
   // Prototype dark identity header
-  coverCardDark: { backgroundColor: '#0D1B2A', borderRadius: 22, padding: 18, marginBottom: 14 },
-  avatarTech: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center' },
-  coverNameDark: { color: '#FFFFFF', fontSize: 19, fontFamily: fonts.extraBold, letterSpacing: -0.2 },
+  coverCardDark: { backgroundColor: colors.dark, borderRadius: 22, padding: 18, marginBottom: 14 },
+  avatarTech: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.tech, alignItems: 'center', justifyContent: 'center' },
+  coverNameDark: { color: colors.white, fontSize: 19, fontFamily: fonts.extraBold, letterSpacing: -0.2 },
   coverRatingTextDark: { color: '#D1D5DB', fontSize: 12, fontFamily: fonts.medium },
-  coverRatingTextMutedDark: { color: '#9CA3AF', fontSize: 12, fontFamily: fonts.medium },
-  editProfileButtonDark: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#2563EB', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, marginTop: 10, alignSelf: 'flex-start' },
-  editProfileButtonTextDark: { color: '#FFFFFF', fontSize: 12, fontFamily: fonts.bold },
+  coverRatingTextMutedDark: { color: colors.muted, fontSize: 12, fontFamily: fonts.medium },
+  editProfileButtonDark: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.tech, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, marginTop: 10, alignSelf: 'flex-start' },
+  editProfileButtonTextDark: { color: colors.white, fontSize: 12, fontFamily: fonts.bold },
   coverDividerDark: { height: 1, backgroundColor: 'rgba(255,255,255,0.12)', marginVertical: 14 },
   coverContactIconDark: { width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.10)', alignItems: 'center', justifyContent: 'center' },
-  coverContactMetaDark: { color: '#9CA3AF', fontSize: 10, fontFamily: fonts.bold, letterSpacing: 1 },
-  coverContactTextDark: { color: '#FFFFFF', fontSize: 13, fontFamily: fonts.semiBold, marginTop: 2 },
+  coverContactMetaDark: { color: colors.muted, fontSize: 10, fontFamily: fonts.bold, letterSpacing: 1 },
+  coverContactTextDark: { color: colors.white, fontSize: 13, fontFamily: fonts.semiBold, marginTop: 2 },
   // Prototype tab bar: info / skills / reviews / portfolio
   protoTabs: { flexDirection: 'row', backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.line, paddingHorizontal: 20, paddingTop: 8, gap: 8, marginBottom: 16, marginHorizontal: -20, paddingBottom: 0 },
-  protoTab: { paddingBottom: 10, paddingHorizontal: 8, alignItems: 'center' },
-  protoTabText: { color: '#9CA3AF', fontSize: 12, fontFamily: fonts.semiBold },
-  protoTabTextActive: { color: '#2563EB' },
-  protoTabUnderline: { height: 2, backgroundColor: '#2563EB', alignSelf: 'stretch', marginTop: 6, borderRadius: 1 },
+  protoTab: { paddingBottom: 10, paddingHorizontal: 8, alignItems: 'center', minHeight: 44 },
+  protoTabText: { color: colors.muted, fontSize: 12, fontFamily: fonts.semiBold },
+  protoTabTextActive: { color: colors.tech },
+  protoTabUnderline: { height: 2, backgroundColor: colors.tech, alignSelf: 'stretch', marginTop: 6, borderRadius: 1 },
   coverTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
   avatar: { width: 68, height: 68, borderRadius: 20, backgroundColor: colors.tech, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
   avatarImage: { width: 68, height: 68, borderRadius: 20, flexShrink: 0 },
@@ -1017,7 +1017,7 @@ const styles = StyleSheet.create({
   groupLabel: { color: colors.ink, fontSize: 11, fontFamily: fonts.extraBold, letterSpacing: 0.8, marginBottom: 12, marginTop: 8, textTransform: 'uppercase' },
   inputGroup: { gap: 6, marginBottom: 14 },
   inputLabel: { color: colors.ink, fontSize: 12, fontFamily: fonts.semiBold },
-  inputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceSunken, borderWidth: 1, borderColor: colors.line, borderRadius: 14, paddingHorizontal: 14, minHeight: 50 },
+  inputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceSunken, borderWidth: 1, borderColor: colors.line, borderRadius: 14, paddingHorizontal: 14, minHeight: 52 },
   inputContainerMulti: { minHeight: 80, alignItems: 'flex-start', paddingVertical: 10 },
   inputIcon: { marginRight: 10, flexShrink: 0 },
   inputIconMulti: { marginTop: 4 },
@@ -1051,7 +1051,7 @@ const styles = StyleSheet.create({
 
   // Skills
   skillWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  skillChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.techSoft, borderWidth: 1, borderColor: colors.hudBorder, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
+  skillChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.techSoft, borderWidth: 1, borderColor: colors.hudBorder, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, minHeight: 32 },
   skillChipIcon: { flexShrink: 0 },
   skillChipText: { color: colors.ink, fontSize: 12, fontFamily: fonts.semiBold },
 
@@ -1101,7 +1101,7 @@ const styles = StyleSheet.create({
   // Portfolio (Preserved as requested)
   portfolioHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 },
   portfolioHeaderCopy: { flex: 1, minWidth: 0 },
-  addPhotosButton: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36, paddingHorizontal: 14, borderRadius: 999, backgroundColor: colors.tech, ...shadows.card, flexShrink: 0 },
+  addPhotosButton: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, paddingHorizontal: 14, borderRadius: 12, backgroundColor: colors.tech, ...shadows.card, flexShrink: 0 },
   addPhotosText: { color: colors.white, fontSize: 13, fontFamily: fonts.bold, letterSpacing: 0.1 },
   selectedPreview: { marginBottom: 14, gap: 10 },
   photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
@@ -1118,7 +1118,7 @@ const styles = StyleSheet.create({
   footerBreak: { marginTop: 8, gap: 12, paddingBottom: 12 },
   footerDivider: { height: 1, backgroundColor: colors.lineSoft, marginBottom: 8 },
   helpRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 16, paddingHorizontal: 16, minHeight: 56, ...shadows.subtle },
-  helpIconWrap: { width: 34, height: 34, borderRadius: 10, backgroundColor: colors.techSoft, borderWidth: 1, borderColor: colors.hudBorder, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  helpIconWrap: { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.techSoft, borderWidth: 1, borderColor: colors.hudBorder, alignItems: 'center', justifyContent: 'center', flexShrink: 0, minHeight: 44, minWidth: 44 },
   helpCopy: { flex: 1, minWidth: 0 },
   helpTitle: { color: colors.ink, fontSize: 13, fontFamily: fonts.bold },
   helpSub: { color: colors.muted, fontSize: 11, fontFamily: fonts.regular, marginTop: 2 },
