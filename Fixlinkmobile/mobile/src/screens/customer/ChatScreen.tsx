@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import {
   StyleSheet,
   Text,
@@ -86,14 +86,15 @@ const shouldShowDivider = (messages: ChatMessage[], index: number): boolean => {
 const statusIcon = (status: string | undefined): IconName =>
   getStatusIcon(status) as IconName;
 
-// ——— Messenger row ———
+// ��� Messenger row ���
 interface ConversationRowProps {
   item: Conversation;
   currentUid: string;
+  accent: string;
   onOpen: () => void;
 }
 
-const ConversationRow = memo(function ConversationRow({ item, currentUid, onOpen }: ConversationRowProps): React.JSX.Element {
+const ConversationRow = memo(function ConversationRow({ item, currentUid, accent, onOpen }: ConversationRowProps): React.JSX.Element {
   const isUnread = (item.unreadCount ?? 0) > 0;
   const preview = item.lastMessage
     ? `${String(item.lastMessage.senderUid ?? '') === String(currentUid) ? 'You: ' : ''}${item.lastMessage.text}`
@@ -106,48 +107,42 @@ const ConversationRow = memo(function ConversationRow({ item, currentUid, onOpen
       accessibilityLabel={`Open conversation with ${item.peerName}`}
       accessibilityHint={isUnread ? `${item.unreadCount} unread messages` : 'Open chat history'}
       onPress={onOpen}
-      style={({ pressed }) => [styles.rowPressable, pressed && styles.rowPressed]}
+      style={({ pressed }) => [styles.rowCard, pressed && styles.rowPressed]}
     >
-      <View style={styles.rowInner}>
-        {/* Avatar 44-46 */}
-        <View style={[styles.rowAvatar, isUnread && styles.rowAvatarUnread]}>
+      <View style={styles.rowAvatarWrap}>
+        <View style={[styles.rowAvatar, { backgroundColor: accent }]}>
           <Text style={styles.rowAvatarText}>{item.peerInitial}</Text>
-          {isUnread ? <View style={styles.rowAvatarDot} /> : null}
         </View>
-
-        {/* Center */}
-        <View style={styles.rowCenter}>
-          <View style={styles.rowNameRow}>
-            <Text style={[styles.rowName, isUnread && styles.rowNameUnread]} numberOfLines={1}>
-              {item.peerName}
-            </Text>
-            <Text style={[styles.rowTime, isUnread && styles.rowTimeUnread]} numberOfLines={1}>
-              {timeLabel}
-            </Text>
-          </View>
-          <Text style={[styles.rowPreview, isUnread && styles.rowPreviewUnread]} numberOfLines={1}>
-            {preview}
-          </Text>
-          <View style={styles.rowMeta}>
-            <Text style={styles.rowMetaText} numberOfLines={1}>
-              {item.applianceType}
-              {item.jobCode ? `  ·  #${item.jobCode}` : ''}
-            </Text>
-          </View>
-        </View>
-
-        {/* Trailing unread dot */}
-        <View style={styles.rowTrailing}>
-          {isUnread ? <View style={styles.unreadDot} /> : null}
-        </View>
+        <View style={styles.rowOnlineDot} />
       </View>
-      <View style={styles.rowDivider} />
+      <View style={styles.rowCenter}>
+        <View style={styles.rowNameRow}>
+          <Text style={styles.rowName} numberOfLines={1}>
+            {item.peerName}
+          </Text>
+          <Text style={styles.rowTime} numberOfLines={1}>
+            {timeLabel}
+          </Text>
+        </View>
+        <Text style={styles.rowRole} numberOfLines={1}>{item.roleLabel}</Text>
+        <Text style={styles.rowPreview} numberOfLines={1}>
+          {preview}
+        </Text>
+      </View>
+      {isUnread ? (
+        <View style={[styles.rowUnread, { backgroundColor: accent }]}>
+          <Text style={styles.rowUnreadText}>{item.unreadCount}</Text>
+        </View>
+      ) : null}
     </Pressable>
   );
 });
-
-export default function ChatScreen({ currentUser, initialTarget = null, onActiveConversationChange }: ChatScreenProps): React.JSX.Element {
+export default function ChatScreen({ currentUser, initialTarget = null, onActiveConversationChange }:
+ChatScreenProps): React.JSX.Element {
   const isTechnician = currentUser?.role === 'technician';
+  const accent = isTechnician ? colors.tech : colors.customer;
+  const accentDark = isTechnician ? colors.techDark : colors.customerDark;
+  const accentSoft = isTechnician ? colors.techSoft : colors.customerSoft;
   const insets = useSafeAreaInsets();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
@@ -371,12 +366,12 @@ export default function ChatScreen({ currentUser, initialTarget = null, onActive
   };
 
   const inboxSubtitle = totalUnread > 0
-    ? `${totalUnread} unread  ·  ${conversations.length} conversation${conversations.length === 1 ? '' : 's'}`
+    ? `${totalUnread} unread  �  ${conversations.length} conversation${conversations.length === 1 ? '' : 's'}`
     : conversations.length > 0
       ? `${conversations.length} conversation${conversations.length === 1 ? '' : 's'}`
       : 'Your repair conversations will appear here.';
 
-  // ── Thread view — Messenger-style single header + context strip + bubbles + lightweight composer ──
+  // -- Thread view � Messenger-style single header + context strip + bubbles + lightweight composer --
   if (selectedConversation) {
     const s = selectedConversation;
     const peerPhone = s.peerPhone ?? null;
@@ -403,17 +398,14 @@ export default function ChatScreen({ currentUser, initialTarget = null, onActive
             onPress={() => peerPhone && handleCopyPhone(peerPhone)}
             style={styles.headerAvatarWrap}
           >
-            <View style={styles.headerAvatar}>
+            <View style={[styles.headerAvatar, { backgroundColor: accent }]}>
               <Text style={styles.headerAvatarText}>{s.peerInitial}</Text>
             </View>
           </Pressable>
 
           <Pressable style={styles.headerCenter} onPress={() => peerPhone && handleCopyPhone(peerPhone)}>
             <Text style={styles.headerName} numberOfLines={1}>{s.peerName}</Text>
-            <View style={styles.headerSubRow}>
-              <Ionicons name="shield-checkmark" size={12} color={colors.green} style={{ marginTop: 1 }} />
-              <Text style={styles.headerSub} numberOfLines={1}>{s.roleLabel}</Text>
-            </View>
+            <Text style={styles.headerOnline} numberOfLines={1}>Online</Text>
           </Pressable>
 
           <Pressable
@@ -421,38 +413,18 @@ export default function ChatScreen({ currentUser, initialTarget = null, onActive
             accessibilityLabel={peerPhone ? `Call ${s.peerName}` : 'No phone number available'}
             hitSlop={8}
             onPress={() => handleCall(peerPhone, s.peerName)}
-            style={({ pressed }) => [styles.headerCall, pressed && styles.pressedSoft]}
+            style={({ pressed }) => [styles.headerCall, { backgroundColor: accent }, pressed && styles.pressedSoft]}
           >
             <Ionicons name="call" size={18} color={colors.white} />
           </Pressable>
         </View>
 
-        {/* Compact contextual strip — supports conversation, does not dominate */}
-        <Pressable
-          onPress={() => showToast(`${s.applianceType}  ·  #${s.jobCode ?? String(s.jobId).slice(0, 6).toUpperCase()}  ·  ${s.status || 'Active'}`)}
-          style={({ pressed }) => [styles.jobStrip, pressed && { opacity: 0.85 }]}
-        >
-          <View style={styles.jobStripLeft}>
-            <View style={[styles.jobStripIcon, { backgroundColor: stripColor + '14' }]}>
-              <Ionicons name={statusIcon(s.status)} size={13} color={stripColor} />
-            </View>
-            <Text style={styles.jobStripText} numberOfLines={1}>
-              {s.applianceType}
-              {s.jobCode ? `  ·  #${s.jobCode}` : `  ·  #${String(s.jobId).slice(0, 6).toUpperCase()}`}
-            </Text>
-            <Text style={styles.jobStripDot}>•</Text>
-            <Text style={[styles.jobStripStatus, { color: stripColor }]} numberOfLines={1}>{s.status || 'Active'}</Text>
-          </View>
-          <View style={styles.jobStripRight}>
-            <Text style={styles.jobStripAction}>View job</Text>
-            <Ionicons name="chevron-forward" size={12} color={colors.teal} />
-          </View>
-        </Pressable>
+        {/* Prototype: no job strip — Today pill opens the message list date */}
 
         {threadLoading && currentMessages.length > 0 ? (
           <View style={styles.syncRow}>
-            <ActivityIndicator size="small" color={colors.teal} />
-            <Text style={styles.syncText}>Syncing latest messages…</Text>
+            <ActivityIndicator size="small" color={colors.customer} />
+            <Text style={styles.syncText}>Syncing latest messages.</Text>
           </View>
         ) : null}
 
@@ -474,19 +446,19 @@ export default function ChatScreen({ currentUser, initialTarget = null, onActive
           >
             {threadLoading && currentMessages.length === 0 ? (
               <View style={styles.chatLoading}>
-                <ActivityIndicator size="large" color={colors.teal} />
-                <Text style={styles.chatLoadingText}>Loading conversation…</Text>
+                <ActivityIndicator size="large" color={colors.customer} />
+                <Text style={styles.chatLoadingText}>Loading conversation�</Text>
               </View>
             ) : currentMessages.length === 0 ? (
               <View style={styles.chatEmpty}>
                 <View style={styles.chatEmptyIcon}>
-                  <Ionicons name="chatbubble-ellipses-outline" size={28} color={colors.teal} />
+                  <Ionicons name="chatbubble-ellipses-outline" size={28} color={colors.customer} />
                 </View>
                 <Text style={styles.chatEmptyTitle}>Say hello to {s.peerName}</Text>
                 <Text style={styles.chatEmptyBody}>Coordinate scheduling, access, and parts. Your history loads instantly here.</Text>
                 {peerPhone ? (
                   <Pressable onPress={() => handleCopyPhone(peerPhone)} style={({ pressed }) => [styles.chatEmptyPhone, pressed && styles.pressedSoft]}>
-                    <Ionicons name="call-outline" size={14} color={colors.teal} />
+                    <Ionicons name="call-outline" size={14} color={colors.customer} />
                     <Text style={styles.chatEmptyPhoneText}>{peerPhone}</Text>
                     <Text style={styles.chatEmptyPhoneHint}>tap to copy</Text>
                   </Pressable>
@@ -519,7 +491,8 @@ export default function ChatScreen({ currentUser, initialTarget = null, onActive
                       <View
                         style={[
                           styles.bubble,
-                          isMe ? styles.bubbleMe : styles.bubbleOther,
+                          isMe ? null : styles.bubbleOther,
+                          isMe ? { backgroundColor: accent, borderWidth: 0 } : null,
                           msg.pending && styles.bubblePending,
                           isMe
                             ? {
@@ -536,12 +509,12 @@ export default function ChatScreen({ currentUser, initialTarget = null, onActive
                           {msg.text}
                         </Text>
                       </View>
-                      {/* Timestamp shown only for last in group — keeps bubbles lightweight */}
+                      {/* Timestamp shown only for last in group � keeps bubbles lightweight */}
                       {isLastInGroup ? (
                         <Text style={[styles.bubbleTime, isMe ? styles.bubbleTimeMe : styles.bubbleTimeOther]}>
                           {formatMessageTime(msg.timestamp)}
-                          {isMe && read ? '  ·  Read' : ''}
-                          {msg.pending ? '  ·  Sending…' : ''}
+                          {isMe && read ? '  �  Read' : ''}
+                          {msg.pending ? '  �  Sending�' : ''}
                         </Text>
                       ) : null}
                     </View>
@@ -558,22 +531,12 @@ export default function ChatScreen({ currentUser, initialTarget = null, onActive
             </View>
           ) : null}
 
-          {/* Lightweight composer anchored to bottom */}
+          {/* Prototype composer: input + send only */}
           <View style={[styles.composerBar, { paddingBottom: Math.max(8, insets.bottom > 0 ? insets.bottom : 10) }]}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="More options"
-              hitSlop={8}
-              onPress={() => showToast('Attachments coming soon')}
-              style={({ pressed }) => [styles.composerPlus, pressed && styles.pressedSoft]}
-            >
-              <Ionicons name="add" size={22} color={colors.teal} />
-            </Pressable>
-
             <View style={styles.composerInputWrap}>
               <TextInput
                 style={styles.composerInput}
-                placeholder={isTechnician ? 'Message the customer…' : 'Message the technician…'}
+                placeholder={isTechnician ? 'Message the customer�' : 'Message the technician�'}
                 placeholderTextColor="#8AA0B5"
                 value={inputText}
                 onChangeText={setInputText}
@@ -595,6 +558,7 @@ export default function ChatScreen({ currentUser, initialTarget = null, onActive
               disabled={!canSend}
               style={({ pressed }) => [
                 styles.composerSend,
+                { backgroundColor: accent },
                 !canSend && styles.composerSendDisabled,
                 pressed && canSend && styles.pressed,
               ]}
@@ -617,61 +581,13 @@ export default function ChatScreen({ currentUser, initialTarget = null, onActive
     );
   }
 
-  // ── Inbox — Messenger conversation list ──
+  // -- Prototype inbox: dark header, conversation cards, no filters --
   return (
     <SafeAreaView style={styles.inboxContainer} edges={['top']}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
+      <StatusBar barStyle="light-content" backgroundColor="#0D1B2A" />
 
-      {/* Clean header: Messages + supporting count */}
-      <View style={styles.inboxHeader}>
-        <View style={styles.inboxHeaderLeft}>
-          <Text style={styles.inboxTitle}>Messages</Text>
-          <Text style={styles.inboxSubtitle}>{inboxSubtitle}</Text>
-        </View>
-        {totalUnread > 0 ? (
-          <View style={styles.headerUnreadBadge}>
-            <Text style={styles.headerUnreadText}>{totalUnread > 99 ? '99+' : totalUnread} new</Text>
-          </View>
-        ) : null}
-      </View>
-
-      {/* Compact filter — segmented / scrollable */}
-      <View style={styles.filterBar}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterScroll}
-          keyboardShouldPersistTaps="handled"
-        >
-          {filters.map((f) => {
-            const active = statusFilter === f.key;
-            return (
-              <Pressable
-                key={f.key}
-                testID={`filter-${f.key}`}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                accessibilityLabel={`${f.label}, ${f.count} conversations`}
-                hitSlop={6}
-                onPress={() => setStatusFilter(f.key)}
-                style={({ pressed }) => [
-                  styles.filterPill,
-                  active ? styles.filterPillActive : styles.filterPillIdle,
-                  pressed && styles.pressedSoft,
-                ]}
-              >
-                <Text style={[styles.filterLabel, active ? styles.filterLabelActive : styles.filterLabelIdle]}>
-                  {f.label}
-                </Text>
-                <View style={[styles.filterCount, active ? styles.filterCountActive : styles.filterCountIdle]}>
-                  <Text style={[styles.filterCountText, active ? styles.filterCountTextActive : styles.filterCountTextIdle]}>
-                    {f.count}
-                  </Text>
-                </View>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+      <View style={styles.inboxHeaderDark}>
+        <Text style={styles.inboxTitleDark}>Messages</Text>
       </View>
 
       {inboxError ? (
@@ -712,20 +628,20 @@ export default function ChatScreen({ currentUser, initialTarget = null, onActive
         </View>
       ) : (
         <FlatList
-          data={visibleConversations}
+          data={conversations}
           keyExtractor={(item) => String(item.jobId)}
           renderItem={({ item }) => (
-            <ConversationRow item={item} currentUid={currentUser?.uid} onOpen={() => handleOpenConversation(item)} />
+            <ConversationRow item={item} currentUid={currentUser?.uid} accent={accent} onOpen={() => handleOpenConversation(item)} />
           )}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContent}
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
               <View style={styles.emptyIcon}>
-                <Ionicons name="chatbubbles-outline" size={28} color={colors.teal} />
+                <Ionicons name="chatbubbles-outline" size={28} color={colors.customer} />
               </View>
-              <Text style={styles.emptyTitle}>{emptyCopy[statusFilter].title}</Text>
-              <Text style={styles.emptyBody}>{emptyCopy[statusFilter].body}</Text>
+              <Text style={styles.emptyTitle}>No conversations yet</Text>
+              <Text style={styles.emptyBody}>{isTechnician ? 'When you accept a service request, you can coordinate directly with the customer here.' : 'Once a technician accepts your repair request, you can message them here to coordinate scheduling.'}</Text>
             </View>
           }
         />
@@ -748,8 +664,10 @@ const styles = StyleSheet.create({
   pressed: { transform: [{ scale: 0.97 }], opacity: 0.96 },
   pressedSoft: { transform: [{ scale: 0.98 }], opacity: 0.92 },
 
-  // ── Inbox ──
-  inboxContainer: { flex: 1, backgroundColor: colors.white },
+  // -- Prototype inbox: dark header + cards --
+  inboxContainer: { flex: 1, backgroundColor: '#F9FAFB' },
+  inboxHeaderDark: { backgroundColor: '#0D1B2A', paddingHorizontal: 20, paddingTop: 24, paddingBottom: 20, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+  inboxTitleDark: { color: '#FFFFFF', fontSize: 21, fontFamily: fonts.extraBold, letterSpacing: -0.3 },
   inboxHeader: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -766,7 +684,7 @@ const styles = StyleSheet.create({
   inboxTitle: { fontSize: 26, fontFamily: fonts.bold, color: colors.ink, letterSpacing: -0.6, lineHeight: 28 },
   inboxSubtitle: { fontSize: 13, fontFamily: fonts.regular, color: colors.muted, marginTop: 3, lineHeight: 18 },
   headerUnreadBadge: {
-    backgroundColor: colors.teal,
+    backgroundColor: colors.customer,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 999,
@@ -793,7 +711,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   filterPillIdle: { backgroundColor: colors.white, borderColor: colors.line },
-  filterPillActive: { backgroundColor: colors.teal, borderColor: colors.tealDark },
+  filterPillActive: { backgroundColor: colors.customer, borderColor: colors.customerDark },
   filterLabel: { fontSize: 13, fontFamily: fonts.semiBold },
   filterLabelIdle: { color: colors.muted },
   filterLabelActive: { color: colors.white },
@@ -824,7 +742,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: colors.teal,
+    backgroundColor: colors.customer,
     paddingHorizontal: 14,
     minHeight: 36,
     borderRadius: 999,
@@ -832,33 +750,27 @@ const styles = StyleSheet.create({
   },
   inlineRetryText: { color: colors.white, fontSize: 12, fontFamily: fonts.bold },
 
-  rowPressable: { backgroundColor: colors.white },
-  rowPressed: { backgroundColor: '#F8FAFC' },
-  rowInner: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 12 },
+  // Prototype conversation cards
+  rowCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: '#F3F4F6' },
+  rowPressed: { opacity: 0.92 },
+  rowAvatarWrap: { position: 'relative' },
   rowAvatar: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: colors.teal,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  rowAvatarUnread: { backgroundColor: colors.tealDark },
-  rowAvatarText: { color: colors.white, fontFamily: fonts.extraBold, fontSize: 16 },
-  rowAvatarDot: { position: 'absolute', right: -1, bottom: -1, width: 12, height: 12, borderRadius: 6, backgroundColor: colors.teal, borderWidth: 2, borderColor: colors.white },
-  rowCenter: { flex: 1, gap: 2 },
+  rowOnlineDot: { position: 'absolute', right: -1, bottom: -1, width: 12, height: 12, borderRadius: 6, backgroundColor: '#10B981', borderWidth: 2, borderColor: '#FFFFFF' },
+  rowAvatarText: { color: colors.white, fontFamily: fonts.extraBold, fontSize: 15 },
+  rowCenter: { flex: 1, gap: 1, minWidth: 0 },
   rowNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  rowName: { flex: 1, fontSize: 15, fontFamily: fonts.bold, color: colors.ink, lineHeight: 20 },
-  rowNameUnread: { fontFamily: fonts.extraBold, color: colors.ink },
-  rowTime: { fontSize: 11, fontFamily: fonts.medium, color: colors.muted, fontVariant: ['tabular-nums'], flexShrink: 0 },
-  rowTimeUnread: { color: colors.tealDark, fontFamily: fonts.semiBold },
-  rowPreview: { fontSize: 13, fontFamily: fonts.regular, color: colors.muted, lineHeight: 18 },
-  rowPreviewUnread: { color: colors.ink, fontFamily: fonts.semiBold },
-  rowMeta: { flexDirection: 'row', alignItems: 'center' },
-  rowMetaText: { fontSize: 11, fontFamily: fonts.medium, color: '#8AA0B5' },
-  rowTrailing: { width: 12, alignItems: 'center', justifyContent: 'center' },
-  unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.teal },
-  rowDivider: { height: StyleSheet.hairlineWidth, backgroundColor: '#EEF2F7', marginLeft: 74 },
+  rowName: { flex: 1, fontSize: 14, fontFamily: fonts.bold, color: '#111827', lineHeight: 18 },
+  rowTime: { fontSize: 11, fontFamily: fonts.regular, color: '#9CA3AF', fontVariant: ['tabular-nums'], flexShrink: 0 },
+  rowRole: { fontSize: 11, fontFamily: fonts.regular, color: '#6B7280' },
+  rowPreview: { fontSize: 12, fontFamily: fonts.regular, color: '#6B7280', lineHeight: 16, marginTop: 2 },
+  rowUnread: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' },
+  rowUnreadText: { color: '#FFFFFF', fontSize: 10, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
 
   skeletonList: { paddingHorizontal: 16, paddingTop: 12, gap: 16 },
   skeletonRow: { flexDirection: 'row', gap: 12, alignItems: 'center' },
@@ -866,13 +778,13 @@ const styles = StyleSheet.create({
   skeletonCol: { flex: 1, gap: 7 },
   skeletonLineRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
 
-  listContent: { paddingBottom: 24, flexGrow: 1, backgroundColor: colors.white },
+  listContent: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24, flexGrow: 1, backgroundColor: '#F9FAFB', gap: 8 },
   emptyWrap: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingTop: 64, paddingBottom: 32, gap: 10 },
   emptyIcon: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: colors.tealLight,
+    backgroundColor: colors.customerSoft,
     borderWidth: 1,
     borderColor: colors.line,
     alignItems: 'center',
@@ -881,7 +793,7 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 16, fontFamily: fonts.bold, color: colors.ink, textAlign: 'center', marginTop: 4 },
   emptyBody: { fontSize: 13, fontFamily: fonts.regular, color: colors.muted, textAlign: 'center', lineHeight: 19, paddingHorizontal: 8 },
 
-  // ── Thread ──
+  // -- Thread --
   threadContainer: { flex: 1, backgroundColor: colors.canvas },
   threadHeader: {
     flexDirection: 'row',
@@ -906,20 +818,21 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.teal,
+    backgroundColor: colors.customer,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerAvatarText: { color: colors.white, fontFamily: fonts.extraBold, fontSize: 15 },
   headerCenter: { flex: 1, gap: 2, paddingRight: 4 },
   headerName: { fontSize: 15, fontFamily: fonts.bold, color: colors.ink, lineHeight: 18 },
+  headerOnline: { fontSize: 12, fontFamily: fonts.semiBold, color: '#10B981' },
   headerSubRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   headerSub: { fontSize: 12, fontFamily: fonts.semiBold, color: colors.green, flexShrink: 1 },
   headerCall: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: colors.teal,
+    backgroundColor: colors.customer,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -941,7 +854,7 @@ const styles = StyleSheet.create({
   jobStripDot: { fontSize: 10, color: colors.muted, fontFamily: fonts.regular },
   jobStripStatus: { fontSize: 11, fontFamily: fonts.bold, flexShrink: 1 },
   jobStripRight: { flexDirection: 'row', alignItems: 'center', gap: 3, flexShrink: 0 },
-  jobStripAction: { fontSize: 12, fontFamily: fonts.semiBold, color: colors.teal },
+  jobStripAction: { fontSize: 12, fontFamily: fonts.semiBold, color: colors.customer },
 
   syncRow: {
     flexDirection: 'row',
@@ -953,7 +866,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.line,
   },
-  syncText: { fontSize: 11, fontFamily: fonts.semiBold, color: colors.tealDark },
+  syncText: { fontSize: 11, fontFamily: fonts.semiBold, color: colors.customerDark },
 
   chatArea: { padding: 14, paddingTop: 10, flexGrow: 1, paddingBottom: 16 },
   chatLoading: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 64, gap: 12 },
@@ -963,7 +876,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: colors.tealLight,
+    backgroundColor: colors.customerSoft,
     borderWidth: 1,
     borderColor: colors.line,
     alignItems: 'center',
@@ -983,7 +896,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.line,
   },
-  chatEmptyPhoneText: { fontSize: 12, fontFamily: fonts.bold, color: colors.tealDark, fontVariant: ['tabular-nums'] },
+  chatEmptyPhoneText: { fontSize: 12, fontFamily: fonts.bold, color: colors.customerDark, fontVariant: ['tabular-nums'] },
   chatEmptyPhoneHint: { fontSize: 11, fontFamily: fonts.medium, color: colors.muted },
 
   dayDivider: {
@@ -1004,7 +917,7 @@ const styles = StyleSheet.create({
   msgRowGrouped: { marginTop: 1 },
 
   bubble: { maxWidth: '76%', paddingHorizontal: 14, paddingVertical: 9, borderRadius: 18 },
-  bubbleMe: { backgroundColor: colors.teal },
+  bubbleMe: { backgroundColor: colors.customer },
   bubbleOther: { backgroundColor: colors.white, borderWidth: StyleSheet.hairlineWidth, borderColor: '#E3ECF2' },
   bubblePending: { opacity: 0.78 },
   bubbleText: { fontSize: 14, fontFamily: fonts.medium, lineHeight: 19 },
@@ -1040,7 +953,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: colors.tealLight,
+    backgroundColor: colors.customerSoft,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.line,
     alignItems: 'center',
@@ -1063,7 +976,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: colors.teal,
+    backgroundColor: colors.customer,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -1,4 +1,4 @@
-ï»¿// @ts-nocheck - migrated from .js, preserve working state; types to be refined incrementally
+// @ts-nocheck - migrated from .js, preserve working state; types to be refined incrementally
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -57,7 +57,7 @@ const distanceInKm = (first, second) => {
  *  - their own live pin (their account GPS / stored location),
  *  - the customer's pin at the job location,
  *  - a driving route that STAYS drawn and connected to the customer's location
- *    until the technician arrives â€” rail-GPS updates never re-center or clear it.
+ *    until the technician arrives — rail-GPS updates never re-center or clear it.
  */
 export default function TechnicianTrackerScreen({ currentUser, selectedJob: initialJob, onBack, onNavigateToJobs }) {
   const [activeJob, setActiveJob] = useState(initialJob);
@@ -190,7 +190,7 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
   }, [currentUser, isAccepted, activeJob?.id]);
 
   // Live tracking: the technician always sees THEIR OWN pin from the
-  // technician field and the CUSTOMER pin from the customer field â€” 1:1, never
+  // technician field and the CUSTOMER pin from the customer field — 1:1, never
   // swapped. Route/markers are updated imperatively, never re-centered.
   useEffect(() => {
     if (!isAccepted || !activeJob?.id) return undefined;
@@ -233,7 +233,7 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
   // Driving route: computed from the technician to the customer. The route is
   // drawn once both sides have coordinates and then STAYS on the map. It is
   // recomputed only when the CUSTOMER's destination actually changes (or on a
-  // job switch), never on the technician's own GPS ticks â€” so the line remains
+  // job switch), never on the technician's own GPS ticks — so the line remains
   // connected to the customer until the technician arrives.
   const routeDestinationRef = useRef(null);
   const destinationMoved = (destination) => {
@@ -352,7 +352,7 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
 
   const formatSchedule = (job) => {
     if (job?.scheduledDate) return job.scheduledDate;
-    if (job?.preferredDate && job?.preferredTime) return `${job.preferredDate} â€¢ ${job.preferredTime}`;
+    if (job?.preferredDate && job?.preferredTime) return `${job.preferredDate} • ${job.preferredTime}`;
     if (job?.preferredDate) return job.preferredDate;
     if (job?.preferredTime) return job.preferredTime;
     return job?.status || 'Scheduled';
@@ -362,7 +362,7 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
     return (
       <View style={styles.emptyContainer}>
         <View style={styles.emptyIconWrap}>
-          <Ionicons name="map-outline" size={42} color={colors.teal} />
+          <Ionicons name="map-outline" size={42} color={colors.tech} />
         </View>
         <Text style={styles.emptyTitle}>No Active Job Selected</Text>
         <Text style={styles.emptySubtitle}>
@@ -378,7 +378,7 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
 
   return (
     <View style={styles.container}>
-      {/* MAP HERO â€” largest visual area, hero treatment */}
+      {/* MAP HERO — largest visual area, hero treatment */}
       <View style={styles.mapArea}>
         <LocationIQMap
           key={activeJob?.id || 'tech-job'}
@@ -390,7 +390,7 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
           style={styles.map}
         />
 
-        {/* Unified map control family â€” white surface, subtle border/shadow, 44px min touch */}
+        {/* Unified map control family — white surface, subtle border/shadow, 44px min touch */}
         {acceptedJobsList.length > 1 && !jobsExpanded && (
           <View style={styles.mapControlsGroup} pointerEvents="box-none">
             <TouchableOpacity
@@ -402,7 +402,7 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
             >
               <View style={styles.activeJobsControlLeft}>
                 <View style={styles.activeJobsIconWrap}>
-                  <Ionicons name="briefcase-outline" size={16} color={colors.teal} />
+                  <Ionicons name="briefcase-outline" size={16} color={colors.tech} />
                 </View>
                 <Text style={styles.activeJobsLabel}>Active</Text>
                 <View style={[styles.activeJobsBadge, acceptedJobsList.length >= 6 && { backgroundColor: colors.danger, borderWidth: 1, borderColor: colors.danger }]}>
@@ -415,9 +415,9 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
         )}
       </View>
 
-      {/* BOTTOM NAVIGATION PANEL â€” single coherent dispatch workspace */}
+      {/* BOTTOM NAVIGATION PANEL — single coherent dispatch workspace */}
       <View style={styles.bottomPanel}>
-        {/* ACTIVE JOBS â€” expanded utility (when toggled) */}
+        {/* ACTIVE JOBS — expanded utility (when toggled) */}
         {acceptedJobsList.length > 1 && jobsExpanded && (
           <View style={styles.activeJobsExpanded}>
             <TouchableOpacity
@@ -427,7 +427,7 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
               accessibilityRole="button"
             >
               <View style={styles.activeJobsExpandedHeaderLeft}>
-                <Ionicons name="briefcase-outline" size={15} color={colors.teal} />
+                <Ionicons name="briefcase-outline" size={15} color={colors.tech} />
                 <Text style={styles.activeJobsExpandedTitle}>Active jobs</Text>
                 <View style={[styles.activeJobsBadge, acceptedJobsList.length >= 6 && { backgroundColor: colors.danger, borderWidth: 1, borderColor: colors.danger }]}>
                   <Text style={styles.activeJobsBadgeText}>{acceptedJobsList.length}</Text>
@@ -455,7 +455,7 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
                       <Ionicons
                         name={iconName}
                         size={16}
-                        color={isSelected ? colors.white : colors.teal}
+                        color={isSelected ? colors.white : colors.tech}
                       />
                     </View>
                     <View style={styles.jobCopy}>
@@ -469,12 +469,12 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
                         style={[styles.jobCustomer, isSelected && styles.jobCustomerSelected]}
                         numberOfLines={1}
                       >
-                        {job.customerName || 'Customer'} â€¢ {formatSchedule(job)}
+                        {job.customerName || 'Customer'} • {formatSchedule(job)}
                       </Text>
                     </View>
                     {isSelected ? (
                       <View style={styles.selectedCheck}>
-                        <Ionicons name="checkmark" size={14} color={colors.teal} />
+                        <Ionicons name="checkmark" size={14} color={colors.tech} />
                       </View>
                     ) : (
                       <Ionicons name="chevron-forward-outline" size={14} color={colors.muted} />
@@ -486,12 +486,12 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
           </View>
         )}
 
-        {/* When collapsed but has jobs, show inline compact bar at top of panel alternative position â€” only if not overlaying map? We keep map overlay for collapsed to save panel space. */}
+        {/* When collapsed but has jobs, show inline compact bar at top of panel alternative position — only if not overlaying map? We keep map overlay for collapsed to save panel space. */}
 
-        {/* TRIP SUMMARY â€” single coherent navigation summary â€” white circular icons like customer */}
+        {/* TRIP SUMMARY — single coherent navigation summary — white circular icons like customer */}
         <View style={styles.tripSummary}>
           <View style={styles.tripCell}>
-            <View style={styles.tripIconWrap}><Ionicons name="navigate-outline" size={14} color={colors.teal} /></View>
+            <View style={styles.tripIconWrap}><Ionicons name="navigate-outline" size={14} color={colors.tech} /></View>
             <Text style={styles.tripLabel}>DISTANCE</Text>
             <Text style={styles.tripValue} numberOfLines={1}>
               {distanceKm != null ? `${distanceKm} km` : '--'}
@@ -501,7 +501,7 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
           <View style={styles.tripDivider} />
 
           <View style={styles.tripCell}>
-            <View style={styles.tripIconWrap}><Ionicons name="time-outline" size={14} color={colors.teal} /></View>
+            <View style={styles.tripIconWrap}><Ionicons name="time-outline" size={14} color={colors.tech} /></View>
             <Text style={styles.tripLabel}>ETA</Text>
             <Text style={styles.tripValue} numberOfLines={1}>
               {travelMinutes != null ? `${travelMinutes} min` : routeCoordinates.length ? 'Live' : '--'}
@@ -513,27 +513,27 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
           <View style={styles.tripCell}>
             <View style={[styles.tripIconWrap, isAccepted && ownCoords?.latitude != null && !arrived && styles.tripIconWrapActive]}><Ionicons name={isAccepted && ownCoords?.latitude != null && !arrived ? "locate-outline" : "radio-outline"} size={14} color={isAccepted && ownCoords?.latitude != null && !arrived ? colors.white : colors.muted} /></View>
             <Text style={styles.tripLabel}>TRACKING</Text>
-            <Text style={[styles.tripValue, isAccepted && ownCoords?.latitude != null && !arrived && styles.tripValueActive]} numberOfLines={1}>{isAccepted ? (arrived ? 'Arrived' : ownCoords?.latitude != null ? 'Active' : 'Locatingâ€¦') : 'Locked'}</Text>
+            <Text style={[styles.tripValue, isAccepted && ownCoords?.latitude != null && !arrived && styles.tripValueActive]} numberOfLines={1}>{isAccepted ? (arrived ? 'Arrived' : ownCoords?.latitude != null ? 'Active' : 'Locating…') : 'Locked'}</Text>
           </View>
         </View>
 
         <View style={styles.sectionDivider} />
 
-        {/* SERVICE DESTINATION â€” matches Customer Map alignment */}
+        {/* SERVICE DESTINATION — matches Customer Map alignment */}
         <View style={styles.destinationRow}>
           <View style={styles.personIconWrap}>
-            <Ionicons name="person-outline" size={18} color={colors.teal} />
+            <Ionicons name="person-outline" size={18} color={colors.tech} />
           </View>
           <View style={styles.destinationCopy}>
             <Text style={styles.destinationKicker}>SERVICE DESTINATION</Text>
             <Text style={styles.destinationName} numberOfLines={1}>{customerCoords.name}</Text>
-            <Text style={styles.destinationMeta} numberOfLines={1}>{activeJob?.applianceType || 'Repair request'} â€¢ {customerCoords.latitude != null ? customerCoords.address : 'Resolving locationâ€¦'}</Text>
+            <Text style={styles.destinationMeta} numberOfLines={1}>{activeJob?.applianceType || 'Repair request'} • {customerCoords.latitude != null ? customerCoords.address : 'Resolving location…'}</Text>
           </View>
         </View>
 
         <View style={styles.sectionDivider} />
 
-        {/* PRIMARY NAVIGATION â€” strongest action */}
+        {/* PRIMARY NAVIGATION — strongest action */}
         <TouchableOpacity
           style={styles.primaryCta}
           onPress={handleOpenGoogleMapsNavigation}
@@ -544,7 +544,7 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
           <Text style={styles.primaryCtaText}>Navigate in Google Maps GPS</Text>
         </TouchableOpacity>
 
-        {/* SECONDARY ACTIONS â€” subordinate to primary */}
+        {/* SECONDARY ACTIONS — subordinate to primary */}
         <View style={styles.secondaryGroup}>
           <TouchableOpacity
             style={styles.secondaryBtn}
@@ -555,7 +555,7 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
             accessibilityLabel="Center route"
           >
             {isRouting ? (
-              <ActivityIndicator color={colors.teal} size="small" />
+              <ActivityIndicator color={colors.tech} size="small" />
             ) : (
               <Text style={styles.secondaryBtnText}>Center Route</Text>
             )}
@@ -580,11 +580,11 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.canvas },
 
-  // Map hero â€” dominant
+  // Map hero — dominant
   mapArea: { flex: 1, minHeight: 280, position: 'relative', backgroundColor: '#EEF2F5' },
   map: { flex: 1 },
 
-  // Map controls â€” native navigation family
+  // Map controls — native navigation family
   mapControlsGroup: {
     position: 'absolute',
     top: 12,
@@ -631,7 +631,7 @@ const styles = StyleSheet.create({
   },
   activeJobsBadgeText: { color: colors.white, fontSize: 11, fontFamily: fonts.bold, textAlign: 'center' },
 
-  // Bottom panel â€” ONE coherent navigation workspace
+  // Bottom panel — ONE coherent navigation workspace
   bottomPanel: {
     backgroundColor: colors.white,
     paddingHorizontal: 16,
@@ -689,8 +689,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   jobRowSelected: {
-    backgroundColor: colors.teal,
-    borderColor: colors.teal,
+    backgroundColor: colors.tech,
+    borderColor: colors.tech,
   },
   jobIconWrap: {
     width: 36,
@@ -720,7 +720,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // Trip summary â€” ONE compact surface â€” white circular icon backgrounds like customer
+  // Trip summary — ONE compact surface — white circular icon backgrounds like customer
   tripSummary: {
     backgroundColor: '#F4F8FA',
     borderRadius: 14,
@@ -734,27 +734,27 @@ const styles = StyleSheet.create({
   },
   tripCell: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6, gap: 4 },
   tripIconWrap: { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.lineSoft, alignItems: 'center', justifyContent: 'center' },
-  tripIconWrapActive: { backgroundColor: colors.teal, borderColor: colors.teal },
+  tripIconWrapActive: { backgroundColor: colors.tech, borderColor: colors.tech },
   tripCellHeader: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   tripLabel: { color: colors.muted, fontSize: 10, fontFamily: fonts.bold, letterSpacing: 0.7, textTransform: 'uppercase' as const },
   tripValue: { color: colors.ink, fontSize: 13, fontFamily: fonts.bold, fontVariant: ['tabular-nums'] as const, textAlign: 'center', marginTop: 2, lineHeight: 18 },
-  tripValueActive: { color: colors.teal },
+  tripValueActive: { color: colors.tech },
   trackingValueRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   liveDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: colors.muted, opacity: 0.6 },
-  liveDotActive: { backgroundColor: colors.teal, opacity: 1 },
+  liveDotActive: { backgroundColor: colors.tech, opacity: 1 },
   tripDivider: { width: 1, backgroundColor: colors.line, alignSelf: 'stretch', marginVertical: 4, opacity: 0.9 },
 
   sectionDivider: { height: 1, backgroundColor: colors.lineSoft, marginHorizontal: 2 },
 
-  // Service destination â€” hierarchy without card
+  // Service destination — hierarchy without card
   destinationSection: { gap: 8, paddingVertical: 2 },
-  destinationKicker: { color: colors.teal, fontSize: 10, letterSpacing: 1.0, fontFamily: fonts.bold, marginBottom: 2, textTransform: 'uppercase' as const },
+  destinationKicker: { color: colors.tech, fontSize: 10, letterSpacing: 1.0, fontFamily: fonts.bold, marginBottom: 2, textTransform: 'uppercase' as const },
   destinationRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 14, borderWidth: 1, borderColor: colors.lineSoft, backgroundColor: colors.surfaceSunken },
   personIconWrap: {
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: colors.tealLight,
+    backgroundColor: colors.techSoft,
     borderWidth: 1,
     borderColor: colors.hudBorder,
     alignItems: 'center',
@@ -765,12 +765,12 @@ const styles = StyleSheet.create({
   destinationName: { color: colors.ink, fontSize: 15, fontFamily: fonts.bold, lineHeight: 18 },
   destinationMeta: { color: colors.muted, fontSize: 11, fontFamily: fonts.regular, lineHeight: 15, marginTop: 2 },
 
-  // Primary CTA â€” strongest
+  // Primary CTA — strongest
   primaryCta: {
     width: '100%',
     height: 54,
     borderRadius: 14,
-    backgroundColor: colors.teal,
+    backgroundColor: colors.tech,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -779,7 +779,7 @@ const styles = StyleSheet.create({
   },
   primaryCtaText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold, letterSpacing: 0.1 },
 
-  // Secondary group â€” subordinate
+  // Secondary group — subordinate
   secondaryGroup: { flexDirection: 'column', gap: 8 },
   secondaryBtn: {
     width: '100%',
@@ -787,14 +787,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: colors.white,
     borderWidth: 1.5,
-    borderColor: colors.teal,
+    borderColor: colors.tech,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
     paddingHorizontal: 14,
   },
-  secondaryBtnText: { color: colors.teal, fontSize: 13, fontFamily: fonts.bold },
+  secondaryBtnText: { color: colors.tech, fontSize: 13, fontFamily: fonts.bold },
   quietBtn: {
     width: '100%',
     height: 44,
@@ -815,6 +815,6 @@ const styles = StyleSheet.create({
   emptyIconWrap: { width: 72, height: 72, borderRadius: 18, backgroundColor: '#E6F6F3', borderWidth: 1, borderColor: '#CBE7E1', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   emptyTitle: { color: colors.ink, fontSize: 18, fontFamily: fonts.bold, marginBottom: 8, textAlign: 'center' },
   emptySubtitle: { color: colors.muted, fontSize: 13, textAlign: 'center', lineHeight: 19, marginBottom: 20, fontFamily: fonts.regular, paddingHorizontal: 12 },
-  emptyButton: { height: 48, borderRadius: 12, backgroundColor: colors.teal, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 160, justifyContent: 'center' },
+  emptyButton: { height: 48, borderRadius: 12, backgroundColor: colors.tech, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 160, justifyContent: 'center' },
   emptyButtonText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
 });

@@ -1,12 +1,19 @@
-﻿// @ts-nocheck - migrated from .js, preserve working state; types to be refined incrementally
-import React, { useState } from 'react';
+// @ts-nocheck - migrated from .js, preserve working state; types to be refined incrementally
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView, TextInput, Alert, ActivityIndicator, Image, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { colors, fonts } from '../../theme';
 import HelpSheet from '../../components/HelpSheet';
+import { fetchCompletedJobs, fetchCustomerRequests } from '../services/api';
 
-export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile }) {
+// Prototype CustomerProfile: dark header + stats + menu list + red sign out.
+// Edit Profile kept as sub-view (prototype EditProfile). Stats are real counts.
+const ORANGE = colors.customer;
+const DARK = colors.dark;
+const ACTIVE_STATUSES = ['accepted', 'confirmed', 'customer ready', 'in progress'];
+
+export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile, onNavigateToProgress, onOpenNotifications }) {
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(user?.name || '');
   const [phone, setPhone] = useState(user?.phone || '');
@@ -14,6 +21,27 @@ export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile 
   const [profileImage, setProfileImage] = useState(user?.profileImage || null);
   const [loading, setLoading] = useState(false);
   const [helpVisible, setHelpVisible] = useState(false);
+  const [completedCount, setCompletedCount] = useState(0);
+  const [activeCount, setActiveCount] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      fetchCompletedJobs(user?.name, user?.uid).catch(() => []),
+      fetchCustomerRequests(user?.name, user?.uid).catch(() => []),
+    ]).then(([completed, tracked]) => {
+      if (!active) return;
+      const c = Array.isArray(completed) ? completed : [];
+      const t = Array.isArray(tracked) ? tracked : [];
+      setCompletedCount(c.length);
+      setActiveCount(t.filter((r) => ACTIVE_STATUSES.includes(String(r.status || '').toLowerCase())).length);
+      setTotalCount(c.length + t.length);
+    });
+    return () => { active = false; };
+  }, [user?.name, user?.uid]);
+
+  const initials = String(name || user?.name || 'C').trim().charAt(0).toUpperCase();
 
   const pickImage = async () => {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -21,14 +49,12 @@ export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile 
       Alert.alert('Permission required', 'Permission to access camera roll is required!');
       return;
     }
-
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
     });
-
     if (!result.canceled && result.assets && result.assets.length > 0) {
       setProfileImage(result.assets[0]);
     }
@@ -39,16 +65,10 @@ export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile 
       Alert.alert('Error', 'Name cannot be empty.');
       return;
     }
-
     setLoading(true);
     try {
       if (onUpdateProfile) {
-        await onUpdateProfile({
-          name: name.trim(),
-          phone: phone.trim(),
-          address: address.trim(),
-          profileImage,
-        });
+        await onUpdateProfile({ name: name.trim(), phone: phone.trim(), address: address.trim(), profileImage });
       }
       setIsEditing(false);
       Alert.alert('Success', 'Profile updated successfully!');
@@ -60,142 +80,80 @@ export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile 
     }
   };
 
-  return (
-    <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-      <View style={styles.card}>
-        <View style={styles.profileHeader}>
-          <TouchableOpacity onPress={isEditing ? pickImage : undefined} activeOpacity={isEditing ? 0.7 : 1} style={styles.avatarContainer}>
-            {profileImage ? (
-              <Image source={{ uri: profileImage }} style={styles.avatarImage} />
-            ) : (
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{(name || 'C').charAt(0).toUpperCase()}</Text>
-              </View>
-            )}
-            {isEditing && (
-              <View style={styles.cameraOverlay}>
-                <Ionicons name="camera" size={16} color={colors.white} />
-              </View>
-            )}
+  if (isEditing) {
+    return (
+      <ScrollView contentContainerStyle={styles.editScroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <View style={styles.editHeader}>
+          <TouchableOpacity onPress={() => setIsEditing(false)} style={styles.backBtn} accessibilityRole="button" accessibilityLabel="Back to profile">
+            <Ionicons name="arrow-back" size={18} color={colors.ink} />
           </TouchableOpacity>
-
-          <View style={styles.identity}>
-            <Text style={styles.name} numberOfLines={1}>{name || 'Customer Name'}</Text>
-            <View style={styles.roleBadge}>
-              <Text style={styles.role}>Customer</Text>
-            </View>
-          </View>
-
-          {!isEditing && (
-            <TouchableOpacity style={styles.editIconButton} onPress={() => setIsEditing(true)}>
-              <Ionicons name="pencil-outline" size={18} color={colors.teal} />
-            </TouchableOpacity>
-          )}
+          <Text style={styles.editTitle}>Edit Profile</Text>
+          <View style={{ width: 36 }} />
         </View>
-
-        <View style={styles.cardHeader}>
-          <Text style={styles.kicker}>DETAILS</Text>
-          <Text style={styles.title}>{isEditing ? 'Edit Profile' : 'Contact Information'}</Text>
+        <View style={styles.avatarCenter}>
+          <TouchableOpacity onPress={pickImage} activeOpacity={0.8}>
+            {profileImage ? (
+              <Image source={{ uri: typeof profileImage === 'string' ? profileImage : profileImage.uri }} style={styles.avatarLg} />
+            ) : (
+              <View style={styles.avatarLgPh}><Text style={styles.avatarLgText}>{initials}</Text></View>
+            )}
+            <View style={styles.cameraBadge}><Ionicons name="pencil" size={12} color="#FFFFFF" /></View>
+          </TouchableOpacity>
+          <Text style={styles.changePhoto}>Change Photo</Text>
         </View>
+        <Text style={styles.label}>FIRST NAME</Text>
+        <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Alex" placeholderTextColor="#9CA3AF" />
+        <Text style={styles.label}>PHONE</Text>
+        <TextInput style={styles.input} value={phone} onChangeText={setPhone} placeholder="+1 555 000 0000" placeholderTextColor="#9CA3AF" keyboardType="phone-pad" />
+        <Text style={styles.label}>ADDRESS</Text>
+        <TextInput style={styles.input} value={address} onChangeText={setAddress} placeholder="142 Oak St, Apt 3B" placeholderTextColor="#9CA3AF" />
+        <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={loading} activeOpacity={0.88}>
+          {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.saveBtnText}>Save Changes</Text>}
+        </TouchableOpacity>
+      </ScrollView>
+    );
+  }
 
-        <View style={styles.form}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Full Name</Text>
-            <View style={styles.inputContainer}>
-              <Ionicons name="person-outline" size={20} color={colors.muted} style={styles.inputIcon} />
-              {isEditing ? (
-                <TextInput
-                  style={styles.textInput}
-                  value={name}
-                  onChangeText={setName}
-                  placeholder="Full Name"
-                  placeholderTextColor={colors.muted}
-                />
-              ) : (
-                <Text style={styles.infoValue}>{name || 'Not Available'}</Text>
-              )}
-            </View>
-          </View>
+  const menu = [
+    { key: 'account', label: 'Account Information', icon: 'person-outline', onPress: () => setIsEditing(true) },
+    { key: 'history', label: 'Repair History', icon: 'construct-outline', onPress: () => onNavigateToProgress && onNavigateToProgress() },
+    { key: 'notifications', label: 'Notifications', icon: 'notifications-outline', onPress: () => onOpenNotifications && onOpenNotifications() },
+    { key: 'help', label: 'Help & Support', icon: 'chatbubble-ellipses-outline', onPress: () => setHelpVisible(true) },
+  ];
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Email Address</Text>
-            <View style={[styles.inputContainer, styles.disabledInput]}>
-              <Ionicons name="mail-outline" size={20} color={colors.muted} style={styles.inputIcon} />
-              <Text style={[styles.infoValue, { color: colors.muted }]}>{user?.email || 'Not Available'}</Text>
-            </View>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Phone Number</Text>
-            <View style={styles.inputContainer}>
-              <Ionicons name="call-outline" size={20} color={colors.muted} style={styles.inputIcon} />
-              {isEditing ? (
-                <TextInput
-                  style={styles.textInput}
-                  value={phone}
-                  onChangeText={setPhone}
-                  placeholder="09XX XXX XXXX"
-                  placeholderTextColor={colors.muted}
-                  keyboardType="phone-pad"
-                />
-              ) : (
-                <Text style={styles.infoValue}>{phone || '+1 (555) 000-0000'}</Text>
-              )}
-            </View>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Service Address</Text>
-            <View style={[styles.inputContainer, styles.textAreaContainer, isEditing && { height: 80 }]}>
-              <Ionicons name="location-outline" size={20} color={colors.muted} style={[styles.inputIcon, isEditing ? { alignSelf: 'flex-start', marginTop: 14 } : { alignSelf: 'center' }]} />
-              {isEditing ? (
-                <TextInput
-                  style={[styles.textInput, styles.textArea]}
-                  value={address}
-                  onChangeText={setAddress}
-                  placeholder="House number, street, barangay, city"
-                  placeholderTextColor={colors.muted}
-                  multiline
-                />
-              ) : (
-                <Text style={[styles.infoValue, { paddingTop: 14, paddingBottom: 14 }]}>{address || 'No address provided'}</Text>
-              )}
-            </View>
-          </View>
-
-          {isEditing ? (
-            <View style={styles.buttonRow}>
-              <TouchableOpacity style={styles.cancelButton} onPress={() => setIsEditing(false)} disabled={loading}>
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={loading}>
-                {loading ? <ActivityIndicator color={colors.white} /> : <Text style={styles.primaryButtonText}>Save Changes</Text>}
-              </TouchableOpacity>
-            </View>
+  return (
+    <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <View style={styles.header}>
+        <View style={styles.avatarWrap}>
+          {profileImage ? (
+            <Image source={{ uri: typeof profileImage === 'string' ? profileImage : profileImage.uri }} style={styles.avatar} />
           ) : (
-            <>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Help and how it works"
-                onPress={() => setHelpVisible(true)}
-                style={({ pressed }) => [styles.helpRow, pressed && styles.pressedSoft]}
-              >
-                <View style={styles.helpIconWrap}>
-                  <Ionicons name="help-circle-outline" size={18} color={colors.teal} />
-                </View>
-                <View style={styles.helpCopy}>
-                  <Text style={styles.helpTitle}>Help & How It Works</Text>
-                  <Text style={styles.helpSub}>Workflow, tracking, OTP and reviews</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={colors.muted} />
-              </Pressable>
-              <TouchableOpacity style={styles.logoutButton} onPress={onLogout}>
-                <Ionicons name="log-out-outline" size={18} color="#DC2626" />
-                <Text style={styles.logoutText}>Log Out</Text>
-              </TouchableOpacity>
-            </>
+            <View style={[styles.avatar, styles.avatarPh]}><Text style={styles.avatarText}>{initials}</Text></View>
           )}
         </View>
+        <Text style={styles.name} numberOfLines={1}>{user?.name || 'Customer'}</Text>
+        <Text style={styles.email} numberOfLines={1}>{user?.email || ''}</Text>
+        <View style={styles.statsRow}>
+          {[{ v: String(totalCount), l: 'Requests' }, { v: String(activeCount), l: 'Active' }, { v: String(completedCount), l: 'Completed' }].map((s) => (
+            <View key={s.l} style={styles.stat}>
+              <Text style={styles.statValue}>{s.v}</Text>
+              <Text style={styles.statLabel}>{s.l}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+      <View style={styles.body}>
+        {menu.map((item) => (
+          <Pressable key={item.key} onPress={item.onPress} style={({ pressed }) => [styles.menuRow, pressed && { opacity: 0.9 }]} accessibilityRole="button" accessibilityLabel={item.label}>
+            <View style={styles.menuIcon}><Ionicons name={item.icon} size={18} color={ORANGE} /></View>
+            <Text style={styles.menuLabel}>{item.label}</Text>
+            <Ionicons name="chevron-forward" size={16} color="#D1D5DB" />
+          </Pressable>
+        ))}
+        <TouchableOpacity style={styles.logoutRow} onPress={onLogout} activeOpacity={0.88} accessibilityRole="button" accessibilityLabel="Sign out">
+          <View style={styles.logoutIcon}><Ionicons name="close" size={18} color="#EF4444" /></View>
+          <Text style={styles.logoutText}>Sign Out</Text>
+        </TouchableOpacity>
       </View>
       <HelpSheet visible={helpVisible} role="customer" onClose={() => setHelpVisible(false)} />
     </ScrollView>
@@ -203,43 +161,39 @@ export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile 
 }
 
 const styles = StyleSheet.create({
-  scrollContent: { flexGrow: 1, padding: 20, backgroundColor: colors.canvas, justifyContent: 'center' },
-  card: { backgroundColor: colors.white, borderRadius: 24, padding: 24, borderWidth: 1, borderColor: colors.line, boxShadow: '0 8px 16px rgba(16,42,67,0.1)', elevation: 6 },
-  profileHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 24, paddingBottom: 20, borderBottomWidth: 1, borderBottomColor: colors.line },
-  avatarContainer: { position: 'relative', marginRight: 16 },
-  avatar: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.teal, justifyContent: 'center', alignItems: 'center' },
-  avatarImage: { width: 64, height: 64, borderRadius: 32 },
-  cameraOverlay: { position: 'absolute', bottom: 0, right: 0, backgroundColor: colors.teal, width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: colors.white },
-  avatarText: { color: colors.white, fontSize: 26, fontFamily: fonts.extraBold },
-  identity: { flex: 1, justifyContent: 'center' },
-  name: { color: colors.ink, fontSize: 20, fontFamily: fonts.bold, marginBottom: 4 },
-  roleBadge: { backgroundColor: '#F0FDF4', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, alignSelf: 'flex-start', borderWidth: 1, borderColor: '#BBF7D0' },
-  role: { color: colors.teal, fontSize: 11, fontFamily: fonts.semiBold },
-  editIconButton: { padding: 8, borderRadius: 10, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line },
-  cardHeader: { marginBottom: 16 },
-  kicker: { color: colors.teal, fontSize: 10, letterSpacing: 1.5, fontFamily: fonts.bold, marginBottom: 4 },
-  title: { color: colors.ink, fontSize: 20, fontFamily: fonts.bold },
-  form: { gap: 16 },
-  inputGroup: { gap: 6 },
-  inputLabel: { color: colors.ink, fontSize: 12, fontFamily: fonts.semiBold },
-  inputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, borderRadius: 14, paddingHorizontal: 14, minHeight: 50 },
-  disabledInput: { backgroundColor: '#F0F4F8' },
-  textAreaContainer: { minHeight: 50, alignItems: 'center' },
-  inputIcon: { marginRight: 10, alignSelf: 'center' },
-  textInput: { flex: 1, color: colors.ink, fontSize: 14, fontFamily: fonts.medium, paddingVertical: 12 },
-  textArea: { height: 60, textAlignVertical: 'top', paddingTop: 12 },
-  infoValue: { flex: 1, color: colors.ink, fontSize: 14, fontFamily: fonts.medium, paddingVertical: 14 },
-  buttonRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
-  cancelButton: { flex: 1, height: 50, borderRadius: 14, borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.canvas },
-  cancelButtonText: { color: colors.muted, fontSize: 14, fontFamily: fonts.bold },
-  saveButton: { flex: 2, height: 50, borderRadius: 14, backgroundColor: colors.teal, alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 8px rgba(15,118,110,0.2)', elevation: 4 },
-  logoutButton: { backgroundColor: '#FFF5F5', borderWidth: 1, borderColor: '#FECACA', height: 50, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 16 },
-  logoutText: { color: '#DC2626', fontSize: 14, fontFamily: fonts.bold },
-  primaryButtonText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold, letterSpacing: 0.5 },
-  pressedSoft: { transform: [{ scale: 0.97 }], opacity: 0.94 },
-  helpRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 14, paddingHorizontal: 14, minHeight: 52, marginTop: 12 },
-  helpIconWrap: { width: 36, height: 36, borderRadius: 11, backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.hudBorder, alignItems: 'center', justifyContent: 'center' },
-  helpCopy: { flex: 1 },
-  helpTitle: { color: colors.ink, fontSize: 13, fontFamily: fonts.bold },
-  helpSub: { color: colors.muted, fontSize: 11, fontFamily: fonts.regular, marginTop: 2 },
+  screen: { flex: 1, backgroundColor: '#F9FAFB' },
+  content: { paddingBottom: 28 },
+  header: { backgroundColor: DARK, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 32, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, alignItems: 'center' },
+  avatarWrap: { marginBottom: 12 },
+  avatar: { width: 56, height: 56, borderRadius: 28 },
+  avatarPh: { backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: '#FFFFFF', fontSize: 22, fontFamily: fonts.extraBold },
+  name: { color: '#FFFFFF', fontSize: 20, fontFamily: fonts.extraBold },
+  email: { color: '#9CA3AF', fontSize: 13, fontFamily: fonts.regular, marginTop: 2 },
+  statsRow: { flexDirection: 'row', gap: 24, marginTop: 16 },
+  stat: { alignItems: 'center' },
+  statValue: { color: '#FFFFFF', fontSize: 17, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
+  statLabel: { color: '#9CA3AF', fontSize: 11, fontFamily: fonts.regular, marginTop: 2 },
+  body: { paddingHorizontal: 20, paddingTop: 20, gap: 12 },
+  menuRow: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: '#F3F4F6' },
+  menuIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#FFF7ED', alignItems: 'center', justifyContent: 'center' },
+  menuLabel: { flex: 1, color: '#374151', fontSize: 14, fontFamily: fonts.semiBold },
+  logoutRow: { backgroundColor: '#FEF2F2', borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: '#FECACA' },
+  logoutIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center' },
+  logoutText: { color: '#EF4444', fontSize: 14, fontFamily: fonts.semiBold },
+  // Edit sub-view (prototype EditProfile)
+  editScroll: { flexGrow: 1, backgroundColor: '#FFFFFF', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 32, gap: 4 },
+  editHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F3F4F6', marginBottom: 16 },
+  backBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  editTitle: { color: '#111827', fontSize: 15, fontFamily: fonts.semiBold },
+  avatarCenter: { alignItems: 'center', marginBottom: 20 },
+  avatarLg: { width: 56, height: 56, borderRadius: 28 },
+  avatarLgPh: { width: 56, height: 56, borderRadius: 28, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center' },
+  avatarLgText: { color: '#FFFFFF', fontSize: 22, fontFamily: fonts.extraBold },
+  cameraBadge: { position: 'absolute', bottom: -2, right: -2, width: 24, height: 24, borderRadius: 12, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFFFFF' },
+  changePhoto: { color: ORANGE, fontSize: 12, fontFamily: fonts.semiBold, marginTop: 8 },
+  label: { color: '#6B7280', fontSize: 11, fontFamily: fonts.bold, letterSpacing: 0.8, marginTop: 16, marginBottom: 6 },
+  input: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 16, minHeight: 52, fontSize: 14, fontFamily: fonts.medium, color: colors.ink, backgroundColor: '#F9FAFB' },
+  saveBtn: { backgroundColor: ORANGE, borderRadius: 12, minHeight: 52, alignItems: 'center', justifyContent: 'center', marginTop: 24 },
+  saveBtnText: { color: '#FFFFFF', fontSize: 15, fontFamily: fonts.bold },
 });

@@ -9,15 +9,18 @@ export interface AppButtonProps {
   loading?: boolean;
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
+  tone?: 'customer' | 'tech';
 }
 
-export default function AppButton({ title, icon, loading = false, onPress, style }: AppButtonProps): React.JSX.Element {
+const TONES = { customer: '#F97316', tech: '#2563EB' } as const;
+
+export default function AppButton({ title, icon, loading = false, onPress, style, tone = 'customer' }: AppButtonProps): React.JSX.Element {
   return (
     <Pressable
       accessibilityRole="button"
       disabled={loading}
       onPress={onPress}
-      style={({ pressed }: { pressed: boolean }) => [styles.button, pressed ? styles.pressed : undefined, style] as const}
+      style={({ pressed }: { pressed: boolean }) => [styles.button, { backgroundColor: TONES[tone] }, pressed ? styles.pressed : undefined, style] as const}
     >
       {loading ? <ActivityIndicator color="#FFFFFF" /> : icon ? <Ionicons name={icon as never} size={18} color="#FFFFFF" /> : null}
       {!loading ? <Text style={styles.label}>{title}</Text> : null}

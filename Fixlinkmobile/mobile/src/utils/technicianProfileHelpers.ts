@@ -2,6 +2,7 @@ export interface TechnicianProfileData {
   name?: string;
   phone?: string;
   address?: string;
+  email?: string;
   bio?: string;
   skills?: string[] | string;
   yearsExperience?: number | string;
@@ -19,6 +20,8 @@ export interface TechnicianProfileData {
     url: string;
   }>;
   profileImage?: string | null;
+  verifiedAt?: string | null;
+  totalEarned?: string | number;
 }
 
 export interface TechnicianDraft {
@@ -58,6 +61,20 @@ export function formatRating(rating: number | null | undefined): string {
     return 'N/A';
   }
   return Number(rating).toFixed(1);
+}
+
+export function formatTotalEarned(earned?: number | string | null): string {
+  if (earned === undefined || earned === null || earned === '') {
+    return '$0';
+  }
+  const num = typeof earned === 'string' ? parseFloat(earned) : earned;
+  if (isNaN(num) || num === 0) {
+    return '$0';
+  }
+  if (num >= 1000) {
+    return `$${(num / 1000).toFixed(1)}k`;
+  }
+  return `$${num.toFixed(0)}`;
 }
 
 export function formatReviewDate(dateStr?: string | null): string {
@@ -106,21 +123,24 @@ export function draftFromProfile(profile: TechnicianProfileData): TechnicianDraf
   };
 }
 
-export function getVerificationBadge(verified?: boolean): {
+export function getVerificationBadge(verified?: boolean, verifiedAt?: string | null): {
   label: string;
   icon: 'shield-checkmark' | 'shield-outline';
   isVerified: boolean;
+  verifiedSince?: string;
 } {
   if (verified) {
     return {
-      label: 'Verified Technician',
+      label: `Verified Technician`,
       icon: 'shield-checkmark',
       isVerified: true,
+      verifiedSince: verifiedAt ?? undefined,
     };
   }
   return {
     label: 'Verification Pending',
     icon: 'shield-outline',
     isVerified: false,
+    verifiedSince: undefined,
   };
 }

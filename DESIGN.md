@@ -2,11 +2,19 @@
 name: FixLink
 description: Verified home-service dispatch for Cebu / Bogo City — calm accountability, proximity without exposure.
 colors:
+  fixit-dark: "#0D1B2A"
+  customer-orange: "#F97316"
+  customer-orange-dark: "#EA580C"
+  customer-soft: "#FFF7ED"
+  customer-mist: "#FFEDD5"
+  tech-blue: "#2563EB"
+  tech-blue-dark: "#1D4ED8"
+  tech-soft: "#EFF6FF"
   harbor-ink: "#102A43"
   harbor-teal: "#0F766E"
   teal-deep: "#075E59"
   teal-mist: "#E6F6F3"
-  canvas: "#F5F8FA"
+  canvas: "#F9FAFB"
   white: "#FFFFFF"
   slate-muted: "#3F5A6E"
   harbor-line: "#D9E2EC"
@@ -69,7 +77,13 @@ spacing:
   2xl: "36px"
 components:
   button-primary:
-    backgroundColor: "{colors.harbor-teal}"
+    backgroundColor: "{colors.customer-orange}"
+    textColor: "{colors.white}"
+    rounded: "{rounded.md}"
+    padding: "0 18px"
+    height: "48px"
+  button-primary-tech:
+    backgroundColor: "{colors.tech-blue}"
     textColor: "{colors.white}"
     rounded: "{rounded.md}"
     padding: "0 18px"
