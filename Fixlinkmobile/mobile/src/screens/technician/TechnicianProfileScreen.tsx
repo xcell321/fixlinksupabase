@@ -898,7 +898,7 @@ const styles = StyleSheet.create({
   avatarImageLarge: { width: 72, height: 72, borderRadius: 36 },
   avatarTechLarge: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center' },
   avatarTextLarge: { color: '#FFFFFF', fontSize: 28, fontFamily: fonts.extraBold },
-  avatarVerifiedBadge: { position: 'absolute', bottom: -2, right: -2, width: 20, height: 20, borderRadius: 10, backgroundColor: '#10B981', borderWidth: 2, borderColor: '#0D1B2A', alignItems: 'center', justifyContent: 'center' },
+  avatarVerifiedBadge: { position: 'absolute', bottom: -2, right: -2, width: 20, height: 20, borderRadius: 10, backgroundColor: '#2563EB', borderWidth: 2, borderColor: '#0D1B2A', alignItems: 'center', justifyContent: 'center' },
   headerNameCentered: { color: '#FFFFFF', fontSize: 18, fontFamily: fonts.extraBold, letterSpacing: -0.2, textAlign: 'center' },
   headerSubCentered: { color: '#9CA3AF', fontSize: 12, fontFamily: fonts.medium, marginTop: 2, textAlign: 'center' },
   headerStatsRowCentered: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 24, marginTop: 14 },
