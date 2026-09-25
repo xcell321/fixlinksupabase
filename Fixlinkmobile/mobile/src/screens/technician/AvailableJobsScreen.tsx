@@ -571,7 +571,7 @@ export default function AvailableJobsScreen({
             <Ionicons
               name="radio"
               size={16}
-              color={feedTab === 'queue' ? colors.techDark : colors.muted}
+              color={feedTab === 'queue' ? '#FFFFFF' : colors.muted}
             />
             <Text style={[styles.feedTabLabel, feedTab === 'queue' && styles.feedTabLabelActive]}>
               Available
@@ -597,7 +597,7 @@ export default function AvailableJobsScreen({
             <Ionicons
               name="construct"
               size={16}
-              color={feedTab === 'active' ? colors.techDark : colors.muted}
+              color={feedTab === 'active' ? '#FFFFFF' : colors.muted}
             />
             <Text style={[styles.feedTabLabel, feedTab === 'active' && styles.feedTabLabelActive]}>
               Assigned
@@ -1380,7 +1380,7 @@ alignSelf: 'center' },
     height: 44,
     borderRadius: 12
   },
-  feedTabItemActive: { backgroundColor: colors.techSoft },
+  feedTabItemActive: { backgroundColor: '#2563EB' },
   feedTabLabel: {
     fontSize: 13,
     fontFamily: fonts.semiBold,
@@ -1388,7 +1388,7 @@ alignSelf: 'center' },
   },
   feedTabLabelActive: {
     fontFamily: fonts.bold,
-    color: colors.techDark
+    color: '#FFFFFF'
   },
   tabBadge: {
     minWidth: 20,
@@ -1399,14 +1399,14 @@ alignSelf: 'center' },
     justifyContent: 'center',
     paddingHorizontal: 5
   },
-  tabBadgeActive: { backgroundColor: colors.techDark },
+  tabBadgeActive: { backgroundColor: '#FFFFFF' },
   tabBadgeText: {
     fontSize: 11,
     fontFamily: fonts.bold,
     color: colors.muted,
     fontVariant: ['tabular-nums']
   },
-  tabBadgeTextActive: { color: colors.white },
+  tabBadgeTextActive: { color: '#2563EB' },
 
   queueControlSection: { marginBottom: 12 },
   searchBarContainer: {
