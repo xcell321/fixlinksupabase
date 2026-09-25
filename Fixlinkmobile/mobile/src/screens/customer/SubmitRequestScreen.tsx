@@ -104,39 +104,33 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
 
   const handleLocate = async () => {
     setLocating(true);
-    let { status } = await Location.requestForegroundPermissionsAsync();
+    const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
       setLocating(false);
       Alert.alert('Permission Denied', 'Permission to access location was denied');
       return;
     }
-
     try {
-      let locationData = await Location.getCurrentPositionAsync({});
-      const lat = locationData.coords.latitude;
-      const lon = locationData.coords.longitude;
+      // Always fresh GPS - never cached, High accuracy for Medellin/Dakit etc
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      const lat = loc.coords.latitude;
+      const lon = loc.coords.longitude;
+      // Set coords immediately from GPS - never from old cache or Gairan fallback
       setCoords({ latitude: lat, longitude: lon });
       if (stepErrors.location) setStepErrors((p) => { const n = { ...p }; delete n.location; return n; });
-
-      let geocode = await Location.reverseGeocodeAsync({
-        latitude: lat,
-        longitude: lon
-      });
-
+      const geocode = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lon });
       if (geocode && geocode.length > 0) {
-        const address = geocode[0];
-        if (address.street) setStreet(address.street);
-        if (address.city) setCity(address.city);
-        if (address.postalCode) setZipCode(address.postalCode);
-        if (address.street || address.city) setCoords({ latitude: lat, longitude: lon });
+        const a = geocode[0];
+        // Use fresh reverseGeocode only - do not geocode the string "Gairan" again
+        if (a.street) setStreet(a.street);
+        else if (a.name) setStreet(a.name);
+        if (a.city) setCity(a.city);
+        else if (a.subregion) setCity(a.subregion);
+        if (a.postalCode) setZipCode(a.postalCode);
+        else if (a.postalCode === null && a.region) setZipCode('');
       }
-      // Also try LocationIQ extra for more accurate Bogo barangay
-      try {
-        const iq = await geocodeAddress(`${lat},${lon}`);
-        if (iq) setCoords({ latitude: iq.latitude, longitude: iq.longitude });
-      } catch {}
-    } catch (e) {
-      Alert.alert('Error', 'Failed to fetch location details.');
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to fetch location details.');
     } finally {
       setLocating(false);
     }
