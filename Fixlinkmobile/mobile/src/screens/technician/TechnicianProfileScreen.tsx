@@ -109,6 +109,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
   const [helpVisible, setHelpVisible] = useState<boolean>(false);
   const [showAllReviews, setShowAllReviews] = useState<boolean>(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [ptab, setPtab] = useState<'info' | 'skills' | 'reviews' | 'portfolio'>('info');
 
   useEffect(() => {
     if (!editing || !draft.address.trim()) {
@@ -302,7 +303,6 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
   const visibleReviews = showAllReviews ? reviews : reviews.slice(0, 2);
   const hasMoreReviews = reviews.length > 2;
   const verification = getVerificationBadge(profile.verified);
-  const [ptab, setPtab] = useState<'info' | 'skills' | 'reviews' | 'portfolio'>('info');
 
   return (
     <ScrollView contentContainerStyle={styles.screen} showsVerticalScrollIndicator={false}>
