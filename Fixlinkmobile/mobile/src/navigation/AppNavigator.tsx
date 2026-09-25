@@ -202,10 +202,11 @@ export default function AppNavigator() {
     { key: 'chat', label: 'Chat', icon: 'chatbubble-ellipses' },
     { key: 'profile', label: 'Profile', icon: 'person' },
   ];
-  // Reference TechNav: Jobs / Map / Profile (chat opens from job details, no tab).
+  // Reference TechNav: Jobs / Map / Message / Profile.
   const techTabs = [
     { key: 'jobs', label: 'Jobs', icon: 'briefcase' },
     { key: 'map', label: 'Map', icon: 'map' },
+    { key: 'chat', label: 'Message', icon: 'chatbubble-ellipses' },
     { key: 'profile', label: 'Profile', icon: 'person' },
   ];
 
@@ -392,66 +393,135 @@ export default function AppNavigator() {
 
       <View style={styles.screenContainer}>{screen}</View>
 
-      <Modal visible={notificationsOpen} transparent animationType="fade" onRequestClose={handleCloseNotifications}>
-        <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={handleCloseNotifications}>
-          <TouchableOpacity style={styles.notificationPanel} activeOpacity={1}>
-            <View style={styles.panelHeader}><View><Text style={styles.panelKicker}>FIXLINK UPDATES</Text><Text style={styles.panelTitle}>Notifications</Text></View><TouchableOpacity style={styles.closeButton} onPress={handleCloseNotifications}><Ionicons name="close" size={18} color={colors.ink} /></TouchableOpacity></View>
+      <Modal visible={notificationsOpen} transparent animationType="slide" onRequestClose={handleCloseNotifications}>
+        <View style={styles.modalBackdrop}>
+          <Pressable style={styles.backdropPress} onPress={handleCloseNotifications} />
+          <View style={styles.notificationPanel}>
+            <View style={styles.notifHeader}>
+              <Pressable style={styles.notifBackBtn} onPress={handleCloseNotifications} hitSlop={12}>
+                <Ionicons name="arrow-back" size={20} color={colors.ink} />
+              </Pressable>
+              <Text style={styles.notifHeaderTitle}>Notifications</Text>
+              <View style={{ width: 32 }} />
+            </View>
+
+            <View style={styles.notifTopBar}>
+              <View>
+                <Text style={styles.unreadCount}>{unreadCount} unread update{unreadCount !== 1 ? 's' : ''}</Text>
+              </View>
+              {unreadCount > 0 && (
+                <Pressable onPress={() => {
+                  chatNotifications.forEach(n => {
+                    if (!n.read && n.id) {
+                      markNotificationRead(n.id).catch(() => {});
+                    }
+                  });
+                  setChatNotifications(prev => prev.map(n => ({ ...n, read: true })));
+                }}>
+                  <Text style={[styles.markAllRead, { color: roleAccent }]}>Mark all as read</Text>
+                </Pressable>
+              )}
+            </View>
 
             {/* Detail card: first click shows details */}
             {selectedNotification ? (
               <View style={styles.detailCard}>
-                <View style={styles.detailHeader}>
-                  <View style={[styles.detailIcon, selectedNotification.type === 'job' ? styles.noticeIconGold : null]}><Ionicons name={selectedNotification.type === 'job' ? 'construct' : 'chatbubble-ellipses'} size={16} color={colors.teal} /></View>
-                  <View style={styles.detailHeaderCopy}>
-                    <Text style={styles.detailTitle}>{selectedNotification.type === 'job' ? (selectedNotification.senderName ? `${selectedNotification.senderName} · request update` : 'Request update') : `New message from ${selectedNotification.senderName}`}</Text>
-                    <Text style={styles.detailSub}>{selectedNotification.read ? 'Read • ' : 'Unread • '}{formatNotificationTime(selectedNotification.timestamp)}{selectedNotification.jobId ? ` • #${String(selectedNotification.jobId).slice(0,6).toUpperCase()}` : ''}</Text>
+                <View style={styles.detailCardTop}>
+                  <View style={[
+                    styles.detailIcon,
+                    { backgroundColor: selectedNotification.type === 'job'
+                        ? (isCustomer ? colors.customer : colors.tech)
+                        : (isCustomer ? colors.tech : '#6366F1') },
+                  ]}>
+                    <Ionicons name={selectedNotification.type === 'job' ? 'construct' : 'chatbubble-ellipses'} size={18} color={colors.white} />
                   </View>
-                  <TouchableOpacity onPress={() => { setSelectedNotification(null); setNotifDetailError(null); }} style={styles.detailClose}><Ionicons name="close" size={14} color={colors.muted} /></TouchableOpacity>
+                  <View style={styles.detailCardCopy}>
+                    <Text style={styles.detailTitle}>{selectedNotification.type === 'job' ? (selectedNotification.senderName ? `${selectedNotification.senderName} · request update` : 'Request update') : `New message from ${selectedNotification.senderName}`}</Text>
+                    <Text style={styles.detailSub}>{formatNotificationTime(selectedNotification.timestamp)}</Text>
+                  </View>
                 </View>
                 <Text style={styles.detailText}>{selectedNotification.text}</Text>
-                {selectedNotification.jobId ? <Text style={styles.detailMeta}>Open to view {selectedNotification.type === 'chat' ? 'conversation' : 'request'} #{String(selectedNotification.jobId).slice(0,6).toUpperCase()}</Text> : <Text style={styles.detailMeta}>No related request to open.</Text>}
-                {notifNavLoading === selectedNotification.id ? <View style={styles.detailLoading}><ActivityIndicator size="small" color={colors.teal} /><Text style={styles.detailLoadingText}>Opening…</Text></View> : null}
-                {notifDetailError ? <View style={styles.detailError}><Ionicons name="alert-circle-outline" size={14} color="#B91C1C" /><Text style={styles.detailErrorText}>{notifDetailError}</Text></View> : null}
+                {notifDetailError ? (
+                  <View style={styles.detailError}>
+                    <Ionicons name="alert-circle-outline" size={14} color="#DC2626" />
+                    <Text style={styles.detailErrorText}>{notifDetailError}</Text>
+                  </View>
+                ) : null}
                 <View style={styles.detailActions}>
-                  <Pressable onPress={() => selectedNotification && handleOpenNotification(selectedNotification)} style={({ pressed }) => [styles.detailPrimary, pressed && { opacity: 0.85 }]}><Text style={styles.detailPrimaryText}>{selectedNotification.type === 'chat' ? 'Open conversation' : 'Open request'}</Text><Ionicons name="arrow-forward" size={14} color={colors.white} /></Pressable>
-                  <Pressable onPress={() => { setSelectedNotification(null); setNotifDetailError(null); }} style={({ pressed }) => [styles.detailSecondary, pressed && { opacity: 0.85 }]}><Text style={styles.detailSecondaryText}>Close</Text></Pressable>
+                  <Pressable
+                    onPress={() => selectedNotification && handleOpenNotification(selectedNotification)}
+                    disabled={notifNavLoading === selectedNotification.id}
+                    style={({ pressed }) => [styles.detailPrimary, { backgroundColor: roleAccent }, pressed && { opacity: 0.9 }]}
+                  >
+                    {notifNavLoading === selectedNotification.id ? (
+                      <ActivityIndicator size="small" color={colors.white} />
+                    ) : (
+                      <>
+                        <Text style={styles.detailPrimaryText}>{selectedNotification.type === 'chat' ? 'View conversation' : 'View request'}</Text>
+                        <Ionicons name="arrow-forward" size={14} color={colors.white} style={{ marginLeft: 6 }} />
+                      </>
+                    )}
+                  </Pressable>
+                  <Pressable
+                    onPress={() => { setSelectedNotification(null); setNotifDetailError(null); }}
+                    style={({ pressed }) => [styles.detailSecondary, pressed && { opacity: 0.85 }]}
+                  >
+                    <Text style={styles.detailSecondaryText}>Dismiss</Text>
+                  </Pressable>
                 </View>
               </View>
             ) : null}
 
-            <ScrollView showsVerticalScrollIndicator={false} style={styles.notifList}>
+            <ScrollView showsVerticalScrollIndicator={false} style={styles.notifList} contentContainerStyle={styles.notifListContent}>
               {chatNotifications.length === 0 ? (
-                <View style={styles.emptyNotif}><Ionicons name="notifications-outline" size={20} color={colors.muted} /><Text style={styles.emptyNotifText}>No notifications yet</Text><Text style={styles.emptyNotifSub}>Updates about your requests and messages will appear here.</Text></View>
-              ) : null}
-              {chatNotifications.map((notification) => {
-                const isJob = notification.type === 'job';
-                const isSelected = selectedNotification && String(selectedNotification.id) === String(notification.id);
-                const isRead = notification.read === true;
-                return (
-                  <TouchableOpacity
-                    key={`${notification.jobId}-${notification.id}-${notification.messageId || ''}`}
-                    style={[styles.notice, isSelected && styles.noticeSelected, isRead && styles.noticeRead]}
-                    onPress={() => handleNotificationPress(notification)}
-                    activeOpacity={0.75}
-                  >
-                    <View style={[styles.noticeIcon, isJob && styles.noticeIconGold, isRead && styles.noticeIconRead, isSelected && styles.noticeIconSelected]}><Ionicons name={isJob ? 'construct' : 'chatbubble-ellipses'} size={18} color={isRead ? colors.muted : colors.teal} /></View>
-                    <View style={styles.noticeCopy}>
-                      <Text style={[styles.noticeTitle, isRead && styles.noticeTitleRead]}>{isJob ? (notification.senderName ? `${notification.senderName} · request update` : 'Request update') : `New message from ${notification.senderName}`}</Text>
-                      <Text style={[styles.noticeText, isRead && styles.noticeTextRead]} numberOfLines={2}>{notification.text}</Text>
-                      <View style={styles.noticeMetaRow}>
-                        <Text style={[styles.noticeTime, isRead && styles.noticeTimeRead]}>{isRead ? 'Read' : 'Unread'} • {formatNotificationTime(notification.timestamp)}</Text>
-                        {isSelected ? <View style={styles.tapHint}><Text style={styles.tapHintText}>Selected — tap Open above</Text></View> : null}
+                <View style={styles.emptyNotif}>
+                  <Ionicons name="notifications-outline" size={28} color={colors.muted} />
+                  <Text style={styles.emptyNotifText}>No notifications</Text>
+                  <Text style={styles.emptyNotifSub}>Updates about your requests will appear here</Text>
+                </View>
+              ) : (
+                chatNotifications.map((notification) => {
+                  const isJob = notification.type === 'job';
+                  const isRead = notification.read === true;
+                  return (
+                    <Pressable
+                      key={`${notification.jobId}-${notification.id}-${notification.messageId || ''}`}
+                      style={[styles.notifCard, isRead && styles.notifCardRead]}
+                      onPress={() => handleNotificationPress(notification)}
+                    >
+                      <View style={[
+                        styles.notifIconBadge,
+                        { backgroundColor: isJob
+                            ? (isCustomer ? colors.customer : colors.tech)
+                            : (isCustomer ? colors.tech : '#6366F1') },
+                      ]}>
+                        <Ionicons
+                          name={isJob ? 'construct' : 'chatbubble-ellipses'}
+                          size={20}
+                          color={colors.white}
+                        />
                       </View>
-                    </View>
-                    {!isRead ? <View style={styles.unreadDot} /> : null}
-                  </TouchableOpacity>
-                );
-              })}
-              <View style={styles.notice}><View style={styles.noticeIcon}><Ionicons name="checkmark-circle" size={19} color={colors.teal} /></View><View style={styles.noticeCopy}><Text style={styles.noticeTitle}>You’re all set</Text><Text style={styles.noticeText}>Your FixLink account is ready for service requests.</Text><Text style={styles.noticeTime}>Just now</Text></View></View>
-              <View style={styles.notice}><View style={[styles.noticeIcon, styles.noticeIconGold]}><Ionicons name="sparkles" size={18} color="#B7791F" /></View><View style={styles.noticeCopy}><Text style={styles.noticeTitle}>{isCustomer ? 'Need something fixed?' : 'New jobs nearby'}</Text><Text style={styles.noticeText}>{isCustomer ? 'Add a request and we’ll match you with a verified technician.' : 'Refresh your jobs feed to see the latest repair requests.'}</Text><Text style={styles.noticeTime}>Today</Text></View></View>
+
+                      <View style={styles.notifCardContent}>
+                        <Text style={[styles.notifCardTitle, isRead && styles.notifCardTitleRead]} numberOfLines={1}>
+                          {notification.text.split('\n')[0] || (isJob ? 'Job Update' : 'New Message')}
+                        </Text>
+                        <Text style={[styles.notifCardDesc, isRead && styles.notifCardDescRead]} numberOfLines={2}>
+                          {notification.text}
+                        </Text>
+                        <Text style={[styles.notifCardTime, isRead && styles.notifCardTimeRead]}>
+                          {formatNotificationTime(notification.timestamp)}
+                        </Text>
+                      </View>
+
+                      {!isRead && <View style={[styles.notifUnreadDot, { backgroundColor: roleAccent }]} />}
+                    </Pressable>
+                  );
+                })
+              )}
             </ScrollView>
-          </TouchableOpacity>
-        </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
 
       <View style={styles.bottomNav}>{navItems.map((item) => { const active = activeTab === item.key || (item.key === 'progress' && ['submit', 'details', 'map', 'techProfile', 'rate'].includes(activeTab)); return <Pressable key={item.key} accessibilityRole="button" accessibilityLabel={`${item.label} tab`} accessibilityState={{ selected: active }} style={({ pressed }) => [styles.navItem, pressed && styles.navItemPressed]} onPress={() => { if (isCustomer && item.key === 'progress') setAcceptedOnlyProgress(false); setTab(item.key); }}><View style={[styles.navIcon, active && { backgroundColor: roleSoft }]}><Ionicons name={active ? item.icon : `${item.icon}-outline`} size={20} color={active ? roleAccent : colors.muted} /></View><Text style={[styles.navLabel, active && { color: roleAccent }]}>{item.label}</Text></Pressable>; })}</View>
@@ -461,29 +531,50 @@ export default function AppNavigator() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.canvas }, authContainer: { flex: 1, backgroundColor: colors.canvas }, screenContainer: { flex: 1, width: '100%' as const, alignSelf: 'center' as const },
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(16,42,67,0.26)', alignItems: 'center', paddingTop: 86, paddingHorizontal: 16 }, notificationPanel: { width: '100%', maxWidth: 390, maxHeight: 560, backgroundColor: colors.white, borderRadius: 22, padding: 20, boxShadow: '0 12px 24px rgba(16,42,67,0.2)', elevation: 12, alignSelf: 'center' as const }, panelHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, gap: 12 }, panelKicker: { color: colors.teal, fontSize: 10, letterSpacing: 1.5, fontFamily: fonts.bold, marginBottom: 4, textTransform: 'uppercase' as const }, panelTitle: { color: colors.ink, fontSize: 22, fontFamily: fonts.bold, letterSpacing: -0.3 }, closeButton: { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line },
-  detailCard: { backgroundColor: '#F0FDFA', borderWidth: 1, borderColor: '#B2E2D8', borderRadius: 16, padding: 14, marginBottom: 12 },
-  detailHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
-  detailIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: '#E6F6F3', alignItems: 'center', justifyContent: 'center' },
-  detailHeaderCopy: { flex: 1 },
-  detailTitle: { color: colors.ink, fontSize: 13, fontFamily: fonts.bold },
-  detailSub: { color: colors.muted, fontSize: 11, fontFamily: fonts.medium, marginTop: 2 },
-  detailClose: { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line },
-  detailText: { color: colors.ink, fontSize: 13, lineHeight: 19, fontFamily: fonts.regular, marginBottom: 8 },
-  detailMeta: { color: colors.teal, fontSize: 11, fontFamily: fonts.semiBold, marginBottom: 10 },
-  detailLoading: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
-  detailLoadingText: { color: colors.muted, fontSize: 12, fontFamily: fonts.medium },
-  detailError: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 10 },
-  detailErrorText: { flex: 1, color: '#B91C1C', fontSize: 12, fontFamily: fonts.medium, lineHeight: 16 },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(16,42,67,0.4)', justifyContent: 'flex-end' },
+  backdropPress: { flex: 1 },
+  notificationPanel: { width: '100%', backgroundColor: colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24, maxHeight: '90%', elevation: 12, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.15, shadowRadius: 16 },
+  notifHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, gap: 12 },
+  notifBackBtn: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', minHeight: 44, minWidth: 44 },
+  notifHeaderTitle: { color: colors.ink, fontSize: 18, fontFamily: fonts.bold, flex: 1, textAlign: 'center' },
+  notifTopBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.line },
+  unreadCount: { color: colors.ink, fontSize: 13, fontFamily: fonts.semiBold },
+  markAllRead: { color: colors.customer, fontSize: 13, fontFamily: fonts.bold },
+
+  detailCard: { backgroundColor: colors.surfaceSunken, borderWidth: 1, borderColor: colors.line, borderRadius: 16, padding: 16, marginBottom: 16 },
+  detailCardTop: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
+  detailIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  detailIconJob: { backgroundColor: colors.gold },
+  detailIconChat: { backgroundColor: colors.tech },
+  detailCardCopy: { flex: 1 },
+  detailTitle: { color: colors.ink, fontSize: 14, fontFamily: fonts.bold },
+  detailSub: { color: colors.muted, fontSize: 12, fontFamily: fonts.medium, marginTop: 2 },
+  detailText: { color: colors.ink, fontSize: 13, lineHeight: 19, fontFamily: fonts.regular, marginBottom: 12 },
+  detailError: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 12 },
+  detailErrorText: { flex: 1, color: '#DC2626', fontSize: 12, fontFamily: fonts.medium, lineHeight: 16 },
   detailActions: { flexDirection: 'row', gap: 8 },
-  detailPrimary: { flex: 1, minHeight: 44, borderRadius: 12, backgroundColor: colors.teal, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  detailPrimaryText: { color: colors.white, fontSize: 12, fontFamily: fonts.bold },
-  detailSecondary: { minHeight: 44, borderRadius: 12, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
-  detailSecondaryText: { color: colors.muted, fontSize: 12, fontFamily: fonts.semiBold },
-  notifList: { maxHeight: 360 },
-  emptyNotif: { alignItems: 'center', paddingVertical: 18, gap: 6 },
-  emptyNotifText: { color: colors.ink, fontSize: 13, fontFamily: fonts.bold },
-  emptyNotifSub: { color: colors.muted, fontSize: 11, fontFamily: fonts.regular, textAlign: 'center', paddingHorizontal: 12, lineHeight: 15 },
-  notice: { flexDirection: 'row', gap: 12, paddingVertical: 14, borderTopWidth: 1, borderTopColor: colors.line, alignItems: 'center' }, noticeSelected: { backgroundColor: '#F0FDFA', borderRadius: 12, paddingHorizontal: 10, borderTopColor: 'transparent', marginVertical: 2, borderWidth: 1, borderColor: '#B2E2D8' }, noticeRead: { opacity: 0.72 }, noticeIcon: { width: 38, height: 38, borderRadius: 13, backgroundColor: '#E6F6F3', alignItems: 'center', justifyContent: 'center' }, noticeIconGold: { backgroundColor: '#FFF8E7' }, noticeIconRead: { backgroundColor: '#F1F5F9' }, noticeIconSelected: { backgroundColor: colors.white, borderWidth: 1, borderColor: '#B2E2D8' }, noticeCopy: { flex: 1 }, noticeTitle: { color: colors.ink, fontSize: 14, fontFamily: fonts.bold, marginBottom: 4 }, noticeTitleRead: { color: colors.muted }, noticeText: { color: colors.muted, fontSize: 12, lineHeight: 17, fontFamily: fonts.regular }, noticeTextRead: { color: '#94A3B8' }, noticeMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 }, noticeTime: { color: colors.muted, fontSize: 11, fontFamily: fonts.semiBold }, noticeTimeRead: { color: '#94A3B8', fontFamily: fonts.medium }, tapHint: { backgroundColor: colors.teal, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 }, tapHintText: { color: colors.white, fontSize: 10, fontFamily: fonts.bold }, unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.teal, marginLeft: 4 },
+  detailPrimary: { flex: 1, minHeight: 44, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  detailPrimaryText: { color: colors.white, fontSize: 13, fontFamily: fonts.bold },
+  detailSecondary: { flex: 1, minHeight: 44, borderRadius: 12, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  detailSecondaryText: { color: colors.muted, fontSize: 13, fontFamily: fonts.semiBold },
+
+  notifList: { maxHeight: 420 },
+  notifListContent: { gap: 12, paddingBottom: 8 },
+  emptyNotif: { alignItems: 'center', paddingVertical: 40, gap: 10 },
+  emptyNotifText: { color: colors.ink, fontSize: 15, fontFamily: fonts.bold },
+  emptyNotifSub: { color: colors.muted, fontSize: 13, fontFamily: fonts.regular, textAlign: 'center', lineHeight: 18 },
+
+  notifCard: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 14, padding: 14, flexDirection: 'row', gap: 14, alignItems: 'flex-start' },
+  notifCardRead: { opacity: 0.6 },
+  notifIconBadge: { width: 48, height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  notifIconJob: { backgroundColor: colors.customer },
+  notifCardContent: { flex: 1, minWidth: 0 },
+  notifCardTitle: { color: colors.ink, fontSize: 13, fontFamily: fonts.bold, marginBottom: 4 },
+  notifCardTitleRead: { color: colors.muted },
+  notifCardDesc: { color: colors.muted, fontSize: 12, lineHeight: 17, fontFamily: fonts.regular, marginBottom: 6 },
+  notifCardDescRead: { color: '#94A3B8' },
+  notifCardTime: { color: colors.muted, fontSize: 11, fontFamily: fonts.medium },
+  notifCardTimeRead: { color: '#94A3B8', fontFamily: fonts.regular },
+  notifUnreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.customer, flexShrink: 0, marginTop: 2 },
   bottomNav: { flexDirection: 'row', justifyContent: 'space-around', paddingTop: 9, paddingBottom: 8, paddingHorizontal: 8, backgroundColor: colors.white, borderTopWidth: 1, borderTopColor: colors.line, gap: 4 }, navItem: { alignItems: 'center', minWidth: 64, minHeight: 52, justifyContent: 'center', flex: 1, maxWidth: 120 }, navItemPressed: { transform: [{ scale: 0.97 }], opacity: 0.94 }, navIcon: { width: 42, height: 30, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }, navIconActive: { backgroundColor: '#E6F6F3' }, navLabel: { color: colors.muted, fontSize: 10, fontFamily: fonts.semiBold, marginTop: 3, letterSpacing: 0.2 }, navLabelActive: { color: colors.teal, fontFamily: fonts.bold },
 });
