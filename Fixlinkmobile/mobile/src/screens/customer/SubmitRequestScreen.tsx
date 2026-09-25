@@ -545,7 +545,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
                 </TouchableOpacity>
                 <View style={styles.photoPreviewCopy}>
                   <View style={styles.photoReadyRow}>
-                    <Ionicons name="checkmark-circle" size={15} color={colors.green} />
+                    <Ionicons name="checkmark-circle" size={15} color={colors.customer} />
                     <Text style={styles.photoReadyText}>Photo ready</Text>
                   </View>
                   <View style={styles.photoPreviewActions}>
@@ -675,7 +675,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
                 {date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} � {selectedTimeSlot}
               </Text>
             </View>
-            <Ionicons name="shield-checkmark" size={16} color={colors.green} />
+            <Ionicons name="shield-checkmark" size={16} color={colors.customer} />
           </View>
           <Text style={styles.helperText}>The technician confirms the exact arrival window after accepting.</Text>
 
