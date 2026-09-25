@@ -1,5 +1,5 @@
 ﻿// @ts-nocheck - migrated from .js, preserve working state; types to be refined incrementally
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import api, { setAuthToken } from '../services/api';
@@ -15,8 +15,14 @@ export default function LoginScreen({ onLoginSuccess, switchToRegister, switchTo
    const [loading, setLoading] = useState(false);
     const [loginError, setLoginError] = useState('');
      const [fieldErrors, setFieldErrors] = useState({});
-     const [showPassword, setShowPassword] = useState(false);
-   const [role, setRole] = useState('customer');
+    const [showPassword, setShowPassword] = useState(false);
+    const [role, setRole] = useState('customer');
+    useEffect(() => {
+      if (loginError) {
+        const t = setTimeout(() => setLoginError(''), 3500);
+        return () => clearTimeout(t);
+      }
+    }, [loginError]);
    const accent = role === 'technician' ? colors.tech : colors.customer;
    const handleLogin = async () => {
     const normalizedEmail = email.trim().toLowerCase();
