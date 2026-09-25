@@ -69,7 +69,7 @@ interface AvailableJobsScreenProps {
   highlightedJobId?: string | null;
 }
 
-const NEARBY_QUEUE_RADIUS_KM = 10;
+const NEARBY_QUEUE_RADIUS_KM = 20;
 const jobsCache = new Map<string, { jobs: JobItem[]; acceptedJobs: JobItem[]; lastSyncAt: Date | null; fetchError: boolean }>();
 
 const CATEGORY_CHIPS = [
@@ -926,7 +926,7 @@ export default function AvailableJobsScreen({
                 <View style={styles.emptyTextContainer}>
                   <Text style={styles.emptyTitle}>Queue is Clear</Text>
                   <Text style={styles.emptyCopy}>
-                    No unassigned repair requests within 10 km matching your current filter. Pull down to refresh or check other categories.
+                    No unassigned repair requests within 20 km matching your current filter. Pull down to refresh or check other categories.
                   </Text>
                 </View>
                 {selectedCategory !== 'all' && (
