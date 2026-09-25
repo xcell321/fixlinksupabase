@@ -1,6 +1,6 @@
 // Prototype TechJobDetail: pay card, customer card, live mini map, action rows.
 import React from 'react';
-import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { PhotoThumb } from '../../components/RequestPhoto';
 import LocationIQMap from '../../components/LocationIQMap';
@@ -103,18 +103,10 @@ export default function TechJobDetailScreen({
                 <Ionicons name="location" size={12} color={colors.tech} />
                 <Text style={styles.mapAddressText} numberOfLines={1}>{job.location || 'Dakit, Bogo City, 6010'}</Text>
               </View>
-              <Pressable
-                onPress={() => {
-                  const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
-                  Linking.openURL(url).catch(() => {});
-                }}
-                style={({ pressed }) => [styles.navigateBtn, pressed && { opacity: 0.85 }]}
-                accessibilityRole="button"
-                accessibilityLabel="Navigate to customer location"
-              >
-                <Ionicons name="navigate" size={14} color="#FFFFFF" />
-                <Text style={styles.navigateText}>Navigate</Text>
-              </Pressable>
+              <View style={styles.navigateBtnSystem}>
+                <Ionicons name="map" size={14} color="#2563EB" />
+                <Text style={styles.navigateTextSystem}>FixLink System Map</Text>
+              </View>
             </>
           ) : (
             <View style={styles.mapPlaceholder}>
@@ -200,6 +192,8 @@ const styles = StyleSheet.create({
   mapAddressText: { flex: 1, color: colors.ink, fontSize: 12, fontFamily: fonts.semiBold },
   navigateBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: BLUE, borderRadius: 12, minHeight: 44, marginTop: 8, ...shadows.card },
   navigateText: { color: '#FFFFFF', fontSize: 13, fontFamily: fonts.bold },
+  navigateBtnSystem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE', borderRadius: 12, minHeight: 44, marginTop: 8 },
+  navigateTextSystem: { color: '#2563EB', fontSize: 13, fontFamily: fonts.bold },
   btnRow: { flexDirection: 'row', gap: 8 },
   declineBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: colors.danger + '40', borderRadius: 14, minHeight: 48, backgroundColor: colors.white },
   declineText: { color: colors.danger, fontSize: 14, fontFamily: fonts.bold },
