@@ -45,9 +45,9 @@ export default function LoginScreen({ onLoginSuccess, switchToRegister, switchTo
   return <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}><ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
     <View style={styles.header}>
       <View style={styles.logoRow}>
-        <View style={[styles.logo, { backgroundColor: accent }]}><Ionicons name={role === 'technician' ? 'construct-outline' : 'construct'} size={22} color="#FFFFFF" /></View>
+        <View style={[styles.logo, { backgroundColor: accent }]}><Ionicons name="construct" size={22} color="#FFFFFF" /></View>
         <View>
-          <Text style={styles.brandSmall}>{role === 'technician' ? 'FixLink Pro' : 'FIXLINK'}</Text>
+          <Text style={styles.brandSmall}>FIXLINK</Text>
           <Text style={styles.roleSmall}>{role === 'technician' ? 'TECHNICIAN PORTAL' : 'HOME SERVICES'}</Text>
         </View>
       </View>
