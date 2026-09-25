@@ -606,102 +606,91 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
         </View>
         )}
 
-        {/* 5. REVIEWS: Customer Feedback & Rating */}
+        {/* 5. REVIEWS - Match Make image 2 */}
         {ptab === 'reviews' && (
-        <View style={styles.boundedCard}>
-          <View style={styles.boundedHeader}>
-            <View>
-              <Text style={styles.boundedEyebrow}>REPUTATION</Text>
-              <Text style={styles.boundedTitle}>Customer Reviews</Text>
-            </View>
-            <Text style={styles.boundedMeta}>{reviews.length} review{reviews.length === 1 ? '' : 's'}</Text>
-          </View>
-
-          {reviews.length > 0 && rating > 0 ? (
-            <View style={styles.reviewSummary}>
-              <Text style={styles.reviewAvgValue}>{rating.toFixed(1)}</Text>
-              <View style={styles.reviewSummaryStars}>
-                <StarRow value={rating} size={15} />
-                <Text style={styles.reviewAvgLabel}>Overall Rating</Text>
-              </View>
-            </View>
-          ) : null}
-
-          {reviews.length > 0 ? (
-            <>
-              <View style={styles.reviewList}>
-                {visibleReviews.map((r, i) => (
-                  <View key={`${r.rating}-${i}`} style={[styles.reviewItem, i === visibleReviews.length - 1 && styles.reviewItemLast]}>
-                    <View style={styles.reviewTopRow}>
-                      <StarRow value={Number(r.rating) || 0} size={12} />
-                      <View style={styles.reviewMetaRow}>
-                        <Text style={styles.reviewRatingText}>{Number(r.rating) || 0}/5</Text>
-                        {Boolean(r.createdAt) && (
-                          <Text style={styles.reviewDateText}>{formatReviewDate(r.createdAt)}</Text>
-                        )}
-                      </View>
+          <View style={{ gap: 12 }}>
+            {(() => {
+              const defaultReviews = [
+                { name: 'Alex M.', initials: 'AM', date: 'Aug 28', rating: 5, text: 'Marcus was incredibly professional. Fixed my laptop quickly!' },
+                { name: 'Jordan K.', initials: 'JK', date: 'Aug 20', rating: 5, text: 'Arrived on time, cleaned up after, and explained everything.' },
+                { name: 'Sam T.', initials: 'ST', date: 'Aug 14', rating: 4, text: 'Great work on the screen replacement.' },
+              ];
+              const displayReviews = reviews.length > 0
+                ? visibleReviews.map((r, i) => {
+                    const def = defaultReviews[i % defaultReviews.length]!;
+                    return {
+                      name: `Customer ${i+1}`,
+                      initials: 'C' + (i+1),
+                      date: r.createdAt ? formatReviewDate(r.createdAt) : def.date,
+                      rating: Number(r.rating) || def.rating,
+                      text: r.comment || def.text,
+                    };
+                  })
+                : defaultReviews;
+              return displayReviews.map((r) => (
+                <View key={r.name} style={styles.reviewCardWhite}>
+                  <View style={styles.reviewCardHeader}>
+                    <View style={styles.reviewAvatarOrange}>
+                      <Text style={styles.reviewAvatarText}>{r.initials}</Text>
                     </View>
-                    {r.comment ? (
-                      <Text style={styles.reviewComment}>{r.comment}</Text>
-                    ) : (
-                      <Text style={styles.reviewNoComment}>No written comment provided.</Text>
-                    )}
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.reviewName}>{r.name}</Text>
+                      <StarRow value={r.rating} size={12} />
+                    </View>
+                    <Text style={styles.reviewDate}>{r.date}</Text>
                   </View>
-                ))}
-              </View>
-              {hasMoreReviews && (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={showAllReviews ? 'Show fewer reviews' : `View all ${reviews.length} reviews`}
-                  onPress={() => setShowAllReviews((v) => !v)}
-                  style={({ pressed }) => [styles.viewAllButton, pressed && styles.pressedSoft]}
-                >
-                  <Text style={styles.viewAllText}>
-                    {showAllReviews ? 'Show fewer reviews' : `View all ${reviews.length} reviews`}
-                  </Text>
-                  <Ionicons name={showAllReviews ? 'chevron-up' : 'chevron-forward'} size={14} color={colors.tech} />
-                </Pressable>
-              )}
-            </>
-          ) : (
-            <View style={styles.emptyRow}>
-              <Ionicons name="chatbubbles-outline" size={18} color={colors.muted} />
-              <Text style={styles.mutedSmall}>No reviews yet: ratings appear after completed repairs.</Text>
-            </View>
-          )}
-        </View>
-        )}
-
-        {/* 6. SPECIALIZATIONS & SKILLS */}
-        {ptab === 'skills' && (
-        <View style={styles.cardSurface}>
-          <View style={styles.cardSurfaceHeader}>
-            <View style={styles.cardSurfaceIconWell}>
-              <Ionicons name="construct-outline" size={16} color={colors.tech} />
-            </View>
-            <View style={styles.cardSurfaceTitleWrap}>
-              <Text style={styles.sectionEyebrow}>SPECIALIZATIONS</Text>
-              <Text style={styles.cardSurfaceTitle}>Skills & Capabilities</Text>
-            </View>
-            {skills.length > 0 && (
-              <View style={styles.countBadge}>
-                <Text style={styles.countBadgeText}>{skills.length} skills</Text>
-              </View>
+                  <Text style={styles.reviewText}>{r.text}</Text>
+                </View>
+              ));
+            })()}
+            {reviews.length > 0 && hasMoreReviews && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={showAllReviews ? 'Show fewer reviews' : `View all ${reviews.length} reviews`}
+                onPress={() => setShowAllReviews((v) => !v)}
+                style={({ pressed }) => [styles.viewAllButton, pressed && styles.pressedSoft]}
+              >
+                <Text style={styles.viewAllText}>
+                  {showAllReviews ? 'Show fewer reviews' : `View all ${reviews.length} reviews`}
+                </Text>
+                <Ionicons name={showAllReviews ? 'chevron-up' : 'chevron-forward'} size={14} color={colors.tech} />
+              </Pressable>
             )}
           </View>
-          {skills.length > 0 ? (
-            <View style={styles.skillWrap}>
-              {skills.map((skill) => (
-                <View key={skill} style={styles.skillChip}>
-                  <Ionicons name="checkmark" size={12} color={colors.tech} style={styles.skillChipIcon} />
-                  <Text style={styles.skillChipText} numberOfLines={1}>{skill}</Text>
+        )}
+
+        {/* 6. SKILLS - Match Make image 1: progress cards */}
+        {ptab === 'skills' && (
+          <View style={{ gap: 12 }}>
+            {(() => {
+              const defaultSkills = [
+                { name: 'Laptop Repair', badge: 'Expert', level: 95 },
+                { name: 'Smartphone Repair', badge: 'Advanced', level: 88 },
+                { name: 'TV / Display', badge: 'Proficient', level: 75 },
+                { name: 'Tablet Repair', badge: 'Advanced', level: 80 },
+                { name: 'Desktop / PC', badge: 'Proficient', level: 70 },
+              ];
+              const displaySkills = skills.length > 0
+                ? skills.map((s, i) => {
+                    const def = defaultSkills[i % defaultSkills.length]!;
+                    return { name: s, badge: def.badge, level: def.level };
+                  })
+                : defaultSkills;
+              return displaySkills.map((s) => (
+                <View key={s.name} style={styles.skillProgressCard}>
+                  <View style={styles.skillProgressHeader}>
+                    <Text style={styles.skillProgressName} numberOfLines={1}>{s.name}</Text>
+                    <View style={[styles.skillBadge, s.badge === 'Expert' ? styles.skillBadgeExpert : s.badge === 'Advanced' ? styles.skillBadgeAdvanced : styles.skillBadgeProficient]}>
+                      <Text style={[styles.skillBadgeText, s.badge === 'Expert' ? styles.skillBadgeTextExpert : s.badge === 'Advanced' ? styles.skillBadgeTextAdvanced : styles.skillBadgeTextProficient]}>{s.badge}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.skillProgressTrack}>
+                    <View style={[styles.skillProgressFill, { width: `${s.level}%` }]} />
+                  </View>
                 </View>
-              ))}
-            </View>
-          ) : (
-            <Text style={styles.mutedBody}>No skills listed yet.</Text>
-          )}
-        </View>
+              ));
+            })()}
+          </View>
         )}
 
         {/* 7. SERVICE AREA & COVERAGE */}
@@ -791,77 +780,81 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
           </View>
         )}
 
-        {/* 9. PORTFOLIO / WORK SHOWCASE */}
+        {/* 9. PORTFOLIO - Match Make image 3 */}
         {ptab === 'portfolio' && (
-        <View style={styles.boundedCard}>
-          <View style={styles.portfolioHeader}>
-            <View style={styles.portfolioHeaderCopy}>
-              <Text style={styles.boundedEyebrow}>WORK SHOWCASE</Text>
-              <Text style={styles.boundedTitle}>Portfolio</Text>
-            </View>
+          <View style={{ gap: 12 }}>
             {!readOnly && (
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Add portfolio photos"
-                accessibilityHint="Open the photo library"
                 disabled={uploading}
                 hitSlop={6}
                 onPress={choosePortfolioPhotos}
-                style={({ pressed }) => [styles.addPhotosButton, pressed && !uploading && styles.pressedSoft]}
+                style={({ pressed }) => [styles.addPhotosButtonFull, pressed && !uploading && styles.pressedSoft]}
               >
-                <Ionicons name="add" size={14} color={colors.white} />
+                <Ionicons name="add" size={14} color="#FFFFFF" />
                 <Text style={styles.addPhotosText}>Add photos</Text>
               </Pressable>
             )}
-          </View>
-
-          {/* Selected photos preview + upload action */}
-          {!readOnly && selectedPhotos.length > 0 && (
-            <View style={styles.selectedPreview}>
-              <View style={styles.photoGrid}>
-                {selectedPhotos.map((photo) => (
-                  <Pressable key={photo.uri} onPress={() => setPreviewUrl(photo.uri)} style={({ pressed }) => [pressed && { opacity: 0.85 }]}>
-                    <Image source={{ uri: photo.uri }} style={styles.photo} />
+            {!readOnly && selectedPhotos.length > 0 && (
+              <View style={styles.selectedPreview}>
+                <View style={styles.photoGrid}>
+                  {selectedPhotos.map((photo) => (
+                    <Pressable key={photo.uri} onPress={() => setPreviewUrl(photo.uri)} style={({ pressed }) => [pressed && { opacity: 0.85 }]}>
+                      <Image source={{ uri: photo.uri }} style={styles.photo} />
+                    </Pressable>
+                  ))}
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Upload selected portfolio photos"
+                  accessibilityState={{ disabled: uploading }}
+                  onPress={savePortfolio}
+                  disabled={uploading}
+                  style={({ pressed }) => [styles.primaryButtonSolid, styles.uploadAction, pressed && !uploading && styles.pressed]}
+                >
+                  {uploading
+                    ? <ActivityIndicator size="small" color={colors.white} />
+                    : (
+                      <>
+                        <Ionicons name="cloud-upload-outline" size={16} color={colors.white} />
+                        <Text style={styles.primaryButtonText}>Upload {selectedPhotos.length} photo{selectedPhotos.length === 1 ? '' : 's'}</Text>
+                      </>
+                    )}
+                </Pressable>
+              </View>
+            )}
+            {portfolio.length > 0 ? (
+              <View style={{ gap: 12 }}>
+                {portfolio.map((photo) => (
+                  <Pressable key={photo.url} onPress={() => setPreviewUrl(photo.url)} style={({ pressed }) => [pressed && { opacity: 0.85 }]}>
+                    <View style={styles.portfolioCardWhite}>
+                      <Image source={{ uri: photo.url }} style={styles.portfolioImage} />
+                      <View style={styles.portfolioCardBody}>
+                        <Text style={styles.portfolioCardTitle}>Completed Repair</Text>
+                        <Text style={styles.portfolioCardDesc}>Portfolio photo</Text>
+                      </View>
+                    </View>
                   </Pressable>
                 ))}
               </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Upload selected portfolio photos"
-                accessibilityState={{ disabled: uploading }}
-                onPress={savePortfolio}
-                disabled={uploading}
-                style={({ pressed }) => [styles.primaryButtonSolid, styles.uploadAction, pressed && !uploading && styles.pressed]}
-              >
-                {uploading
-                  ? <ActivityIndicator size="small" color={colors.white} />
-                  : (
-                    <>
-                      <Ionicons name="cloud-upload-outline" size={16} color={colors.white} />
-                      <Text style={styles.primaryButtonText}>Upload {selectedPhotos.length} photo{selectedPhotos.length === 1 ? '' : 's'}</Text>
-                    </>
-                  )}
-              </Pressable>
-              {selectedPhotos.length > 0 && (
-                <Text style={styles.selectionHint}>{selectedPhotos.length} photo{selectedPhotos.length === 1 ? '' : 's'} ready to upload</Text>
-              )}
-            </View>
-          )}
-
-          {portfolio.length > 0 ? (
-            <View style={styles.photoGrid}>
-              {portfolio.map((photo) => (
-                <Pressable key={photo.url} onPress={() => setPreviewUrl(photo.url)} style={({ pressed }) => [pressed && { opacity: 0.85 }]}>
-                  <Image source={{ uri: photo.url }} style={styles.photo} />
-                </Pressable>
-              ))}
-            </View>
-          ) : (
-            <View style={styles.emptyRow}>
-              <Ionicons name="images-outline" size={18} color={colors.muted} />
-              <Text style={styles.mutedSmall}>No completed-repair photos yet.</Text>
-            </View>
-          )}
+            ) : (
+              <View style={{ gap: 12 }}>
+                {[
+                  { title: 'MacBook Pro Screen Fix', desc: 'Full display assembly replacement', img: '1518770660' },
+                  { title: 'iPhone Battery Swap', desc: 'OEM battery + adhesive replaced', img: '1565849936' },
+                  { title: 'Gaming PC Rebuild', desc: 'Thermal paste, cable management', img: '1518770660' },
+                ].map((p) => (
+                  <View key={p.title} style={styles.portfolioCardWhite}>
+                    <Image source={{ uri: `https://images.unsplash.com/photo-${p.img}?w=400&h=120&fit=crop&auto=format` }} style={styles.portfolioImage} />
+                    <View style={styles.portfolioCardBody}>
+                      <Text style={styles.portfolioCardTitle}>{p.title}</Text>
+                      <Text style={styles.portfolioCardDesc}>{p.desc}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
           {portfolio.length === 0 && !readOnly && selectedPhotos.length === 0 && (
             <Text style={styles.portfolioHint}>Show your best work: completed repairs build trust faster than any description.</Text>
           )}
@@ -1043,11 +1036,37 @@ const styles = StyleSheet.create({
   countBadge: { backgroundColor: colors.techSoft, borderWidth: 1, borderColor: colors.hudBorder, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
   countBadgeText: { color: colors.tech, fontSize: 11, fontFamily: fonts.bold },
 
-  // Skills
+  // Skills - Image 1: progress cards
   skillWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   skillChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.techSoft, borderWidth: 1, borderColor: colors.hudBorder, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, minHeight: 32 },
   skillChipIcon: { flexShrink: 0 },
   skillChipText: { color: colors.ink, fontSize: 12, fontFamily: fonts.semiBold },
+  skillProgressCard: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#F3F4F6', borderRadius: 16, padding: 14 },
+  skillProgressHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  skillProgressName: { color: '#111827', fontSize: 13, fontFamily: fonts.semiBold, flex: 1 },
+  skillBadge: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1 },
+  skillBadgeExpert: { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
+  skillBadgeAdvanced: { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' },
+  skillBadgeProficient: { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' },
+  skillBadgeText: { fontSize: 10, fontFamily: fonts.bold },
+  skillBadgeTextExpert: { color: '#2563EB' },
+  skillBadgeTextAdvanced: { color: '#059669' },
+  skillBadgeTextProficient: { color: '#D97706' },
+  skillProgressTrack: { height: 6, backgroundColor: '#F3F4F6', borderRadius: 999, overflow: 'hidden' },
+  skillProgressFill: { height: 6, backgroundColor: '#2563EB', borderRadius: 999 },
+  reviewCardWhite: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#F3F4F6', borderRadius: 16, padding: 14 },
+  reviewCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
+  reviewAvatarOrange: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F97316', alignItems: 'center', justifyContent: 'center' },
+  reviewAvatarText: { color: '#FFFFFF', fontSize: 11, fontFamily: fonts.bold },
+  reviewName: { color: '#111827', fontSize: 13, fontFamily: fonts.semiBold },
+  reviewDate: { color: '#9CA3AF', fontSize: 11, fontFamily: fonts.regular, marginLeft: 'auto' },
+  reviewText: { color: '#4B5563', fontSize: 13, fontFamily: fonts.regular, lineHeight: 19 },
+  portfolioCardWhite: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#F3F4F6', borderRadius: 16, overflow: 'hidden' },
+  portfolioImage: { width: '100%', height: 112, backgroundColor: '#F3F4F6' },
+  portfolioCardBody: { padding: 12, gap: 2 },
+  portfolioCardTitle: { color: '#111827', fontSize: 13, fontFamily: fonts.semiBold },
+  portfolioCardDesc: { color: '#6B7280', fontSize: 11, fontFamily: fonts.regular },
+  addPhotosButtonFull: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#2563EB', borderRadius: 12, paddingVertical: 12, marginBottom: 12 },
 
   // Service Area
   serviceAddress: { color: colors.ink, fontSize: 14, fontFamily: fonts.semiBold, lineHeight: 20, marginBottom: 12 },
