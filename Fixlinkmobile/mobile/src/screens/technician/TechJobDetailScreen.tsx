@@ -1,6 +1,6 @@
 // Prototype TechJobDetail: pay card, customer card, live mini map, action rows.
 import React from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { PhotoThumb } from '../../components/RequestPhoto';
 import LocationIQMap from '../../components/LocationIQMap';
@@ -91,13 +91,31 @@ export default function TechJobDetailScreen({
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Job Map</Text>
           {hasCoords ? (
-            <LocationIQMap
-              technicianCoords={techCoords?.latitude != null ? { latitude: techCoords.latitude, longitude: techCoords.longitude, name: 'You' } : undefined}
-              customerCoords={{ latitude: lat, longitude: lng, name: job.customerName || 'Customer', address: job.location || '' }}
-              currentUserRole="technician"
-              isAccepted={!isQueue}
-              style={{ height: 140, borderRadius: 12, overflow: 'hidden' }}
-            />
+            <>
+              <LocationIQMap
+                technicianCoords={techCoords?.latitude != null ? { latitude: techCoords.latitude, longitude: techCoords.longitude, name: 'You' } : undefined}
+                customerCoords={{ latitude: lat, longitude: lng, name: job.customerName || 'Customer', address: job.location || '' }}
+                currentUserRole="technician"
+                isAccepted={!isQueue}
+                style={{ height: 140, borderRadius: 12, overflow: 'hidden' }}
+              />
+              <View style={styles.mapAddressBar}>
+                <Ionicons name="location" size={12} color={colors.tech} />
+                <Text style={styles.mapAddressText} numberOfLines={1}>{job.location || 'Dakit, Bogo City, 6010'}</Text>
+              </View>
+              <Pressable
+                onPress={() => {
+                  const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+                  Linking.openURL(url).catch(() => {});
+                }}
+                style={({ pressed }) => [styles.navigateBtn, pressed && { opacity: 0.85 }]}
+                accessibilityRole="button"
+                accessibilityLabel="Navigate to customer location"
+              >
+                <Ionicons name="navigate" size={14} color="#FFFFFF" />
+                <Text style={styles.navigateText}>Navigate</Text>
+              </Pressable>
+            </>
           ) : (
             <View style={styles.mapPlaceholder}>
               <Ionicons name="location" size={20} color={BLUE} />
@@ -178,6 +196,10 @@ const styles = StyleSheet.create({
   infoText: { flex: 1, color: colors.muted, fontSize: 12, fontFamily: fonts.regular },
   mapPlaceholder: { backgroundColor: colors.surfaceSunken, borderRadius: 12, height: 112, alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: colors.lineSoft },
   mapPlaceholderText: { color: colors.muted, fontSize: 12, fontFamily: fonts.medium },
+  mapAddressBar: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.techSoft, borderWidth: 1, borderColor: colors.hudBorder, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginTop: 10 },
+  mapAddressText: { flex: 1, color: colors.ink, fontSize: 12, fontFamily: fonts.semiBold },
+  navigateBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: BLUE, borderRadius: 12, minHeight: 44, marginTop: 8, ...shadows.card },
+  navigateText: { color: '#FFFFFF', fontSize: 13, fontFamily: fonts.bold },
   btnRow: { flexDirection: 'row', gap: 8 },
   declineBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: colors.danger + '40', borderRadius: 14, minHeight: 48, backgroundColor: colors.white },
   declineText: { color: colors.danger, fontSize: 14, fontFamily: fonts.bold },
