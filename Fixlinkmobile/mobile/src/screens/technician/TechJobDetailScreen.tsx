@@ -91,21 +91,11 @@ export default function TechJobDetailScreen({
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Job Map</Text>
           {hasCoords ? (
-            <>
-              <TechnicianLocationMap
-                customerCoords={{ latitude: lat, longitude: lng, name: job.customerName || 'Customer', address: job.location || '' }}
-                isAccepted={!isQueue}
-                style={{ height: 140, borderRadius: 12, overflow: 'hidden' }}
-              />
-              <View style={styles.mapAddressBar}>
-                <Ionicons name="location" size={12} color={colors.tech} />
-                <Text style={styles.mapAddressText} numberOfLines={1}>{job.location || 'Dakit, Bogo City, 6010'}</Text>
-              </View>
-              <View style={styles.navigateBtnSystem}>
-                <Ionicons name="map" size={14} color="#2563EB" />
-                <Text style={styles.navigateTextSystem}>FixLink System Map - Customer Only</Text>
-              </View>
-            </>
+            <TechnicianLocationMap
+              customerCoords={{ latitude: lat, longitude: lng, name: job.customerName || 'Customer', address: job.location || '' }}
+              isAccepted={!isQueue}
+              style={{ height: 140, borderRadius: 12, overflow: 'hidden' }}
+            />
           ) : (
             <View style={styles.mapPlaceholder}>
               <Ionicons name="location" size={20} color={BLUE} />
