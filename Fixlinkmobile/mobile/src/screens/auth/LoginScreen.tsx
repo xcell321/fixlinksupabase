@@ -18,13 +18,13 @@ export default function LoginScreen({ onLoginSuccess, switchToRegister, switchTo
      const [showPassword, setShowPassword] = useState(false);
    const [role, setRole] = useState('customer');
    const accent = role === 'technician' ? colors.tech : colors.customer;
-  const handleLogin = async () => {
+   const handleLogin = async () => {
     const normalizedEmail = email.trim().toLowerCase();
      const errors = {};
     if (!normalizedEmail) errors.email = 'Email is required.'; else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) errors.email = 'Enter a valid email.';
     if (!password) errors.password = 'Password is required.'; else if (password.length < 6) errors.password = 'Password must be at least 6 characters.';
     setFieldErrors(errors); setLoginError(''); if (Object.keys(errors).length) return; setLoading(true);
-    try { const response = await api.post('/auth/login', { email: normalizedEmail, password });
+    try { const response = await api.post('/auth/login', { email: normalizedEmail, password, expectedRole: role });
     setAuthToken(response.data.idToken);
      onLoginSuccess(response.data);
      } catch (error)

@@ -18,10 +18,10 @@ const upload = multer({
   }
 });
 
-// POST: Login user
+// POST: Login user - enforces role: customer cannot log in as technician and vice versa
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, expectedRole } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ error: 'Missing email or password' });
@@ -49,6 +49,18 @@ router.post('/login', async (req, res) => {
 
     if (profileError || !userData) {
       return res.status(404).json({ error: 'User profile not found in database' });
+    }
+
+    // Enforce role: customer cannot log in as technician and vice versa
+    if (expectedRole && String(expectedRole).toLowerCase() !== String(userData.role).toLowerCase()) {
+      const actual = String(userData.role).toLowerCase();
+      if (actual === 'customer' && String(expectedRole).toLowerCase() === 'technician') {
+        return res.status(403).json({ error: 'This account is registered as a customer. Please use Customer login.' });
+      }
+      if (actual === 'technician' && String(expectedRole).toLowerCase() === 'customer') {
+        return res.status(403).json({ error: 'This account is registered as a technician. Please use Technician login.' });
+      }
+      return res.status(403).json({ error: `Role mismatch: this account is a ${userData.role}.` });
     }
 
     // Check if technician account is still pending verification
