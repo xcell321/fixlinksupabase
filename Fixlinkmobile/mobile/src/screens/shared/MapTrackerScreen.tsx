@@ -88,7 +88,7 @@ export default function MapTrackerScreen({ currentUser, selectedJob: initialJob,
   }, [activeJob?.id]);
 
   // The customer's technician pin starts empty. Only the live-tracking poll (or
-  // the live tracking response) fills it — never the job's coordinates, so the
+  // the live tracking response) fills it ï¿½ never the job's coordinates, so the
   // technician pin can never sit on the customer's home.
   const initialTechnicianCoords = null;
 
@@ -167,7 +167,7 @@ export default function MapTrackerScreen({ currentUser, selectedJob: initialJob,
 
   // Live tracking: fetch the other party's REAL location so the technician pin
   // is placed at the technician's position and the customer pin at the
-  // customer's position — never mixed up. The response is an explicit split
+  // customer's position ï¿½ never mixed up. The response is an explicit split
   // `{ technician, customer }` object so the two roles map 1:1 to markers.
   useEffect(() => {
     if (!isAccepted || !activeJob?.id) return undefined;
@@ -326,8 +326,8 @@ export default function MapTrackerScreen({ currentUser, selectedJob: initialJob,
       <View style={styles.mapArea}>
         <LocationIQMap
           key={activeJob?.id || 'job'}
-          technicianCoords={technicianCoords}
-          customerCoords={customerCoords}
+          technicianCoords={currentUser?.role === 'customer' ? technicianCoords : null}
+          customerCoords={currentUser?.role === 'technician' ? customerCoords : null}
           routeCoordinates={routeCoordinates}
           currentUserRole={currentUser?.role || 'customer'}
           isAccepted={isAccepted}
@@ -352,7 +352,7 @@ export default function MapTrackerScreen({ currentUser, selectedJob: initialJob,
           <View style={styles.tripCell}>
             <View style={[styles.tripIconWrap, isAccepted && technicianCoords?.latitude != null && styles.tripIconWrapActive]}><Ionicons name={isAccepted && technicianCoords?.latitude != null ? "locate-outline" : "radio-outline"} size={14} color={isAccepted && technicianCoords?.latitude != null ? colors.white : colors.muted} /></View>
             <Text style={styles.tripLabel}>TRACKING</Text>
-            <Text style={[styles.tripValue, isAccepted && technicianCoords?.latitude != null && styles.tripValueActive]}>{isAccepted ? (technicianCoords?.latitude != null ? 'Active' : 'Locating…') : 'Locked'}</Text>
+            <Text style={[styles.tripValue, isAccepted && technicianCoords?.latitude != null && styles.tripValueActive]}>{isAccepted ? (technicianCoords?.latitude != null ? 'Active' : 'Locatingï¿½') : 'Locked'}</Text>
           </View>
         </View>
 
@@ -361,7 +361,7 @@ export default function MapTrackerScreen({ currentUser, selectedJob: initialJob,
           <View style={styles.destinationCopy}>
             <Text style={styles.destinationKicker}>SERVICE DESTINATION</Text>
             <Text style={styles.destinationName} numberOfLines={1}>{customerCoords.name}</Text>
-            <Text style={styles.destinationMeta} numberOfLines={1}>{activeJob?.applianceType || 'Repair request'} • {customerCoords.latitude != null ? customerCoords.address : 'Resolving location…'}</Text>
+            <Text style={styles.destinationMeta} numberOfLines={1}>{activeJob?.applianceType || 'Repair request'} ï¿½ {customerCoords.latitude != null ? customerCoords.address : 'Resolving locationï¿½'}</Text>
           </View>
         </View>
 

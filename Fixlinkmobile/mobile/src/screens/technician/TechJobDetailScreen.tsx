@@ -93,7 +93,6 @@ export default function TechJobDetailScreen({
           {hasCoords ? (
             <>
               <TechnicianLocationMap
-                technicianCoords={techCoords?.latitude != null ? { latitude: techCoords.latitude, longitude: techCoords.longitude, name: 'You' } : undefined}
                 customerCoords={{ latitude: lat, longitude: lng, name: job.customerName || 'Customer', address: job.location || '' }}
                 isAccepted={!isQueue}
                 style={{ height: 140, borderRadius: 12, overflow: 'hidden' }}
@@ -104,7 +103,7 @@ export default function TechJobDetailScreen({
               </View>
               <View style={styles.navigateBtnSystem}>
                 <Ionicons name="map" size={14} color="#2563EB" />
-                <Text style={styles.navigateTextSystem}>FixLink System Map</Text>
+                <Text style={styles.navigateTextSystem}>FixLink System Map - Customer Only</Text>
               </View>
             </>
           ) : (
