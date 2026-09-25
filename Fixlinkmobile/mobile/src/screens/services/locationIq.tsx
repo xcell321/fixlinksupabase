@@ -66,7 +66,7 @@ const BOGO_LOCAL_COORDS: Record<string, LatLng> = {
   taytayan: { latitude: 11.043, longitude: 124.008 },
   gairan: { latitude: 11.0554, longitude: 124.0217 },
   cogon: { latitude: 11.038, longitude: 124.015 },
-  dakit: { latitude: 11.062, longitude: 124.012 },
+  dakit: { latitude: 11.058, longitude: 124.008 },
   nailon: { latitude: 11.085, longitude: 124.035 },
   libertad: { latitude: 11.031, longitude: 124.002 },
   siocon: { latitude: 11.068, longitude: 124.025 },

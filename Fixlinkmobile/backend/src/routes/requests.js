@@ -50,7 +50,7 @@ const BOGO_LANDMARKS = {
   'taytayan': { latitude: 11.0430, longitude: 124.0080 },
   'gairan': { latitude: 11.0554, longitude: 124.0217 },
   'cogon': { latitude: 11.0380, longitude: 124.0150 },
-  'dakit': { latitude: 11.0620, longitude: 124.0120 },
+  'dakit': { latitude: 11.0580, longitude: 124.0080 },
   'nailon': { latitude: 11.0850, longitude: 124.0350 },
   'libertad': { latitude: 11.0310, longitude: 124.0020 },
   'siocon': { latitude: 11.0680, longitude: 124.0250 },
