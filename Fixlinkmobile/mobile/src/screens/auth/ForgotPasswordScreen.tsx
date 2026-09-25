@@ -5,10 +5,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { forgotPassword } from '../services/api';
 import { colors, fonts } from '../../theme';
 
-// Prototype ForgotPassword: white BackHeader + orange lock tile. Logic unchanged.
-const ORANGE = colors.customer;
-
-export default function ForgotPasswordScreen({ switchToLogin }) {
+// Prototype ForgotPassword: white BackHeader + role-aware (orange customer / blue technician). Logic unchanged.
+export default function ForgotPasswordScreen({ switchToLogin, role = 'customer' }) {
+  const accent = role === 'technician' ? colors.tech : colors.customer;
+  const softBg = role === 'technician' ? colors.techSoft : '#FFF7ED';
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [isSent, setIsSent] = useState(false);
@@ -38,8 +38,8 @@ export default function ForgotPasswordScreen({ switchToLogin }) {
         <Text style={styles.backTitle}>Forgot Password</Text>
       </View>
       <View style={styles.body}>
-        <View style={styles.iconTile}>
-          <Ionicons name={isSent ? 'mail-open-outline' : 'lock-closed-outline'} size={28} color={ORANGE} />
+        <View style={[styles.iconTile, { backgroundColor: softBg }]}>
+          <Ionicons name={isSent ? 'mail-open-outline' : 'lock-closed-outline'} size={28} color={accent} />
         </View>
         <Text style={styles.title}>{isSent ? 'Check your email' : 'Reset your password'}</Text>
         <Text style={styles.copy}>
@@ -65,7 +65,7 @@ export default function ForgotPasswordScreen({ switchToLogin }) {
           </>
         )}
         <TouchableOpacity
-          style={styles.primary}
+          style={[styles.primary, { backgroundColor: accent }]}
           onPress={isSent ? switchToLogin : handleReset}
           disabled={loading}
           activeOpacity={0.88}
