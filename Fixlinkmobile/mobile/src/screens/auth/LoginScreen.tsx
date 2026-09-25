@@ -107,7 +107,7 @@ const styles = StyleSheet.create({ container: { flex: 1, backgroundColor: '#FFFF
    inputError: { borderColor: '#FC8181' }, fieldError: { color: colors.danger, fontSize: 12, marginTop: 6, fontFamily: fonts.medium },
    forgotWrap: { alignItems: 'flex-end', marginTop: 10 },
    forgot: { color: ORANGE, fontSize: 13, fontFamily: fonts.semiBold },
-   errorText: { color: colors.danger, fontSize: 13, marginTop: 12, textAlign: 'center', fontFamily: fonts.medium },
+    errorText: { color: colors.danger, fontSize: 11, marginTop: 10, textAlign: 'center', fontFamily: fonts.medium, lineHeight: 15 },
    button: { minHeight: 52, borderRadius: 12, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center', marginTop: 20 },
    buttonText: { color: '#FFFFFF', fontSize: 15, fontFamily: fonts.bold },
     registerRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 20 },
