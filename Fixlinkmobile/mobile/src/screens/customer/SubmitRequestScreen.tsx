@@ -392,8 +392,10 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
       setIsCustomTime(false);
       setCurrentStep(1);
       setStepErrors({});
-    } catch (error) {
-      Alert.alert("Error", "Failed to submit request.");
+    } catch (error: any) {
+      const msg = error?.error || error?.message || (typeof error === 'string' ? error : JSON.stringify(error)) || 'Network Error - check backend 5050';
+      console.log('Submit failed:', msg, error);
+      Alert.alert("Submit Error", String(msg));
     } finally {
       setLoading(false);
     }

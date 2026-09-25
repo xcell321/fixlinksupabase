@@ -4,7 +4,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { Ionicons } from '@expo/vector-icons';
 import { PhotoThumb } from '../../components/RequestPhoto';
 import LocationIQMap from '../../components/LocationIQMap';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, shadows } from '../../theme';
 import { formatJobSchedule, canMarkArrival, canStartRepair, type JobItem } from '../../utils/availableJobsHelpers';
 
 const BLUE = '#2563EB';
@@ -91,13 +91,23 @@ export default function TechJobDetailScreen({
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Job Map</Text>
           {hasCoords ? (
-            <LocationIQMap
-              technicianCoords={techCoords?.latitude != null ? { latitude: techCoords.latitude, longitude: techCoords.longitude, name: 'You' } : undefined}
-              customerCoords={{ latitude: lat, longitude: lng, name: job.customerName || 'Customer', address: job.location || '' }}
-              currentUserRole="technician"
-              isAccepted={!isQueue}
-              style={{ height: 140, borderRadius: 12, overflow: 'hidden' }}
-            />
+            <>
+              <LocationIQMap
+                technicianCoords={techCoords?.latitude != null ? { latitude: techCoords.latitude, longitude: techCoords.longitude, name: 'You' } : undefined}
+                customerCoords={{ latitude: lat, longitude: lng, name: job.customerName || 'Customer', address: job.location || '' }}
+                currentUserRole="technician"
+                isAccepted={!isQueue}
+                style={{ height: 140, borderRadius: 12, overflow: 'hidden' }}
+              />
+              <View style={styles.mapAddressBar}>
+                <Ionicons name="location" size={12} color={colors.tech} />
+                <Text style={styles.mapAddressText} numberOfLines={1}>{job.location || 'Dakit, Bogo City, 6010'}</Text>
+              </View>
+              <View style={styles.navigateBtnSystem}>
+                <Ionicons name="map" size={14} color="#2563EB" />
+                <Text style={styles.navigateTextSystem}>FixLink System Map</Text>
+              </View>
+            </>
           ) : (
             <View style={styles.mapPlaceholder}>
               <Ionicons name="location" size={20} color={BLUE} />
@@ -157,38 +167,44 @@ export default function TechJobDetailScreen({
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#F9FAFB' },
-  backHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
-  backBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  backTitle: { color: '#111827', fontSize: 15, fontFamily: fonts.semiBold },
+  screen: { flex: 1, backgroundColor: colors.canvas },
+  backHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16, backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.line },
+  backBtn: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', minHeight: 44, minWidth: 44 },
+  backTitle: { color: colors.ink, fontSize: 15, fontFamily: fonts.semiBold },
   body: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 32, gap: 16 },
-  card: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#F3F4F6' },
-  cardTitle: { color: '#111827', fontSize: 14, fontFamily: fonts.bold, marginBottom: 12 },
+  card: { backgroundColor: colors.white, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: colors.line, ...shadows.card },
+  cardTitle: { color: colors.ink, fontSize: 14, fontFamily: fonts.bold, marginBottom: 12 },
   payRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 4 },
-  jobTitle: { color: '#111827', fontSize: 16, fontFamily: fonts.bold },
-  jobIssue: { color: '#6B7280', fontSize: 13, fontFamily: fonts.regular, marginTop: 2 },
-  descBox: { backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#F3F4F6', borderRadius: 12, padding: 12, marginTop: 12 },
-  descText: { color: '#4B5563', fontSize: 13, fontFamily: fonts.regular, lineHeight: 19 },
+  jobTitle: { color: colors.ink, fontSize: 16, fontFamily: fonts.bold, letterSpacing: -0.2 },
+  jobIssue: { color: colors.muted, fontSize: 13, fontFamily: fonts.regular, marginTop: 2 },
+  descBox: { backgroundColor: colors.surfaceSunken, borderWidth: 1, borderColor: colors.lineSoft, borderRadius: 12, padding: 12, marginTop: 12 },
+  descText: { color: colors.ink, fontSize: 13, fontFamily: fonts.regular, lineHeight: 19 },
   customerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
-  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#F97316', alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: '#FFFFFF', fontSize: 15, fontFamily: fonts.extraBold },
-  customerName: { color: '#111827', fontSize: 14, fontFamily: fonts.semiBold },
-  customerMeta: { color: '#6B7280', fontSize: 12, fontFamily: fonts.regular, marginTop: 2 },
+  avatar: { width: 44, height: 44, borderRadius: 14, backgroundColor: colors.techSoft, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.hudBorder },
+  avatarText: { color: colors.techDark, fontSize: 18, fontFamily: fonts.bold },
+  customerName: { color: colors.ink, fontSize: 14, fontFamily: fonts.semiBold },
+  customerMeta: { color: colors.muted, fontSize: 12, fontFamily: fonts.regular, marginTop: 2 },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
-  infoText: { flex: 1, color: '#6B7280', fontSize: 12, fontFamily: fonts.regular },
-  mapPlaceholder: { backgroundColor: '#F3F4F6', borderRadius: 12, height: 112, alignItems: 'center', justifyContent: 'center', gap: 6 },
-  mapPlaceholderText: { color: '#6B7280', fontSize: 12, fontFamily: fonts.medium },
+  infoText: { flex: 1, color: colors.muted, fontSize: 12, fontFamily: fonts.regular },
+  mapPlaceholder: { backgroundColor: colors.surfaceSunken, borderRadius: 12, height: 112, alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: colors.lineSoft },
+  mapPlaceholderText: { color: colors.muted, fontSize: 12, fontFamily: fonts.medium },
+  mapAddressBar: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.techSoft, borderWidth: 1, borderColor: colors.hudBorder, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginTop: 10 },
+  mapAddressText: { flex: 1, color: colors.ink, fontSize: 12, fontFamily: fonts.semiBold },
+  navigateBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: BLUE, borderRadius: 12, minHeight: 44, marginTop: 8, ...shadows.card },
+  navigateText: { color: '#FFFFFF', fontSize: 13, fontFamily: fonts.bold },
+  navigateBtnSystem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE', borderRadius: 12, minHeight: 44, marginTop: 8 },
+  navigateTextSystem: { color: '#2563EB', fontSize: 13, fontFamily: fonts.bold },
   btnRow: { flexDirection: 'row', gap: 8 },
-  declineBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 2, borderColor: '#FECACA', borderRadius: 12, minHeight: 52, backgroundColor: '#FFFFFF' },
-  declineText: { color: '#EF4444', fontSize: 14, fontFamily: fonts.semiBold },
-  acceptBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: BLUE, borderRadius: 12, minHeight: 52 },
-  acceptText: { color: '#FFFFFF', fontSize: 14, fontFamily: fonts.semiBold },
-  messageBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#F3F4F6', borderRadius: 12, minHeight: 52 },
-  messageText: { color: '#374151', fontSize: 14, fontFamily: fonts.semiBold },
-  startBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#D1FAE5', borderRadius: 12, minHeight: 52 },
-  startText: { color: '#047857', fontSize: 14, fontFamily: fonts.semiBold },
-  primaryBlue: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: BLUE, borderRadius: 12, minHeight: 52 },
-  primaryBlueText: { color: '#FFFFFF', fontSize: 14, fontFamily: fonts.semiBold },
-  completeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#10B981', borderRadius: 12, minHeight: 52 },
-  completeText: { color: '#FFFFFF', fontSize: 14, fontFamily: fonts.semiBold },
+  declineBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: colors.danger + '40', borderRadius: 14, minHeight: 48, backgroundColor: colors.white },
+  declineText: { color: colors.danger, fontSize: 14, fontFamily: fonts.bold },
+  acceptBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.tech, borderRadius: 14, minHeight: 48, ...shadows.card },
+  acceptText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
+  messageBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 14, minHeight: 48 },
+  messageText: { color: colors.ink, fontSize: 14, fontFamily: fonts.bold },
+  startBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.green, borderRadius: 14, minHeight: 48 },
+  startText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
+  primaryBlue: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.tech, borderRadius: 14, minHeight: 48, ...shadows.card },
+  primaryBlueText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
+  completeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.green, borderRadius: 14, minHeight: 48, ...shadows.card },
+  completeText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
 });

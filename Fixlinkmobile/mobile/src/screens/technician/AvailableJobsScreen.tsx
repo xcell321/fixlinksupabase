@@ -571,7 +571,7 @@ export default function AvailableJobsScreen({
             <Ionicons
               name="radio"
               size={16}
-              color={feedTab === 'queue' ? colors.techDark : colors.muted}
+              color={feedTab === 'queue' ? '#FFFFFF' : colors.muted}
             />
             <Text style={[styles.feedTabLabel, feedTab === 'queue' && styles.feedTabLabelActive]}>
               Available
@@ -597,7 +597,7 @@ export default function AvailableJobsScreen({
             <Ionicons
               name="construct"
               size={16}
-              color={feedTab === 'active' ? colors.techDark : colors.muted}
+              color={feedTab === 'active' ? '#FFFFFF' : colors.muted}
             />
             <Text style={[styles.feedTabLabel, feedTab === 'active' && styles.feedTabLabelActive]}>
               Assigned
@@ -1157,16 +1157,16 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 48 },
   centerWrap: { width: '100%', maxWidth: 640,
 alignSelf: 'center' },
-  // Prototype TechJobs dark header
-  protoHeader: { backgroundColor: '#0D1B2A', paddingHorizontal: 20, paddingTop: 24, paddingBottom: 24, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, marginHorizontal: -16, marginTop: -12, marginBottom: 16 },
+  // Dark header matching Make file design
+  protoHeader: { backgroundColor: colors.dark, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 24, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, marginHorizontal: -16, marginTop: -12, marginBottom: 16 },
   protoHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 10 },
-  protoKicker: { color: '#9CA3AF', fontSize: 12, fontFamily: fonts.regular },
-  protoName: { color: '#FFFFFF', fontSize: 21, fontFamily: fonts.extraBold, letterSpacing: -0.3, marginTop: 2 },
-  protoBell: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.10)', alignItems: 'center', justifyContent: 'center' },
+  protoKicker: { color: colors.muted, fontSize: 12, fontFamily: fonts.regular },
+  protoName: { color: colors.white, fontSize: 21, fontFamily: fonts.extraBold, letterSpacing: -0.3, marginTop: 2 },
+  protoBell: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.10)', alignItems: 'center', justifyContent: 'center', minHeight: 44, minWidth: 44 },
   protoStatsRow: { flexDirection: 'row', gap: 12 },
   protoStat: { flex: 1, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14, paddingVertical: 12, alignItems: 'center' },
-  protoStatValue: { color: '#FFFFFF', fontSize: 22, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
-  protoStatLabel: { color: '#9CA3AF', fontSize: 11, fontFamily: fonts.medium, marginTop: 2 },
+  protoStatValue: { color: colors.white, fontSize: 22, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
+  protoStatLabel: { color: colors.muted, fontSize: 11, fontFamily: fonts.medium, marginTop: 2 },
 
   topBar: {
     flexDirection: 'row',
@@ -1243,7 +1243,7 @@ alignSelf: 'center' },
     minWidth: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: colors.error,
+    backgroundColor: colors.danger,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,
@@ -1378,9 +1378,10 @@ alignSelf: 'center' },
     justifyContent: 'center',
     gap: 6,
     height: 44,
-    borderRadius: 12
+    borderRadius: 12,
+    minHeight: 44
   },
-  feedTabItemActive: { backgroundColor: colors.techSoft },
+  feedTabItemActive: { backgroundColor: colors.tech },
   feedTabLabel: {
     fontSize: 13,
     fontFamily: fonts.semiBold,
@@ -1388,7 +1389,7 @@ alignSelf: 'center' },
   },
   feedTabLabelActive: {
     fontFamily: fonts.bold,
-    color: colors.techDark
+    color: colors.white
   },
   tabBadge: {
     minWidth: 20,
@@ -1399,14 +1400,14 @@ alignSelf: 'center' },
     justifyContent: 'center',
     paddingHorizontal: 5
   },
-  tabBadgeActive: { backgroundColor: colors.techDark },
+  tabBadgeActive: { backgroundColor: colors.white },
   tabBadgeText: {
     fontSize: 11,
     fontFamily: fonts.bold,
     color: colors.muted,
     fontVariant: ['tabular-nums']
   },
-  tabBadgeTextActive: { color: colors.white },
+  tabBadgeTextActive: { color: colors.tech },
 
   queueControlSection: { marginBottom: 12 },
   searchBarContainer: {
@@ -1474,7 +1475,7 @@ alignSelf: 'center' },
     borderWidth: 1,
     borderColor: colors.line,
     padding: 16,
-    ...shadows.subtle
+    ...shadows.card
   },
   cardHeader: {
     flexDirection: 'row',
@@ -1665,12 +1666,13 @@ alignSelf: 'center' },
     flex: 1,
     minWidth: 120,
     height: 48,
-    borderRadius: 12,
+    borderRadius: 14,
     backgroundColor: colors.tech,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 14
+    paddingHorizontal: 14,
+    ...shadows.card
   },
   primaryBtnText: {
     fontSize: 13,
@@ -1679,15 +1681,16 @@ alignSelf: 'center' },
   },
   secondaryBtn: {
     height: 48,
-    borderRadius: 12,
-    backgroundColor: colors.canvas,
+    borderRadius: 14,
+    backgroundColor: colors.white,
     borderWidth: 1,
     borderColor: colors.line,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 14,
-    gap: 6
+    gap: 6,
+    minHeight: 48
   },
   secondaryBtnText: {
     fontSize: 13,
@@ -1697,12 +1700,14 @@ alignSelf: 'center' },
   dangerOutlineBtn: {
     width: 48,
     height: 48,
-    borderRadius: 12,
+    borderRadius: 14,
     backgroundColor: colors.white,
     borderWidth: 1,
     borderColor: colors.danger + '40',
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    minHeight: 48,
+    minWidth: 48
   },
   dangerOutlineText: {
     fontSize: 12,
@@ -1713,22 +1718,25 @@ alignSelf: 'center' },
     flex: 1,
     minWidth: 150,
     height: 48,
-    borderRadius: 12,
+    borderRadius: 14,
     backgroundColor: colors.green,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 14
+    paddingHorizontal: 14,
+    ...shadows.card
   },
   iconCompanion: {
     width: 48,
     height: 48,
-    borderRadius: 12,
+    borderRadius: 14,
     backgroundColor: colors.techSoft,
     borderWidth: 1,
     borderColor: colors.hudBorder,
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    minHeight: 48,
+    minWidth: 48
   },
 
   emptyCard: {
@@ -1946,5 +1954,6 @@ alignSelf: 'center' },
     height: 1
   },
 
-  pressedSoft: { opacity: 0.85, transform: [{ scale: 0.98 }] }
+  pressedSoft: { opacity: 0.85, transform: [{ scale: 0.98 }] },
+  pressed: { transform: [{ scale: 0.97 }], opacity: 0.96 }
 });
