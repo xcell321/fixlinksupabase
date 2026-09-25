@@ -38,14 +38,6 @@ export default function LoginScreen({ onLoginSuccess, switchToRegister, switchTo
   };
   return <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}><ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
     <View style={styles.header}>
-      <View style={styles.modeToggle}>
-        <TouchableOpacity onPress={() => setRole('customer')} style={[styles.modeTab, role === 'customer' && styles.modeTabCustomer]} activeOpacity={0.85}>
-          <Text style={[styles.modeText, role === 'customer' && styles.modeTextOn]}>Customer</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setRole('technician')} style={[styles.modeTab, role === 'technician' && styles.modeTabTech]} activeOpacity={0.85}>
-          <Text style={[styles.modeText, role === 'technician' && styles.modeTextOn]}>Technician</Text>
-        </TouchableOpacity>
-      </View>
       <View style={styles.logoRow}>
         <View style={[styles.logo, { backgroundColor: accent }]}><Ionicons name={role === 'technician' ? 'construct-outline' : 'construct'} size={22} color="#FFFFFF" /></View>
         <View>
@@ -75,6 +67,15 @@ export default function LoginScreen({ onLoginSuccess, switchToRegister, switchTo
        : null}<TouchableOpacity style={[styles.button, { backgroundColor: accent }]} onPress={handleLogin} disabled={loading} activeOpacity={0.88}>{loading ?
         <ActivityIndicator color={colors.white} /> : <Text style={styles.buttonText}>Sign In</Text>}</TouchableOpacity>
       <View style={styles.registerRow}><Text style={styles.registerText}>{role === 'technician' ? 'New technician? ' : "Don't have an account? "}</Text><TouchableOpacity onPress={() => switchToRegister(role)}><Text style={[styles.registerLink, { color: accent }]}>{role === 'technician' ? 'Apply Now' : 'Register'}</Text></TouchableOpacity></View>
+      {role === 'customer' ? (
+        <TouchableOpacity onPress={() => setRole('technician')} style={styles.techLoginRow} activeOpacity={0.7}>
+          <Text style={styles.techLoginText}>Log in as <Text style={styles.techLoginBlue}>technician</Text></Text>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity onPress={() => setRole('customer')} style={styles.techLoginRow} activeOpacity={0.7}>
+          <Text style={styles.techLoginText}>Log in as <Text style={styles.techLoginOrange}>customer</Text></Text>
+        </TouchableOpacity>
+      )}
     </View>
   </ScrollView></KeyboardAvoidingView>;
 }
@@ -103,5 +104,9 @@ const styles = StyleSheet.create({ container: { flex: 1, backgroundColor: '#FFFF
    errorText: { color: colors.danger, fontSize: 13, marginTop: 12, textAlign: 'center', fontFamily: fonts.medium },
    button: { minHeight: 52, borderRadius: 12, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center', marginTop: 20 },
    buttonText: { color: '#FFFFFF', fontSize: 15, fontFamily: fonts.bold },
-   registerRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 20 },
-   registerText: { color: '#6B7280', fontSize: 13, fontFamily: fonts.regular }, registerLink: { color: ORANGE, fontSize: 13, fontFamily: fonts.bold } });
+    registerRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 20 },
+    registerText: { color: '#6B7280', fontSize: 13, fontFamily: fonts.regular }, registerLink: { color: ORANGE, fontSize: 13, fontFamily: fonts.bold },
+    techLoginRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 12 },
+    techLoginText: { color: '#6B7280', fontSize: 13, fontFamily: fonts.regular },
+    techLoginBlue: { color: colors.tech, fontFamily: fonts.bold },
+    techLoginOrange: { color: colors.customer, fontFamily: fonts.bold } });
