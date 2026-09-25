@@ -199,10 +199,10 @@ const styles = StyleSheet.create({
   acceptText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
   messageBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 14, minHeight: 48 },
   messageText: { color: colors.ink, fontSize: 14, fontFamily: fonts.bold },
-  startBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.green, borderRadius: 14, minHeight: 48 },
+  startBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.tech, borderRadius: 14, minHeight: 48, ...shadows.card },
   startText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
   primaryBlue: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.tech, borderRadius: 14, minHeight: 48, ...shadows.card },
   primaryBlueText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
-  completeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.green, borderRadius: 14, minHeight: 48, ...shadows.card },
+  completeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.tech, borderRadius: 14, minHeight: 48, ...shadows.card },
   completeText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
 });
