@@ -532,7 +532,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.canvas }, authContainer: { flex: 1, backgroundColor: colors.canvas }, screenContainer: { flex: 1, width: '100%' as const, alignSelf: 'center' as const },
   modalBackdrop: { flex: 1, backgroundColor: colors.white },
   backdropPress: { flex: 1 },
-  notificationPanel: { flex: 1, width: '100%', backgroundColor: colors.white, paddingHorizontal: 16, paddingTop: 56, paddingBottom: 24 },
+  notificationPanel: { flex: 1, width: '100%', backgroundColor: colors.white, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 24 },
   notifHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, gap: 12 },
   notifBackBtn: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', minHeight: 44, minWidth: 44 },
   notifHeaderTitle: { color: colors.ink, fontSize: 18, fontFamily: fonts.bold, flex: 1, textAlign: 'center' },
