@@ -90,39 +90,15 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
     { key: 'Pending', value: String(pendingCount) },
   ];
 
-  const aiReplyFor = (raw) => {
-    const q = String(raw || '').toLowerCase();
-    const job = heroJob;
-    if (!q.trim()) return 'Type a question, for example "Track my repair" or "Find nearby technician".';
-    if (q.includes('track') || q.includes('status') || q.includes('where') || q.includes('my repair')) {
-      if (!job) return 'You have no active repairs right now. Tap Book service to submit your first request.';
-      const tech = job.technicianName ? ` ${job.technicianName} is assigned.` : '';
-      const when = job.preferredTime ? ` Expected: ${job.preferredTime}.` : '';
-      return `Your ${job.applianceType || 'repair'} is ${job.status || 'Pending'}.${tech}${when}`;
-    }
-    if (q.includes('find') || q.includes('nearby') || q.includes('technician') || q.includes('pro')) {
-      if (job && job.technicianName) return `${job.technicianName} is on your ${job.applianceType || 'repair'}. Open Repairs to track them live.`;
-      return 'Tap Book service, choose your device, describe the issue, set a schedule and location. I will match a verified nearby technician for you.';
-    }
-    if (q.includes('book') || q.includes('submit') || q.includes('request')) {
-      return 'To book: tap Book service, pick a device, add the problem and a photo, choose date and time, then pin your location and submit.';
-    }
-    if (q.includes('history') || q.includes('completed') || q.includes('done')) {
-      return completedCount > 0 ? `You have ${completedCount} completed repair${completedCount === 1 ? '' : 's'}. Open Repairs to view them.` : 'No completed repairs yet. Your finished jobs will appear under Repairs.';
-    }
-    if (q.includes('hi') || q.includes('hello') || q.includes('hey')) {
-      return `Hi ${firstName}! I can help you track repairs or find a technician. Try "Track my repair".`;
-    }
-    return 'I can help with tracking repairs and finding technicians. Try "Track my repair" or "Find nearby technician".';
-  };
-
+  // No hardcoded answers: every reply comes from the real AI (OmniRoute)
+  // with live FixLink data. When the gateway is down, say so honestly.
+  const AI_DOWN = 'AI service is unavailable right now. Please check your connection and try again.';
   const aiSend = (preset) => {
     const text = String(preset ?? aiInput).trim();
     if (!text || aiTyping) return;
     setAiMessages((cur) => [...cur, { id: `me-${Date.now()}`, from: 'me', text }]);
     setAiInput('');
     setAiTyping(true);
-    // Real AI via OmniRoute (billed per prompt); local reply is the fallback.
     const ctx = {
       customerName: fullName,
       activeJob: heroJob ? {
@@ -136,11 +112,11 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
       completedCount,
     };
     askAssistant(text, ctx).then((r) => {
-      const reply = String(r?.reply || '').trim() || aiReplyFor(text);
+      const reply = String(r?.reply || '').trim() || AI_DOWN;
       setAiMessages((cur) => [...cur, { id: `ai-${Date.now()}`, from: 'ai', text: reply }]);
       setAiTyping(false);
     }).catch(() => {
-      setAiMessages((cur) => [...cur, { id: `ai-${Date.now()}`, from: 'ai', text: aiReplyFor(text) }]);
+      setAiMessages((cur) => [...cur, { id: `ai-${Date.now()}`, from: 'ai', text: AI_DOWN }]);
       setAiTyping(false);
     });
   };
