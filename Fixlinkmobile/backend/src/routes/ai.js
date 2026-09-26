@@ -76,6 +76,17 @@ router.post('/assistant', async (req, res) => {
     if (!isOmniRouteConfigured()) {
       return res.status(502).json({ error: 'AI service is not configured.', ai: 'degraded' });
     }
+    // Language detection (logic only, no canned answers): Bisaya, Tagalog, or English.
+    const detectLanguage = (t) => {
+      const s = ` ${String(t || '').toLowerCase()} `;
+      const has = (words) => words.some((w) => s.includes(` ${w} `) || s.includes(` ${w}?`) || s.includes(` ${w}!`) || s.includes(` ${w}.`) || s.includes(` ${w},`));
+      const bisaya = ['unsa', 'unsaon', 'ngano', 'asa', 'kanus-a', 'kanusa', 'kinsa', 'kinsay', 'pila', 'pwede', 'lage', 'jud', 'gyud', 'kaayo', 'nako', 'nimo', 'niya', 'akoa', 'imoha', 'ila', 'diri', 'didto', 'dinhi', 'didto', 'karon', 'ugma', 'gahapon', 'salamat', 'palihug', 'maayong', 'kumusta', 'gani', 'nindot', 'dili', 'wala', 'naa', 'tabang', 'pangan', 'buhat', 'tan-aw', 'tanawa'];
+      const tagalog = ['ano', 'paano', 'bakit', 'saan', 'kailan', 'sino', 'magkano', 'puwede', 'kamusta', 'naman', 'gusto', 'kailangan', 'akin', 'iyo', 'dito', 'doon', 'ngayon', 'bukas', 'salamat', 'paki'];
+      if (has(bisaya)) return 'Bisaya';
+      if (has(tagalog)) return 'Tagalog';
+      return 'English';
+    };
+    const lang = detectLanguage(text);
     const c = context && typeof context === 'object' ? context : {};
     // Top technicians by rating for ranking/recommendation questions (real data only).
     let topTechnicians = [];
@@ -104,7 +115,7 @@ router.post('/assistant', async (req, res) => {
     };
     const system = [
       "You are FixLink Assistant, the friendly in-app helper for FixLink customers (repair request + technician dispatch, Philippines).",
-      'The customer may write in Bisaya, Tagalog, or English. ALWAYS reply in the SAME language they used (Bisaya in, Bisaya out).',
+      'Reply ONLY in the detected customer language. Never mix languages: English messages get English-only replies, Bisaya gets Bisaya-only, Tagalog gets Tagalog-only.',
       'Reply warmly and directly, at most 4 short sentences, plain text, no markdown.',
       'Greet by first name only when the customer greets you.',
       'You know the FixLink mobile system: customer submits a repair in 4 steps (Appliance, Problem, Schedule, Location with GPS + map), tracks it under Repairs with live map, chats via Messages, verifies completion with a 4-digit OTP code, and rates the technician. Technicians see Available/Assigned jobs within 20km, accept jobs, navigate on the in-app map, and complete via OTP. Customer login and technician login are separate; a customer account cannot log in as technician and vice versa.',
@@ -114,7 +125,7 @@ router.post('/assistant', async (req, res) => {
       'Do NOT provide price estimates. FixLink matching itself is free.',
       'If the data does not answer the question, say what the customer should tap (Book service, Repairs, Messages).',
     ].join(' ');
-    const user = `Customer message: ${text}\nLive FixLink data: ${JSON.stringify(live).slice(0, 2000)}`;
+    const user = `Detected language: ${lang}. Reply ONLY in ${lang}.\nCustomer message: ${text}\nLive FixLink data: ${JSON.stringify(live).slice(0, 2000)}`;
     const { content } = await chatComplete({ system, user, json: false, temperature: 0.4, maxTokens: 260 });
     return res.status(200).json({ reply: String(content).trim().slice(0, 900), ai: 'ai' });
   } catch (error) {
