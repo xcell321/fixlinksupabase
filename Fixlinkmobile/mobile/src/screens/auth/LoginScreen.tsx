@@ -1,5 +1,5 @@
 ﻿// @ts-nocheck - migrated from .js, preserve working state; types to be refined incrementally
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import api, { setAuthToken } from '../services/api';
@@ -15,16 +15,22 @@ export default function LoginScreen({ onLoginSuccess, switchToRegister, switchTo
    const [loading, setLoading] = useState(false);
     const [loginError, setLoginError] = useState('');
      const [fieldErrors, setFieldErrors] = useState({});
-     const [showPassword, setShowPassword] = useState(false);
-   const [role, setRole] = useState('customer');
+    const [showPassword, setShowPassword] = useState(false);
+    const [role, setRole] = useState('customer');
+    useEffect(() => {
+      if (loginError) {
+        const t = setTimeout(() => setLoginError(''), 3500);
+        return () => clearTimeout(t);
+      }
+    }, [loginError]);
    const accent = role === 'technician' ? colors.tech : colors.customer;
-  const handleLogin = async () => {
+   const handleLogin = async () => {
     const normalizedEmail = email.trim().toLowerCase();
      const errors = {};
     if (!normalizedEmail) errors.email = 'Email is required.'; else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) errors.email = 'Enter a valid email.';
     if (!password) errors.password = 'Password is required.'; else if (password.length < 6) errors.password = 'Password must be at least 6 characters.';
     setFieldErrors(errors); setLoginError(''); if (Object.keys(errors).length) return; setLoading(true);
-    try { const response = await api.post('/auth/login', { email: normalizedEmail, password });
+    try { const response = await api.post('/auth/login', { email: normalizedEmail, password, expectedRole: role });
     setAuthToken(response.data.idToken);
      onLoginSuccess(response.data);
      } catch (error)
@@ -38,18 +44,10 @@ export default function LoginScreen({ onLoginSuccess, switchToRegister, switchTo
   };
   return <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}><ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
     <View style={styles.header}>
-      <View style={styles.modeToggle}>
-        <TouchableOpacity onPress={() => setRole('customer')} style={[styles.modeTab, role === 'customer' && styles.modeTabCustomer]} activeOpacity={0.85}>
-          <Text style={[styles.modeText, role === 'customer' && styles.modeTextOn]}>Customer</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setRole('technician')} style={[styles.modeTab, role === 'technician' && styles.modeTabTech]} activeOpacity={0.85}>
-          <Text style={[styles.modeText, role === 'technician' && styles.modeTextOn]}>Technician</Text>
-        </TouchableOpacity>
-      </View>
       <View style={styles.logoRow}>
-        <View style={[styles.logo, { backgroundColor: accent }]}><Ionicons name={role === 'technician' ? 'construct-outline' : 'construct'} size={22} color="#FFFFFF" /></View>
+        <View style={[styles.logo, { backgroundColor: accent }]}><Ionicons name="construct" size={22} color="#FFFFFF" /></View>
         <View>
-          <Text style={styles.brandSmall}>{role === 'technician' ? 'FixLink Pro' : 'FIXLINK'}</Text>
+          <Text style={styles.brandSmall}>FIXLINK</Text>
           <Text style={styles.roleSmall}>{role === 'technician' ? 'TECHNICIAN PORTAL' : 'HOME SERVICES'}</Text>
         </View>
       </View>
@@ -70,11 +68,20 @@ export default function LoginScreen({ onLoginSuccess, switchToRegister, switchTo
           setFieldErrors(e => ({ ...e, password: '' }));
            }} /><TouchableOpacity onPress={() => setShowPassword(!showPassword)}
            ><Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={18} color={colors.muted} /></TouchableOpacity></View>{fieldErrors.password ? <Text style={styles.fieldError}>{fieldErrors.password}</Text> : null}
-      <TouchableOpacity style={styles.forgotWrap} onPress={switchToForgotPassword}><Text style={[styles.forgot, { color: accent }]}>Forgot password?</Text></TouchableOpacity>
+      <TouchableOpacity style={styles.forgotWrap} onPress={() => switchToForgotPassword(role)}><Text style={[styles.forgot, { color: accent }]}>Forgot password?</Text></TouchableOpacity>
       {loginError ? <Text style={styles.errorText}>{loginError}</Text>
        : null}<TouchableOpacity style={[styles.button, { backgroundColor: accent }]} onPress={handleLogin} disabled={loading} activeOpacity={0.88}>{loading ?
         <ActivityIndicator color={colors.white} /> : <Text style={styles.buttonText}>Sign In</Text>}</TouchableOpacity>
       <View style={styles.registerRow}><Text style={styles.registerText}>{role === 'technician' ? 'New technician? ' : "Don't have an account? "}</Text><TouchableOpacity onPress={() => switchToRegister(role)}><Text style={[styles.registerLink, { color: accent }]}>{role === 'technician' ? 'Apply Now' : 'Register'}</Text></TouchableOpacity></View>
+      {role === 'customer' ? (
+        <TouchableOpacity onPress={() => setRole('technician')} style={styles.techLoginRow} activeOpacity={0.7}>
+          <Text style={styles.techLoginText}>Log in as <Text style={styles.techLoginBlue}>technician</Text></Text>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity onPress={() => setRole('customer')} style={styles.techLoginRow} activeOpacity={0.7}>
+          <Text style={styles.techLoginText}>Log in as <Text style={styles.techLoginOrange}>customer</Text></Text>
+        </TouchableOpacity>
+      )}
     </View>
   </ScrollView></KeyboardAvoidingView>;
 }
@@ -100,8 +107,12 @@ const styles = StyleSheet.create({ container: { flex: 1, backgroundColor: '#FFFF
    inputError: { borderColor: '#FC8181' }, fieldError: { color: colors.danger, fontSize: 12, marginTop: 6, fontFamily: fonts.medium },
    forgotWrap: { alignItems: 'flex-end', marginTop: 10 },
    forgot: { color: ORANGE, fontSize: 13, fontFamily: fonts.semiBold },
-   errorText: { color: colors.danger, fontSize: 13, marginTop: 12, textAlign: 'center', fontFamily: fonts.medium },
+    errorText: { color: colors.danger, fontSize: 11, marginTop: 10, textAlign: 'center', fontFamily: fonts.medium, lineHeight: 15 },
    button: { minHeight: 52, borderRadius: 12, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center', marginTop: 20 },
    buttonText: { color: '#FFFFFF', fontSize: 15, fontFamily: fonts.bold },
-   registerRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 20 },
-   registerText: { color: '#6B7280', fontSize: 13, fontFamily: fonts.regular }, registerLink: { color: ORANGE, fontSize: 13, fontFamily: fonts.bold } });
+    registerRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 20 },
+    registerText: { color: '#6B7280', fontSize: 13, fontFamily: fonts.regular }, registerLink: { color: ORANGE, fontSize: 13, fontFamily: fonts.bold },
+    techLoginRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 12 },
+    techLoginText: { color: '#6B7280', fontSize: 13, fontFamily: fonts.regular },
+    techLoginBlue: { color: colors.tech, fontFamily: fonts.bold },
+    techLoginOrange: { color: colors.customer, fontFamily: fonts.bold } });

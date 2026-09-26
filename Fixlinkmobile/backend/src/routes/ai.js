@@ -12,6 +12,10 @@ const { chatComplete, isOmniRouteConfigured } = require('../utils/omniRoute');
 const { getSchedulesForTechnicians, dayKeyOf, availabilityForDay } = require('../utils/techSchedule');
 const { getActiveJobCountsForTechnicians, getWorkloadStatus } = require('../utils/workload');
 
+// Per-customer assistant language preference. Module-level so it survives
+// across requests (resets on backend restart).
+const langPrefs = new Map();
+
 router.use(requireAuth);
 
 // Resolve a job by its own id or the legacy original request id (same lookup
@@ -58,6 +62,104 @@ router.post('/detect-category', async (req, res) => {
     return res.status(200).json(analysis);
   } catch (error) {
     console.error('AI detect-category error:', error.message);
+    return res.status(502).json({ error: 'AI service unavailable.', ai: 'degraded' });
+  }
+});
+
+// POST /api/ai/assistant — Customer floating FixLink Assistant.
+// Grounded in the customer's live FixLink data sent by the app. Real AI via
+// the OmniRoute gateway (billed per prompt); the app falls back to local
+// replies when the gateway is unavailable.
+router.post('/assistant', async (req, res) => {
+  try {
+    const { message, context } = req.body || {};
+    const text = String(message || '').trim().slice(0, 500);
+    if (!text) {
+      return res.status(400).json({ error: 'A message is required.' });
+    }
+    if (!isOmniRouteConfigured()) {
+      return res.status(502).json({ error: 'AI service is not configured.', ai: 'degraded' });
+    }
+    // Once the customer asks to switch (e.g. "can we speak english"), later
+    // messages stay in that language until they switch again.
+    const switchTarget = (t) => {
+      const s = ` ${String(t || '').toLowerCase()} `;
+      const wants = (names) => names.some((n) => s.includes(` ${n} `) || s.includes(` ${n}?`) || s.includes(` ${n}.`) || s.includes(` ${n},`) || s.includes(` ${n}!`));
+      const verbs = ['speak', 'switch', 'use', 'using', 'only', 'convers', 'istorya', 'mag ', 'prefer', 'let us', 'lets ', 'lang ', ' lang'];
+      const hasVerb = verbs.some((v) => s.includes(v));
+      if ((wants(['english']) || s.includes(' mag english') || s.includes(' in english')) && (hasVerb || s.trim().length < 30)) return 'English';
+      if (wants(['tagalog']) && (hasVerb || s.trim().length < 30)) return 'Tagalog';
+      if ((wants(['bisaya', 'cebuano', 'binisaya']) || s.includes(' mag bisaya') || s.includes(' sa bisaya')) && (hasVerb || s.trim().length < 30)) return 'Bisaya';
+      return null;
+    };
+    // Language detection (logic only, no canned answers): Bisaya, Tagalog, or English.
+    const detectLanguage = (t) => {
+      const s = ` ${String(t || '').toLowerCase()} `;
+      const has = (words) => words.some((w) => s.includes(` ${w} `) || s.includes(` ${w}?`) || s.includes(` ${w}!`) || s.includes(` ${w}.`) || s.includes(` ${w},`));
+      const bisaya = ['unsa', 'unsaon', 'ngano', 'asa', 'kanus-a', 'kanusa', 'kinsa', 'kinsay', 'pila', 'pwede', 'lage', 'jud', 'gyud', 'kaayo', 'nako', 'nimo', 'niya', 'akoa', 'imoha', 'ila', 'diri', 'didto', 'dinhi', 'didto', 'karon', 'ugma', 'gahapon', 'salamat', 'palihug', 'maayong', 'kumusta', 'gani', 'nindot', 'dili', 'wala', 'naa', 'tabang', 'pangan', 'buhat', 'tan-aw', 'tanawa'];
+      const tagalog = ['ano', 'paano', 'bakit', 'saan', 'kailan', 'sino', 'magkano', 'puwede', 'kamusta', 'naman', 'gusto', 'kailangan', 'akin', 'iyo', 'dito', 'doon', 'ngayon', 'bukas', 'salamat', 'paki'];
+      if (has(bisaya)) return 'Bisaya';
+      if (has(tagalog)) return 'Tagalog';
+      return 'English';
+    };
+    const c = context && typeof context === 'object' ? context : {};
+    const customerKey = String(c.customerUid || c.customerName || '').trim().toLowerCase();
+    let lang;
+    let switched = false;
+    const target = switchTarget(text);
+    if (target) {
+      lang = target;
+      switched = true;
+      if (customerKey) langPrefs.set(customerKey, target);
+    } else if (customerKey && langPrefs.get(customerKey)) {
+      lang = langPrefs.get(customerKey);
+    } else {
+      lang = detectLanguage(text);
+    }
+    // Top technicians by rating for ranking/recommendation questions (real data only).
+    let topTechnicians = [];
+    try {
+      const { data: techRows } = await supabase
+        .from('users')
+        .select('name, rating, total_reviews, years_experience, skills')
+        .eq('role', 'technician')
+        .order('rating', { ascending: false, nullsFirst: false })
+        .limit(5);
+      topTechnicians = (techRows || []).map((t) => ({
+        name: t.name,
+        rating: t.rating != null ? Number(Number(t.rating).toFixed(1)) : null,
+        reviews: t.total_reviews != null ? Number(t.total_reviews) : 0,
+        yearsExperience: t.years_experience ?? null,
+        skills: Array.isArray(t.skills) ? t.skills.slice(0, 5) : [],
+      }));
+    } catch (_) {}
+    const live = {
+      customerName: c.customerName || null,
+      activeJob: c.activeJob || null,
+      activeCount: c.activeCount ?? null,
+      pendingCount: c.pendingCount ?? null,
+      completedCount: c.completedCount ?? null,
+      topTechnicians,
+    };
+    const system = [
+      "You are FixLink Assistant, the friendly in-app helper for FixLink customers (repair request + technician dispatch, Philippines).",
+      'Reply ONLY in the detected customer language. Never mix languages: English messages get English-only replies, Bisaya gets Bisaya-only, Tagalog gets Tagalog-only.',
+      'If the customer just asked to switch languages, confirm briefly in the NEW language (e.g. "Sure! Let us continue in English.") and then answer their question in that language.',
+      'Reply warmly and directly, at most 4 short sentences, plain text, no markdown.',
+      'Greet by first name only when the customer greets you.',
+      'You know the FixLink mobile system: customer submits a repair in 4 steps (Appliance, Problem, Schedule, Location with GPS + map), tracks it under Repairs with live map, chats via Messages, verifies completion with a 4-digit OTP code, and rates the technician. Technicians see Available/Assigned jobs within 20km, accept jobs, navigate on the in-app map, and complete via OTP. Customer login and technician login are separate; a customer account cannot log in as technician and vice versa.',
+      'For questions about the system or how to use the app, explain using the real screen and button names above.',
+      'For ranking or recommendation questions, rank using ONLY topTechnicians (rating, then reviews). Name names with rating and review count, e.g. "1. Dustine Villaruz - 4.9 (12 reviews)".',
+      'For status or time questions, use ONLY activeJob (status, technicianName, preferredTime). Never invent names, statuses, times, or prices.',
+      'Do NOT provide price estimates. FixLink matching itself is free.',
+      'If the data does not answer the question, say what the customer should tap (Book service, Repairs, Messages).',
+    ].join(' ');
+    const user = `Detected language: ${lang}.${switched ? ' The customer just requested this language; confirm briefly, then answer.' : ''} You MUST reply ONLY in ${lang}. Any other language is a wrong answer.\nCustomer message: ${text}\nLive FixLink data: ${JSON.stringify(live).slice(0, 2000)}`;
+    console.log(`AI assistant lang: ${lang}${switched ? ' (switched)' : ''} | msg: ${text.slice(0, 60)}`);
+    const { content } = await chatComplete({ system, user, json: false, temperature: 0.4, maxTokens: 260 });
+    return res.status(200).json({ reply: String(content).trim().slice(0, 900), ai: 'ai' });
+  } catch (error) {
+    console.error('AI assistant error:', error.message);
     return res.status(502).json({ error: 'AI service unavailable.', ai: 'degraded' });
   }
 });

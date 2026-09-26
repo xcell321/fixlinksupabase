@@ -65,7 +65,7 @@ interface PhotoThumbProps {
  * Compact inline row shown inside job / request cards when a photo exists.
  * 52px thumbnail keeps cards scannable; the full image opens in PhotoLightbox.
  */
-export function PhotoThumb({ photoUrl, onPress, label = 'Photo attached — tap to view' }: PhotoThumbProps): React.JSX.Element {
+export function PhotoThumb({ photoUrl, onPress, label = 'tap to view' }: PhotoThumbProps): React.JSX.Element {
   return (
     <Pressable
       accessibilityRole="button"
@@ -75,7 +75,7 @@ export function PhotoThumb({ photoUrl, onPress, label = 'Photo attached — tap 
       style={({ pressed }) => [styles.thumbRow, pressed && styles.pressedSoft]}
     >
       <Image source={{ uri: photoUrl }} style={styles.thumb} accessibilityLabel="Repair photo thumbnail" />
-      <Ionicons name="image-outline" size={16} color={colors.teal} />
+      <Ionicons name="image-outline" size={16} color={colors.tech} />
       <Text style={styles.thumbLabel} numberOfLines={1}>{label}</Text>
       <Ionicons name="chevron-forward" size={16} color={colors.muted} />
     </Pressable>
@@ -101,5 +101,5 @@ const styles = StyleSheet.create({
 
   thumbRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, borderRadius: 14, padding: 8, paddingRight: 12, marginTop: 10 },
   thumb: { width: 52, height: 52, borderRadius: 10, backgroundColor: colors.lineSoft ?? '#E3ECF2' },
-  thumbLabel: { flex: 1, color: colors.teal, fontSize: 12, fontFamily: fonts.semiBold },
+  thumbLabel: { flex: 1, color: colors.tech, fontSize: 12, fontFamily: fonts.semiBold },
 });

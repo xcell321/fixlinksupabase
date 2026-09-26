@@ -213,7 +213,7 @@ export default function AppNavigator() {
   if (!user) return (
     <SafeAreaView style={styles.authContainer}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.canvas} />
-      {authMode === 'splash' ? <SplashScreen onGetStarted={() => { setAuthRole('customer'); setAuthMode('register'); }} onHaveAccount={() => setAuthMode('login')} /> : authMode === 'login' ? <LoginScreen onLoginSuccess={setUser} switchToRegister={(role) => { if (role) setAuthRole(role); setAuthMode('register'); }} switchToForgotPassword={() => setAuthMode('forgotPassword')} /> : authMode === 'register' ? <RegisterScreen key={authRole} initialRole={authRole} switchToLogin={() => setAuthMode('login')} onTechnicianPending={() => setAuthMode('verifyPending')} /> : authMode === 'verifyPending' ? <VerifyPendingScreen onBackToLogin={() => setAuthMode('login')} /> : authMode === 'resetPassword' ? <PasswordResetScreen params={recoveryParams} switchToLogin={() => setAuthMode('login')} /> : <ForgotPasswordScreen switchToLogin={() => setAuthMode('login')} />}
+      {authMode === 'splash' ? <SplashScreen onGetStarted={() => { setAuthRole('customer'); setAuthMode('register'); }} onHaveAccount={() => setAuthMode('login')} /> : authMode === 'login' ? <LoginScreen onLoginSuccess={setUser} switchToRegister={(role) => { if (role) setAuthRole(role); setAuthMode('register'); }} switchToForgotPassword={(role) => { if (role) setAuthRole(role); setAuthMode('forgotPassword'); }} /> : authMode === 'register' ? <RegisterScreen key={authRole} initialRole={authRole} switchToLogin={() => setAuthMode('login')} onTechnicianPending={() => setAuthMode('verifyPending')} /> : authMode === 'verifyPending' ? <VerifyPendingScreen onBackToLogin={() => setAuthMode('login')} /> : authMode === 'resetPassword' ? <PasswordResetScreen params={recoveryParams} switchToLogin={() => setAuthMode('login')} /> : <ForgotPasswordScreen role={authRole} switchToLogin={() => setAuthMode('login')} />}
     </SafeAreaView>
   );
 
@@ -257,33 +257,25 @@ export default function AppNavigator() {
   };
 
   const handleNotificationPress = (notification) => {
-    const isFirstClick = !selectedNotification || String(selectedNotification.id) !== String(notification.id);
-    // Tap row → show details + mark read. Navigation is explicit via Open button.
-    if (isFirstClick) {
-      setSelectedNotification(notification);
-      setNotifDetailError(null);
-      if (!notification.read) {
-        setChatNotifications((prev) => prev.map((n) => String(n.id) === String(notification.id) ? { ...n, read: true, readAt: new Date().toISOString() } : n));
-        void markNotificationRead(notification.id).catch((error) => {
-          const status = error?.response?.status ?? error?.status;
-          const isNotFound = status === 404 || String(error?.message || '').includes('404') || String(error?.error || '').toLowerCase().includes('not found');
-          if (isNotFound) return;
-          console.warn('Unable to mark notification read:', error);
-          setChatNotifications((prev) => prev.map((n) => String(n.id) === String(notification.id) ? { ...n, read: false, readAt: null } : n));
-          setNotifDetailError('Could not mark as read. Please check your connection.');
-        });
-      }
-      return;
+    // One-tap direct: mark read, then navigate straight to the related job/chat.
+    if (!notification || notifNavLoading) return;
+    if (!notification.read) {
+      setChatNotifications((prev) => prev.map((n) => String(n.id) === String(notification.id) ? { ...n, read: true, readAt: new Date().toISOString() } : n));
+      void markNotificationRead(notification.id).catch((error) => {
+        const status = error?.response?.status ?? error?.status;
+        const isNotFound = status === 404 || String(error?.message || '').includes('404') || String(error?.error || '').toLowerCase().includes('not found');
+        if (isNotFound) return;
+        console.warn('Unable to mark notification read:', error);
+        setChatNotifications((prev) => prev.map((n) => String(n.id) === String(notification.id) ? { ...n, read: false, readAt: null } : n));
+      });
     }
-    // Already selected — keep details visible; use Open button to navigate.
-    setSelectedNotification(notification);
-    setNotifDetailError(null);
+    void handleOpenNotification(notification);
   };
 
   const handleOpenNotification = async (notification) => {
     if (!notification) return;
     if (!notification.jobId) {
-      setNotifDetailError('This notification has no related request to open.');
+      Alert.alert('No related request', 'This notification has no related request to open.');
       return;
     }
     if (notifNavLoading) return;
@@ -297,15 +289,14 @@ export default function AppNavigator() {
       } catch (fetchError) {
         const msg = String(fetchError?.error || fetchError?.message || '');
         if (/not found/i.test(msg) || /job not found/i.test(msg)) {
-          setNotifDetailError('The related request no longer exists. It may have been deleted. The notification has been kept for your records.');
+          Alert.alert('Request gone', 'The related request no longer exists. It may have been deleted.');
           return;
         }
         if (/not authorized/i.test(msg) || /permission/i.test(msg)) {
-          setNotifDetailError('You no longer have permission to view this request.');
+          Alert.alert('Not allowed', 'You no longer have permission to view this request.');
           return;
         }
-        if (msg) setNotifDetailError(msg);
-        else setNotifDetailError('Unable to open the related request. Please try again.');
+        Alert.alert('Unable to open', msg || 'Unable to open the related request. Please try again.');
         return;
       }
       if (notification.type === 'chat') {
@@ -370,7 +361,7 @@ export default function AppNavigator() {
 
   const screen = isCustomer ? (
     customerTab === 'dashboard' ? <DashboardScreen user={user} notificationCount={unreadCount} onOpenNotifications={() => setNotificationsOpen(true)} onNavigateToSubmit={() => setCustomerTab('submit')} onNavigateToProgress={() => { setAcceptedOnlyProgress(false); setCustomerTab('progress'); }} onTrackAcceptedJob={() => { setAcceptedOnlyProgress(true); setCustomerTab('progress'); }} onOpenRequest={(req) => { setSelectedRequest(req); setCustomerTab('details'); }} /> :
-    customerTab === 'submit' ? <SubmitRequestScreen currentUser={user} customerName={user.name} onNavigateToProgress={() => setCustomerTab('progress')} /> :
+    customerTab === 'submit' ? <SubmitRequestScreen currentUser={user} customerName={user.name} onNavigateToProgress={() => setCustomerTab('progress')} onClose={() => setCustomerTab('dashboard')} /> :
     customerTab === 'details' ? <RequestDetailsScreen request={selectedRequest} onBack={() => setCustomerTab('progress')} onMessageTechnician={() => { setSelectedChatTarget(selectedRequest); setCustomerTab('chat'); }} onTrackMap={(req) => { setSelectedRequest(req); setCustomerTab('map'); }} /> :
     customerTab === 'progress' ? <RequestProgressScreen customerName={user.name} customerUid={user.uid} acceptedOnly={acceptedOnlyProgress} focusedJobId={customerFocusedJobId} autoExpandReview={Boolean(customerFocusedJobId)} onViewDetails={(req) => { setSelectedRequest(req); setCustomerTab('details'); }} onTrackMap={(req) => { setSelectedRequest(req); setCustomerTab('map'); }} onViewTechnicianProfile={(tech) => { setViewedTechnician({ uid: tech.uid, name: tech.name }); setCustomerTab('techProfile'); }} onMessageTechnician={(req, tech) => { setSelectedChatTarget({ id: req.id, technicianName: tech.name, applianceType: req.applianceType, status: req.status }); setCustomerTab('chat'); }} onRate={(job) => { setSelectedJobForRate(job); setCustomerTab('rate'); }} /> :
     customerTab === 'rate' ? <RateTechnicianScreen job={selectedJobForRate || {}} customerName={user.name} onBack={() => setCustomerTab('progress')} onSubmitted={() => { setSelectedJobForRate(null); setCustomerFocusedJobId(null); setCustomerTab('progress'); }} /> :
@@ -393,9 +384,8 @@ export default function AppNavigator() {
 
       <View style={styles.screenContainer}>{screen}</View>
 
-      <Modal visible={notificationsOpen} transparent animationType="slide" onRequestClose={handleCloseNotifications}>
+      <Modal visible={notificationsOpen} animationType="slide" onRequestClose={handleCloseNotifications}>
         <View style={styles.modalBackdrop}>
-          <Pressable style={styles.backdropPress} onPress={handleCloseNotifications} />
           <View style={styles.notificationPanel}>
             <View style={styles.notifHeader}>
               <Pressable style={styles.notifBackBtn} onPress={handleCloseNotifications} hitSlop={12}>
@@ -422,55 +412,6 @@ export default function AppNavigator() {
                 </Pressable>
               )}
             </View>
-
-            {/* Detail card: first click shows details */}
-            {selectedNotification ? (
-              <View style={styles.detailCard}>
-                <View style={styles.detailCardTop}>
-                  <View style={[
-                    styles.detailIcon,
-                    { backgroundColor: selectedNotification.type === 'job'
-                        ? (isCustomer ? colors.customer : colors.tech)
-                        : (isCustomer ? colors.tech : '#6366F1') },
-                  ]}>
-                    <Ionicons name={selectedNotification.type === 'job' ? 'construct' : 'chatbubble-ellipses'} size={18} color={colors.white} />
-                  </View>
-                  <View style={styles.detailCardCopy}>
-                    <Text style={styles.detailTitle}>{selectedNotification.type === 'job' ? (selectedNotification.senderName ? `${selectedNotification.senderName} · request update` : 'Request update') : `New message from ${selectedNotification.senderName}`}</Text>
-                    <Text style={styles.detailSub}>{formatNotificationTime(selectedNotification.timestamp)}</Text>
-                  </View>
-                </View>
-                <Text style={styles.detailText}>{selectedNotification.text}</Text>
-                {notifDetailError ? (
-                  <View style={styles.detailError}>
-                    <Ionicons name="alert-circle-outline" size={14} color="#DC2626" />
-                    <Text style={styles.detailErrorText}>{notifDetailError}</Text>
-                  </View>
-                ) : null}
-                <View style={styles.detailActions}>
-                  <Pressable
-                    onPress={() => selectedNotification && handleOpenNotification(selectedNotification)}
-                    disabled={notifNavLoading === selectedNotification.id}
-                    style={({ pressed }) => [styles.detailPrimary, { backgroundColor: roleAccent }, pressed && { opacity: 0.9 }]}
-                  >
-                    {notifNavLoading === selectedNotification.id ? (
-                      <ActivityIndicator size="small" color={colors.white} />
-                    ) : (
-                      <>
-                        <Text style={styles.detailPrimaryText}>{selectedNotification.type === 'chat' ? 'View conversation' : 'View request'}</Text>
-                        <Ionicons name="arrow-forward" size={14} color={colors.white} style={{ marginLeft: 6 }} />
-                      </>
-                    )}
-                  </Pressable>
-                  <Pressable
-                    onPress={() => { setSelectedNotification(null); setNotifDetailError(null); }}
-                    style={({ pressed }) => [styles.detailSecondary, pressed && { opacity: 0.85 }]}
-                  >
-                    <Text style={styles.detailSecondaryText}>Dismiss</Text>
-                  </Pressable>
-                </View>
-              </View>
-            ) : null}
 
             <ScrollView showsVerticalScrollIndicator={false} style={styles.notifList} contentContainerStyle={styles.notifListContent}>
               {chatNotifications.length === 0 ? (
@@ -514,7 +455,11 @@ export default function AppNavigator() {
                         </Text>
                       </View>
 
-                      {!isRead && <View style={[styles.notifUnreadDot, { backgroundColor: roleAccent }]} />}
+                      {notifNavLoading === notification.id ? (
+                        <ActivityIndicator size="small" color={roleAccent} />
+                      ) : (
+                        !isRead && <View style={[styles.notifUnreadDot, { backgroundColor: roleAccent }]} />
+                      )}
                     </Pressable>
                   );
                 })
@@ -524,16 +469,16 @@ export default function AppNavigator() {
         </View>
       </Modal>
 
-      <View style={styles.bottomNav}>{navItems.map((item) => { const active = activeTab === item.key || (item.key === 'progress' && ['submit', 'details', 'map', 'techProfile', 'rate'].includes(activeTab)); return <Pressable key={item.key} accessibilityRole="button" accessibilityLabel={`${item.label} tab`} accessibilityState={{ selected: active }} style={({ pressed }) => [styles.navItem, pressed && styles.navItemPressed]} onPress={() => { if (isCustomer && item.key === 'progress') setAcceptedOnlyProgress(false); setTab(item.key); }}><View style={[styles.navIcon, active && { backgroundColor: roleSoft }]}><Ionicons name={active ? item.icon : `${item.icon}-outline`} size={20} color={active ? roleAccent : colors.muted} /></View><Text style={[styles.navLabel, active && { color: roleAccent }]}>{item.label}</Text></Pressable>; })}</View>
+      {(isCustomer && customerTab === 'submit') ? null : (<View style={styles.bottomNav}>{navItems.map((item) => { const active = activeTab === item.key || (item.key === 'progress' && ['submit', 'details', 'map', 'techProfile', 'rate'].includes(activeTab)); return <Pressable key={item.key} accessibilityRole="button" accessibilityLabel={`${item.label} tab`} accessibilityState={{ selected: active }} style={({ pressed }) => [styles.navItem, pressed && styles.navItemPressed]} onPress={() => { if (isCustomer && item.key === 'progress') setAcceptedOnlyProgress(false); setTab(item.key); }}><View style={[styles.navIcon, active && { backgroundColor: roleSoft }]}><Ionicons name={active ? item.icon : `${item.icon}-outline`} size={20} color={active ? roleAccent : colors.muted} /></View><Text style={[styles.navLabel, active && { color: roleAccent }]}>{item.label}</Text></Pressable>; })}</View>)}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.canvas }, authContainer: { flex: 1, backgroundColor: colors.canvas }, screenContainer: { flex: 1, width: '100%' as const, alignSelf: 'center' as const },
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(16,42,67,0.4)', justifyContent: 'flex-end' },
+  modalBackdrop: { flex: 1, backgroundColor: colors.white },
   backdropPress: { flex: 1 },
-  notificationPanel: { width: '100%', backgroundColor: colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24, maxHeight: '90%', elevation: 12, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.15, shadowRadius: 16 },
+  notificationPanel: { flex: 1, width: '100%', backgroundColor: colors.white, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 24 },
   notifHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, gap: 12 },
   notifBackBtn: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', minHeight: 44, minWidth: 44 },
   notifHeaderTitle: { color: colors.ink, fontSize: 18, fontFamily: fonts.bold, flex: 1, textAlign: 'center' },
@@ -558,7 +503,7 @@ const styles = StyleSheet.create({
   detailSecondary: { flex: 1, minHeight: 44, borderRadius: 12, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   detailSecondaryText: { color: colors.muted, fontSize: 13, fontFamily: fonts.semiBold },
 
-  notifList: { maxHeight: 420 },
+  notifList: { flex: 1 },
   notifListContent: { gap: 12, paddingBottom: 8 },
   emptyNotif: { alignItems: 'center', paddingVertical: 40, gap: 10 },
   emptyNotifText: { color: colors.ink, fontSize: 15, fontFamily: fonts.bold },

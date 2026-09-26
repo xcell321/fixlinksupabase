@@ -3,7 +3,7 @@ import React from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { PhotoThumb } from '../../components/RequestPhoto';
-import LocationIQMap from '../../components/LocationIQMap';
+import TechnicianLocationMap from '../../components/TechnicianLocationMap';
 import { colors, fonts, shadows } from '../../theme';
 import { formatJobSchedule, canMarkArrival, canStartRepair, type JobItem } from '../../utils/availableJobsHelpers';
 
@@ -91,23 +91,11 @@ export default function TechJobDetailScreen({
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Job Map</Text>
           {hasCoords ? (
-            <>
-              <LocationIQMap
-                technicianCoords={techCoords?.latitude != null ? { latitude: techCoords.latitude, longitude: techCoords.longitude, name: 'You' } : undefined}
-                customerCoords={{ latitude: lat, longitude: lng, name: job.customerName || 'Customer', address: job.location || '' }}
-                currentUserRole="technician"
-                isAccepted={!isQueue}
-                style={{ height: 140, borderRadius: 12, overflow: 'hidden' }}
-              />
-              <View style={styles.mapAddressBar}>
-                <Ionicons name="location" size={12} color={colors.tech} />
-                <Text style={styles.mapAddressText} numberOfLines={1}>{job.location || 'Dakit, Bogo City, 6010'}</Text>
-              </View>
-              <View style={styles.navigateBtnSystem}>
-                <Ionicons name="map" size={14} color="#2563EB" />
-                <Text style={styles.navigateTextSystem}>FixLink System Map</Text>
-              </View>
-            </>
+            <TechnicianLocationMap
+              customerCoords={{ latitude: lat, longitude: lng, name: job.customerName || 'Customer', address: job.location || '' }}
+              isAccepted={!isQueue}
+              style={{ height: 140, borderRadius: 12, overflow: 'hidden' }}
+            />
           ) : (
             <View style={styles.mapPlaceholder}>
               <Ionicons name="location" size={20} color={BLUE} />
@@ -201,10 +189,10 @@ const styles = StyleSheet.create({
   acceptText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
   messageBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 14, minHeight: 48 },
   messageText: { color: colors.ink, fontSize: 14, fontFamily: fonts.bold },
-  startBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.green, borderRadius: 14, minHeight: 48 },
+  startBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.tech, borderRadius: 14, minHeight: 48, ...shadows.card },
   startText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
   primaryBlue: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.tech, borderRadius: 14, minHeight: 48, ...shadows.card },
   primaryBlueText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
-  completeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.green, borderRadius: 14, minHeight: 48, ...shadows.card },
+  completeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.tech, borderRadius: 14, minHeight: 48, ...shadows.card },
   completeText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
 });

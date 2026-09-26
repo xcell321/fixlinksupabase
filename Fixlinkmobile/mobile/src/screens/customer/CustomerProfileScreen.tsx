@@ -24,9 +24,11 @@ export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile,
   const [completedCount, setCompletedCount] = useState(0);
   const [activeCount, setActiveCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
+  const [statsLoading, setStatsLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
+    setStatsLoading(true);
     Promise.all([
       fetchCompletedJobs(user?.name, user?.uid).catch(() => []),
       fetchCustomerRequests(user?.name, user?.uid).catch(() => []),
@@ -37,6 +39,7 @@ export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile,
       setCompletedCount(c.length);
       setActiveCount(t.filter((r) => ACTIVE_STATUSES.includes(String(r.status || '').toLowerCase())).length);
       setTotalCount(c.length + t.length);
+      setStatsLoading(false);
     });
     return () => { active = false; };
   }, [user?.name, user?.uid]);
@@ -133,13 +136,17 @@ export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile,
         </View>
         <Text style={styles.name} numberOfLines={1}>{user?.name || 'Customer'}</Text>
         <Text style={styles.email} numberOfLines={1}>{user?.email || ''}</Text>
-        <View style={styles.statsRow}>
-          {[{ v: String(totalCount), l: 'Requests' }, { v: String(activeCount), l: 'Active' }, { v: String(completedCount), l: 'Completed' }].map((s) => (
-            <View key={s.l} style={styles.stat}>
-              <Text style={styles.statValue}>{s.v}</Text>
-              <Text style={styles.statLabel}>{s.l}</Text>
-            </View>
-          ))}
+        <View style={[styles.statsRow, statsLoading && styles.statsRowLoading]}>
+          {statsLoading ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            [{ v: String(totalCount), l: 'Requests' }, { v: String(activeCount), l: 'Active' }, { v: String(completedCount), l: 'Completed' }].map((s) => (
+              <View key={s.l} style={styles.stat}>
+                <Text style={styles.statValue}>{s.v}</Text>
+                <Text style={styles.statLabel}>{s.l}</Text>
+              </View>
+            ))
+          )}
         </View>
       </View>
       <View style={styles.body}>
@@ -170,7 +177,8 @@ const styles = StyleSheet.create({
   avatarText: { color: '#FFFFFF', fontSize: 22, fontFamily: fonts.extraBold },
   name: { color: '#FFFFFF', fontSize: 20, fontFamily: fonts.extraBold },
   email: { color: '#9CA3AF', fontSize: 13, fontFamily: fonts.regular, marginTop: 2 },
-  statsRow: { flexDirection: 'row', gap: 24, marginTop: 16 },
+  statsRow: { flexDirection: 'row', gap: 24, marginTop: 16, minHeight: 38, alignItems: 'center' },
+  statsRowLoading: { justifyContent: 'center' },
   stat: { alignItems: 'center' },
   statValue: { color: '#FFFFFF', fontSize: 17, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
   statLabel: { color: '#9CA3AF', fontSize: 11, fontFamily: fonts.regular, marginTop: 2 },

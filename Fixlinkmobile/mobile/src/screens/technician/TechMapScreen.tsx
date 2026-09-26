@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import LocationIQMap from '../../components/LocationIQMap';
+import TechnicianLocationMap from '../../components/TechnicianLocationMap';
 import { fetchRepairRequests } from '../services/api';
 import { colors, fonts } from '../../theme';
 import { type JobItem } from '../../utils/availableJobsHelpers';
@@ -49,7 +49,7 @@ export default function TechMapScreen({ technician, onOpenJob }: TechMapScreenPr
   const pins = jobs
     .filter((j) => Number.isFinite(Number(j.latitude)) && Number.isFinite(Number(j.longitude)))
     .map((j) => ({ latitude: Number(j.latitude), longitude: Number(j.longitude), label: j.applianceType || 'Job' }));
-  const nearbyCount = jobs.filter((j) => j.distanceKm == null || Number(j.distanceKm) <= 5).length;
+  const nearbyCount = jobs.filter((j) => j.distanceKm == null || Number(j.distanceKm) <= 20).length;
 
   return (
     <ScrollView
@@ -60,16 +60,15 @@ export default function TechMapScreen({ technician, onOpenJob }: TechMapScreenPr
     >
       <View style={styles.header}>
         <Text style={styles.title}>Nearby Jobs</Text>
-        <Text style={styles.subtitle}>{nearbyCount} job{nearbyCount === 1 ? '' : 's'} within 5 miles</Text>
+        <Text style={styles.subtitle}>{nearbyCount} job{nearbyCount === 1 ? '' : 's'} within 20 km</Text>
       </View>
       <View style={styles.body}>
         <View style={styles.mapCard}>
           {loading ? (
             <View style={styles.mapLoading}><ActivityIndicator color={BLUE} /></View>
           ) : (
-            <LocationIQMap
+            <TechnicianLocationMap
               technicianCoords={techCoords ? { ...techCoords, name: 'You' } : undefined}
-              currentUserRole="technician"
               isAccepted={false}
               jobPins={pins}
               style={{ height: 220 }}

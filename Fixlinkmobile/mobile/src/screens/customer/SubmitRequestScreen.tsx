@@ -7,8 +7,8 @@ import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from "../../components/DateTimePicker";
 import { PhotoLightbox } from "../../components/RequestPhoto";
 import { submitRepairRequest, fetchPlatformCategories } from "../services/api";
-import { geocodeAddress } from "../services/locationIq";
-import LocationIQMap from "../../components/LocationIQMap";
+import { geocodeAddress, geocodeAddressPrecise } from "../services/locationIq";
+import CustomerLocationMap from "../../components/CustomerLocationMap";
 import { colors, fonts, shadows } from '../../theme';
 import { getApplianceIcon } from '../../utils/applianceIcons';
 
@@ -37,15 +37,15 @@ const TIME_SLOTS = [
 ];
 
 const STEPS = [
-  { key: 'appliance', label: 'Appliance', title: 'What needs repair?', subtitle: 'Choose the appliance or device that needs service.' },
-  { key: 'problem', label: 'Problem', title: "What's wrong?", subtitle: 'Describe the issue and add a photo if it helps.' },
-  { key: 'schedule', label: 'Schedule', title: 'When should we come?', subtitle: 'Pick a preferred date and time window.' },
-  { key: 'location', label: 'Location', title: 'Where is the service?', subtitle: 'Pin the address so the technician can find you.' },
+  { key: 'appliance', label: 'Appliance', title: 'Select Device Type', subtitle: 'What needs fixing?' },
+  { key: 'problem', label: 'Problem', title: 'Describe the Issue', subtitle: '' },
+  { key: 'schedule', label: 'Schedule', title: 'Choose a Time Slot', subtitle: '' },
+  { key: 'location', label: 'Location', title: 'Repair Location', subtitle: '' },
 ];
 
 const TOTAL_STEPS = 4;
 
-export default function SubmitRequestScreen({ currentUser, customerName, onNavigateToProgress }) {
+export default function SubmitRequestScreen({ currentUser, customerName, onNavigateToProgress, onClose }) {
   const [currentStep, setCurrentStep] = useState(1);
   const [stepErrors, setStepErrors] = useState({});
   const [selectedCategoryName, setSelectedCategoryName] = useState("");
@@ -59,6 +59,11 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
   const [zipCode, setZipCode] = useState("");
   const [notes, setNotes] = useState("");
   const [coords, setCoords] = useState(null);
+  // Smart opacity: manual text = 50%, GPS autofill = 100% (medium weight, never bold)
+  const [locationFromGps, setLocationFromGps] = useState(false);
+  const locTextStyle = [styles.textInputSingle, { opacity: locationFromGps ? 1 : 0.5 }];
+  // Consistent focus ring for all step 4 boxes (orange when focused)
+  const [focusedField, setFocusedField] = useState(null);
   const [categoryOptions, setCategoryOptions] = useState([]);
   const [date, setDate] = useState(new Date());
   const [selectedTimeSlot, setSelectedTimeSlot] = useState('Afternoon (1PM-5PM)');
@@ -68,6 +73,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
   const [modalVisible, setModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [locateAccuracy, setLocateAccuracy] = useState(null);
   const [photo, setPhoto] = useState(null);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoViewerVisible, setPhotoViewerVisible] = useState(false);
@@ -84,7 +90,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
     : APPLIANCE_OPTIONS;
 
   const displayAppliance = selectedDevice
-    ? `${selectedCategoryName} � ${selectedDevice}`
+    ? `${selectedCategoryName} - ${selectedDevice}`
     : selectedCategoryName || "Select appliance type";
 
   const selectedCategoryObj = categoryOptions.find((c) => String(c.name || '').trim() === selectedCategoryName) || null;
@@ -104,37 +110,109 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
 
   const handleLocate = async () => {
     setLocating(true);
-    let { status } = await Location.requestForegroundPermissionsAsync();
+    setLocateAccuracy(null);
+    const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
       setLocating(false);
       Alert.alert('Permission Denied', 'Permission to access location was denied');
       return;
     }
-
+    let watcher = null;
     try {
-      let locationData = await Location.getCurrentPositionAsync({});
-      const lat = locationData.coords.latitude;
-      const lon = locationData.coords.longitude;
-      setCoords({ latitude: lat, longitude: lon });
-      if (stepErrors.location) setStepErrors((p) => { const n = { ...p }; delete n.location; return n; });
-
-      let geocode = await Location.reverseGeocodeAsync({
-        latitude: lat,
-        longitude: lon
-      });
-
-      if (geocode && geocode.length > 0) {
-        const address = geocode[0];
-        if (address.street) setStreet(address.street);
-        if (address.city) setCity(address.city);
-        if (address.postalCode) setZipCode(address.postalCode);
+      // Multi-fix collection for ~99% accuracy: a single GPS shot is often a
+      // stale/cached fix (hundreds of meters off). Collect fixes for up to 12s
+      // with Highest accuracy and keep the most accurate one (lowest meters).
+      let best = null;
+      let finished = false;
+      watcher = await Location.watchPositionAsync(
+        { accuracy: Location.Accuracy.Highest, timeInterval: 1000, distanceInterval: 0 },
+        (pos) => {
+          const acc = pos.coords.accuracy ?? 9999;
+          if (!best || acc < (best.coords.accuracy ?? 9999)) {
+            best = pos;
+            setCoords({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+            setLocateAccuracy(acc);
+          }
+          if (acc <= 20) finished = true;
+        }
+      );
+      const start = Date.now();
+      while (!finished && Date.now() - start < 12000) {
+        await new Promise((r) => setTimeout(r, 500));
       }
-    } catch (e) {
-      Alert.alert('Error', 'Failed to fetch location details.');
+      if (!best) {
+        Alert.alert('No GPS fix', 'Could not get your location. Go outside and try again.');
+        return;
+      }
+      const bestAcc = best.coords.accuracy ?? 9999;
+      const lat = best.coords.latitude;
+      const lon = best.coords.longitude;
+      setCoords({ latitude: lat, longitude: lon });
+      setLocateAccuracy(bestAcc);
+      if (stepErrors.location) setStepErrors((p) => { const n = { ...p }; delete n.location; return n; });
+      const geocode = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lon });
+      let resolvedStreet = '';
+      let resolvedCity = '';
+      let resolvedZip = '';
+      if (geocode && geocode.length > 0) {
+        const a = geocode[0];
+        // Use fresh reverseGeocode only - do not geocode the string "Gairan" again
+        resolvedStreet = a.street || a.name || '';
+        resolvedCity = a.city || a.subregion || '';
+        resolvedZip = a.postalCode || '';
+        if (resolvedStreet) setStreet(resolvedStreet);
+        if (resolvedCity) setCity(resolvedCity);
+        if (resolvedZip) setZipCode(resolvedZip);
+        else if (a.postalCode === null && a.region) setZipCode('');
+      }
+      // Indoor snap: weak GPS (>30m, typical inside a house) gets snapped to the
+      // rooftop of the resolved street address via API-only forward geocode.
+      // Good GPS (<=30m) is kept as-is since it is already best. The coarse
+      // dict is never used here so it cannot drag the pin offshore again.
+      let finalLat = lat;
+      let finalLon = lon;
+      const fullAddr = [resolvedStreet, resolvedCity, resolvedZip].filter(Boolean).join(', ');
+      if (bestAcc > 30 && fullAddr.length > 5) {
+        try {
+          const snap = await geocodeAddressPrecise(fullAddr);
+          if (snap && Number.isFinite(snap.latitude) && Number.isFinite(snap.longitude)) {
+            finalLat = snap.latitude;
+            finalLon = snap.longitude;
+          }
+        } catch {}
+      }
+      setCoords({ latitude: finalLat, longitude: finalLon });
+      // GPS autofill done - full 100% opacity text (medium, not bold)
+      setLocationFromGps(true);
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to fetch location details.');
     } finally {
+      try { watcher && watcher.remove(); } catch {}
       setLocating(false);
     }
   };
+
+  // Auto-detect all location inputs when entering Step 4
+  useEffect(() => {
+    if (currentStep === 4 && !street.trim() && !city.trim()) {
+      handleLocate();
+    }
+  }, [currentStep]);
+
+  // Auto-geocode as user types street/city/zip to keep map in sync
+  useEffect(() => {
+    if (currentStep !== 4) return;
+    const q = composedLocation;
+    if (!q || q.length < 5) return;
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const res = await geocodeAddress(q);
+        if (!cancelled && res) setCoords({ latitude: res.latitude, longitude: res.longitude });
+      } catch {}
+    }, 700);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [composedLocation, currentStep]);
 
   // Optional problem photo: helps the technician see the issue before
   // accepting. Kept local until submit; uploaded as multipart `photo`.
@@ -235,6 +313,12 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
       }
     }
     if (step === 2) {
+      if (!brandModel.trim()) {
+        next.brand = 'Enter the device brand and model.';
+        valid = false;
+      } else {
+        delete next.brand;
+      }
       if (!description.trim()) {
         next.description = 'Add a short description so the technician can prepare.';
         valid = false;
@@ -266,7 +350,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
 
   const canContinueForStep = (step) => {
     if (step === 1) return !!selectedCategoryName.trim();
-    if (step === 2) return !!description.trim();
+    if (step === 2) return !!description.trim() && !!brandModel.trim();
     if (step === 3) {
       const today = new Date(); today.setHours(0,0,0,0);
       const d = new Date(date); d.setHours(0,0,0,0);
@@ -296,9 +380,10 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
   const handleSubmit = async () => {
     const fullLocation = composedLocation + (notes.trim() ? ` (${notes.trim()})` : '');
     // Final guard: validate all steps inline before network call
+    const step2Ok = !!description.trim() && !!brandModel.trim();
     const allValid = [1,2,3,4].every((s) => {
       if (s === 1 && !selectedCategoryName.trim()) return false;
-      if (s === 2 && !description.trim()) return false;
+      if (s === 2 && !step2Ok) return false;
       if (s === 3) {
         const today = new Date(); today.setHours(0,0,0,0);
         const d = new Date(date); d.setHours(0,0,0,0);
@@ -311,6 +396,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
       // surface inline errors and jump to first failing step
       const next = {};
       if (!selectedCategoryName.trim()) next.category = 'Choose the appliance that needs repair.';
+      if (!brandModel.trim()) next.brand = 'Enter the device brand and model.';
       if (!description.trim()) next.description = 'Add a short description so the technician can prepare.';
       const today = new Date(); today.setHours(0,0,0,0);
       const d = new Date(date); d.setHours(0,0,0,0);
@@ -318,15 +404,15 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
       if (!street.trim()) next.location = 'Enter the street address.';
       setStepErrors(next);
       if (!selectedCategoryName.trim()) setCurrentStep(1);
-      else if (!description.trim()) setCurrentStep(2);
+      else if (!step2Ok) setCurrentStep(2);
       else if (d < today) setCurrentStep(3);
       else setCurrentStep(4);
       return;
     }
 
-    if (!selectedCategoryName || !description || !street.trim()) {
+    if (!selectedCategoryName || !description.trim() || !brandModel.trim() || !street.trim()) {
       // fallback generic alert for any edge path, but inline is primary
-      const missing = !selectedCategoryName ? 'appliance' : !description ? 'description' : 'location';
+      const missing = !selectedCategoryName ? 'appliance' : (!brandModel.trim() ? 'brand' : (!description.trim() ? 'description' : 'location'));
       setStepErrors((p) => ({ ...p, [missing]: 'This field is required.' }));
       return;
     }
@@ -429,8 +515,16 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
                     style={[styles.deviceCard, isActive && styles.deviceCardActive]}
                     onPress={() => {
                       const cat = categoryOptions.find((c) => String(c.name || '').trim() === name);
-                      if (cat) pickCategory(cat);
-                      else { setSelectedCategoryName(name); setSelectedDevice(''); }
+                      const devices = cat && Array.isArray(cat.devices) ? cat.devices.map((d) => String(d).trim()).filter(Boolean) : [];
+                      // Auto-select instantly (orange highlight); if it has devices, open picker to choose one.
+                      setSelectedCategoryName(cat ? cat.name : name);
+                      setSelectedDevice('');
+                      if (devices.length > 0) {
+                        setDrillCategory({ ...cat, devices });
+                        setModalVisible(true);
+                      } else {
+                        setModalVisible(false);
+                      }
                       if (stepErrors.category) setStepErrors((p) => { const n = { ...p }; delete n.category; return n; });
                     }}
                     activeOpacity={0.7}
@@ -463,28 +557,33 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
               <Text style={styles.inputLabel}>Device brand & model</Text>
+              <Text style={styles.requiredMark}> *</Text>
             </View>
-            <View style={styles.textInputContainer}>
-              <Ionicons name="hardware-chip-outline" size={18} color={colors.muted} />
+            <View style={[styles.textInputContainer, !!stepErrors.brand && styles.inputError]}>
               <TextInput
                 style={styles.textInputSingle}
                 placeholder="e.g. Dell XPS 15 9530"
                 placeholderTextColor={colors.muted}
                 value={brandModel}
-                onChangeText={setBrandModel}
+                onChangeText={(t) => {
+                  setBrandModel(t);
+                  if (stepErrors.brand && t.trim()) setStepErrors((p) => { const n = { ...p }; delete n.brand; return n; });
+                }}
                 accessibilityLabel="Device brand and model"
                 maxLength={80}
               />
             </View>
+            {!!stepErrors.brand && (
+              <Text style={styles.errorText} accessibilityLiveRegion="polite">{stepErrors.brand}</Text>
+            )}
           </View>
 
           <View style={styles.inputGroup}>
-            <View style={styles.labelRow}>
-              <Text style={styles.inputLabel}>Problem description</Text>
-              <Text style={styles.requiredMark}> *</Text>
-            </View>
+              <View style={styles.labelRow}>
+                <Text style={styles.inputLabel}>Problem description</Text>
+                <Text style={styles.requiredMark}> *</Text>
+              </View>
             <View style={[styles.textAreaContainer, !!stepErrors.description && styles.inputError]}>
-              <Ionicons name="chatbox-ellipses-outline" size={18} color={!!stepErrors.description ? colors.danger : colors.muted} style={{ marginTop: 2 }} />
               <TextInput
                 style={styles.textArea}
                 placeholder="Example: Refrigerator not cooling, makes a humming noise. Started yesterday..."
@@ -523,7 +622,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
                 </TouchableOpacity>
                 <View style={styles.photoPreviewCopy}>
                   <View style={styles.photoReadyRow}>
-                    <Ionicons name="checkmark-circle" size={15} color={colors.green} />
+                    <Ionicons name="checkmark-circle" size={15} color={colors.customer} />
                     <Text style={styles.photoReadyText}>Photo ready</Text>
                   </View>
                   <View style={styles.photoPreviewActions}>
@@ -549,7 +648,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
                     </View>
                     <View style={styles.photoPickerCopy}>
                       <Text style={styles.photoPickerTitle}>Add a photo of the problem</Text>
-                      <Text style={styles.photoPickerSub}>Camera or gallery � JPG / PNG up to 5MB</Text>
+                      <Text style={styles.photoPickerSub}>Camera or gallery - JPG / PNG up to 5MB</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={16} color={colors.muted} />
                   </>
@@ -650,10 +749,10 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
             <View style={{ flex: 1 }}>
               <Text style={styles.locationConfirmTitle}>Appointment set</Text>
               <Text style={styles.locationConfirmSub} numberOfLines={2}>
-                {date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} � {selectedTimeSlot}
+                {date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} - {selectedTimeSlot}
               </Text>
             </View>
-            <Ionicons name="shield-checkmark" size={16} color={colors.green} />
+            <Ionicons name="shield-checkmark" size={16} color={colors.customer} />
           </View>
           <Text style={styles.helperText}>The technician confirms the exact arrival window after accepting.</Text>
 
@@ -676,12 +775,10 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
     const clearLocationError = () => { if (stepErrors.location) setStepErrors((p) => { const n = { ...p }; delete n.location; return n; }); };
     return (
       <View style={styles.stepBody}>
-        <Text style={styles.stepSectionTitle}>Repair Location</Text>
         <View style={styles.mapBox}>
           {coords ? (
-            <LocationIQMap
+            <CustomerLocationMap
               customerCoords={{ latitude: coords.latitude, longitude: coords.longitude, name: 'Service location' }}
-              currentUserRole="customer"
               isAccepted={false}
               style={{ height: 144 }}
             />
@@ -703,13 +800,15 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
         </TouchableOpacity>
         <View style={styles.inputGroup}>
           <Text style={styles.refLabel}>Street Address</Text>
-          <View style={[styles.textInputContainer, !!stepErrors.location && styles.inputError]}>
+          <View style={[styles.textInputContainer, focusedField === 'street' && styles.inputFocused, !!stepErrors.location && styles.inputError]}>
             <TextInput
-              style={styles.textInputSingle}
+              style={locTextStyle}
               placeholder="142 Oak Street, Apt 3B"
               placeholderTextColor={colors.muted}
               value={street}
-              onChangeText={(t) => { setStreet(t); setCoords(null); clearLocationError(); }}
+              onChangeText={(t) => { setStreet(t); setCoords(null); setLocationFromGps(false); clearLocationError(); }}
+              onFocus={() => setFocusedField('street')}
+              onBlur={() => setFocusedField(null)}
               accessibilityLabel="Street address"
               autoCorrect={false}
             />
@@ -719,13 +818,15 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
         <View style={styles.twoColGrid}>
           <View style={[styles.inputGroup, styles.twoColCell]}>
             <Text style={styles.refLabel}>City</Text>
-            <View style={styles.textInputContainer}>
+            <View style={[styles.textInputContainer, focusedField === 'city' && styles.inputFocused]}>
               <TextInput
-                style={styles.textInputSingle}
+                style={locTextStyle}
                 placeholder="Bogo City"
                 placeholderTextColor={colors.muted}
                 value={city}
-                onChangeText={(t) => { setCity(t); setCoords(null); }}
+                onChangeText={(t) => { setCity(t); setCoords(null); setLocationFromGps(false); }}
+                onFocus={() => setFocusedField('city')}
+                onBlur={() => setFocusedField(null)}
                 accessibilityLabel="City"
                 autoCorrect={false}
               />
@@ -733,13 +834,15 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
           </View>
           <View style={[styles.inputGroup, styles.twoColCell]}>
             <Text style={styles.refLabel}>ZIP Code</Text>
-            <View style={styles.textInputContainer}>
+            <View style={[styles.textInputContainer, focusedField === 'zip' && styles.inputFocused]}>
               <TextInput
-                style={styles.textInputSingle}
+                style={locTextStyle}
                 placeholder="6005"
                 placeholderTextColor={colors.muted}
                 value={zipCode}
-                onChangeText={setZipCode}
+                onChangeText={(t) => { setZipCode(t); setLocationFromGps(false); }}
+                onFocus={() => setFocusedField('zip')}
+                onBlur={() => setFocusedField(null)}
                 accessibilityLabel="ZIP code"
                 keyboardType="number-pad"
               />
@@ -748,13 +851,15 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
         </View>
         <View style={styles.inputGroup}>
           <Text style={styles.refLabel}>Additional Notes</Text>
-          <View style={styles.textInputContainer}>
+          <View style={[styles.textInputContainer, focusedField === 'notes' && styles.inputFocused]}>
             <TextInput
               style={styles.textInputSingle}
               placeholder="Landmark, gate code, leave at door, etc."
               placeholderTextColor={colors.muted}
               value={notes}
               onChangeText={setNotes}
+              onFocus={() => setFocusedField('notes')}
+              onBlur={() => setFocusedField(null)}
               accessibilityLabel="Additional notes"
             />
           </View>
@@ -766,21 +871,18 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
   return (
     <ScrollView ref={scrollRef} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
       <View style={styles.centerWrap}>
-      <View style={styles.sectionHeaderContainer}>
-        <Text style={styles.screenKicker}>SUBMIT REPAIR REQUEST</Text>
+      <View style={styles.refHeader}>
+        {onClose ? (
+          <TouchableOpacity onPress={onClose} style={styles.refBackBtn} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Back" hitSlop={8}>
+            <Ionicons name="arrow-back" size={20} color={colors.ink} />
+          </TouchableOpacity>
+        ) : null}
+        <Text style={styles.refHeaderTitle}>Repair Request</Text>
       </View>
 
       <View style={styles.card}>
-        {/* Stepper header � distilled: ONE clear track (dots + labels). Kicker keeps step context; badge + segmented bar removed as duplicate signals. */}
+        {/* Compact stepper only (dots + labels) - matches reference, big header removed */}
         <View style={styles.stepperHeader}>
-          <View style={styles.stepperTopRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.stepKicker} accessibilityRole="text">STEP {currentStep} OF {TOTAL_STEPS} � {STEPS[currentStep - 1].label.toUpperCase()}</Text>
-              <Text style={styles.stepTitle}>{STEPS[currentStep - 1].title}</Text>
-              <Text style={styles.stepSubtitle}>{STEPS[currentStep - 1].subtitle}</Text>
-            </View>
-          </View>
-
           <View style={styles.stepDotsRow} accessibilityRole="progressbar" accessibilityValue={{ now: currentStep, min: 1, max: TOTAL_STEPS }}>
             {STEPS.map((s, idx) => {
               const stepNum = idx + 1;
@@ -807,6 +909,13 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
         </View>
 
         <View style={styles.divider} />
+
+        <View style={styles.stepHeadBlock}>
+          <Text style={styles.stepHeadTitle}>{STEPS[currentStep - 1].title}</Text>
+          {!!STEPS[currentStep - 1].subtitle && (
+            <Text style={styles.stepHeadSub}>{STEPS[currentStep - 1].subtitle}</Text>
+          )}
+        </View>
 
         {renderStepContent()}
 
@@ -938,7 +1047,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
                         </View>
                         <View style={{ flex: 1 }}>
                           <Text style={[styles.modalItemText, isSelected && styles.modalItemTextSelected]}>{item}</Text>
-                          {deviceCount > 0 ? <Text style={styles.modalItemHint}>{deviceCount} device{deviceCount !== 1 ? 's' : ''} � tap to choose</Text> : null}
+                          {deviceCount > 0 ? <Text style={styles.modalItemHint}>{deviceCount} device{deviceCount !== 1 ? 's' : ''} - tap to choose</Text> : null}
                         </View>
                       </View>
                       {isSelected ? <Ionicons name="checkmark-circle" size={18} color={colors.customer} /> : <Ionicons name="chevron-forward" size={16} color={colors.muted} />}
@@ -967,7 +1076,11 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
 const styles = StyleSheet.create({
   scrollContent: { flexGrow: 1, paddingHorizontal: 16, paddingTop: 20, paddingBottom: 36, backgroundColor: colors.white, alignItems: 'center' as const },
   centerWrap: { width: '100%' as const, maxWidth: 480, alignSelf: 'center' as const },
-  sectionHeaderContainer: { marginBottom: 20, marginTop: 6 },
+  sectionHeaderContainer: { marginBottom: 20, marginTop: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center' },
+  refHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 6, marginBottom: 20 },
+  refBackBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  refHeaderTitle: { color: colors.ink, fontSize: 16, fontFamily: fonts.bold },
   kicker: { color: colors.customer, fontSize: 10, letterSpacing: 1.4, fontFamily: fonts.extraBold, marginBottom: 2, textTransform: 'uppercase' as const },
   screenKicker: { color: colors.muted, fontSize: 10, letterSpacing: 1.4, fontFamily: fonts.extraBold, textTransform: 'uppercase' as const },
   sectionTitle: { fontSize: 22, fontFamily: fonts.extraBold, color: colors.ink, letterSpacing: -0.3, lineHeight: 28 },
@@ -975,7 +1088,7 @@ const styles = StyleSheet.create({
 
   card: { backgroundColor: colors.white, borderRadius: 20, padding: 24, borderWidth: 1, borderColor: colors.line, ...shadows.card, gap: 0 },
 
-  // Stepper � tight within, generous separation between sections (spacing thesis)
+  // Stepper - tight within, generous separation between sections (spacing thesis)
   stepperHeader: { gap: 18, paddingBottom: 8 },
   stepperTopRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
   stepKicker: { color: colors.customer, fontSize: 10, letterSpacing: 1.2, fontFamily: fonts.extraBold, textTransform: 'uppercase' as const },
@@ -1001,6 +1114,9 @@ const styles = StyleSheet.create({
   dotConnector: { position: 'absolute' as const, top: 20, left: '62%', right: '-38%', height: 2, backgroundColor: colors.line, zIndex: 0 },
   dotConnectorCompleted: { backgroundColor: colors.customer, opacity: 0.9 },
   divider: { height: 1, backgroundColor: colors.lineSoft, marginTop: 18, marginBottom: 18 },
+  stepHeadBlock: { marginBottom: 4 },
+  stepHeadTitle: { fontSize: 17, fontFamily: fonts.bold, color: colors.ink, letterSpacing: -0.2 },
+  stepHeadSub: { fontSize: 13, fontFamily: fonts.regular, color: colors.muted, marginTop: 2 },
 
   stepBody: { gap: 20, marginTop: 8 },
   stepIntroBlock: { backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, borderRadius: 14, padding: 14, gap: 6, ...shadows.subtle },
@@ -1009,9 +1125,9 @@ const styles = StyleSheet.create({
 
   inputGroup: { gap: 2 },
   labelRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  inputLabel: { fontSize: 14, fontFamily: fonts.bold, color: colors.ink },
-  requiredMark: { color: colors.danger, fontSize: 14, fontFamily: fonts.bold },
-  optionalLabel: { fontSize: 12, fontFamily: fonts.medium, color: colors.muted },
+  inputLabel: { fontSize: 12, fontFamily: fonts.bold, color: colors.ink },
+  requiredMark: { color: colors.danger, fontSize: 12, fontFamily: fonts.bold },
+  optionalLabel: { fontSize: 11, fontFamily: fonts.medium, color: colors.muted },
   helperText: { fontSize: 13, fontFamily: fonts.regular, color: colors.muted, lineHeight: 17, marginTop: 8 },
   errorText: { fontSize: 13, fontFamily: fonts.medium, color: colors.danger, lineHeight: 17, marginTop: 8 },
   inputError: { borderColor: colors.danger, borderWidth: 2 },
@@ -1019,12 +1135,12 @@ const styles = StyleSheet.create({
   inputIconTile: { width: 32, height: 32, borderRadius: 10, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
   inputIconTileActive: { backgroundColor: colors.customerSoft, borderColor: colors.hudBorder },
 
-  // quick picks � grouped tight (8) within, generous (16) from next input
+  // quick picks - grouped tight (8) within, generous (16) from next input
   // Prototype 2x2 device grid
   quickPickWrap: { gap: 14, marginTop: 12 },
   deviceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, width: '100%' },
-  deviceCard: { width: '48%', borderRadius: 14, borderWidth: 2, borderColor: colors.line, backgroundColor: colors.canvas, padding: 16, alignItems: 'center', gap: 12, minHeight: 130, justifyContent: 'center', ...shadows.subtle },
-  deviceCardActive: { borderColor: colors.customer, backgroundColor: colors.customerSoft, ...shadows.card },
+  deviceCard: { width: '48%', borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.canvas, padding: 16, alignItems: 'center', gap: 12, minHeight: 130, justifyContent: 'center', elevation: 0 },
+  deviceCardActive: { borderColor: colors.customer, borderWidth: 1.5, backgroundColor: colors.customerSoft, elevation: 0 },
   deviceIconTile: { width: 56, height: 56, borderRadius: 14, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.lineSoft },
   deviceIconTileActive: { backgroundColor: colors.customerMist, borderColor: colors.customer },
   deviceCardText: { fontSize: 13, fontFamily: fonts.semiBold, color: colors.ink, textAlign: 'center', lineHeight: 17 },
@@ -1046,37 +1162,38 @@ const styles = StyleSheet.create({
   photoPicker: { minHeight: 80, backgroundColor: colors.white, borderWidth: 2, borderColor: colors.customer, borderStyle: 'dashed', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', gap: 14, ...shadows.subtle },
   photoPickerIcon: { width: 48, height: 48, borderRadius: 14, backgroundColor: colors.customerSoft, alignItems: 'center', justifyContent: 'center' },
   photoPickerCopy: { flex: 1 },
-  photoPickerTitle: { fontSize: 15, fontFamily: fonts.bold, color: colors.ink },
-  photoPickerSub: { fontSize: 12, fontFamily: fonts.regular, color: colors.muted, marginTop: 3 },
+  photoPickerTitle: { fontSize: 14, fontFamily: fonts.bold, color: colors.ink },
+  photoPickerSub: { fontSize: 11, fontFamily: fonts.regular, color: colors.muted, marginTop: 3 },
   photoPreview: { backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, borderRadius: 14, padding: 12, flexDirection: 'row', gap: 14, alignItems: 'center', ...shadows.subtle },
   photoPreviewImage: { width: 90, height: 90, borderRadius: 12, backgroundColor: colors.line },
   photoPreviewCopy: { flex: 1, gap: 6 },
   photoReadyRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  photoReadyText: { fontSize: 14, fontFamily: fonts.bold, color: colors.ink },
+  photoReadyText: { fontSize: 13, fontFamily: fonts.bold, color: colors.ink },
   photoHint: { fontSize: 12, fontFamily: fonts.regular, color: colors.muted, lineHeight: 16 },
   photoPreviewActions: { flexDirection: 'row', flexWrap: 'wrap' as const, gap: 10, marginTop: 8 },
   photoSecondaryButton: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, minHeight: 44 },
-  photoSecondaryText: { fontSize: 13, fontFamily: fonts.semiBold, color: colors.customer },
+  photoSecondaryText: { fontSize: 12, fontFamily: fonts.semiBold, color: colors.customer },
   photoBadge: { marginLeft: 8, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, backgroundColor: colors.customerSoft, borderWidth: 1, borderColor: colors.hudBorder },
   photoBadgeText: { fontSize: 11, fontFamily: fonts.semiBold, color: colors.customer, letterSpacing: 0.2 },
   
   selectInput: { height: 52, backgroundColor: colors.surfaceSunken, borderWidth: 1, borderColor: colors.line, borderRadius: 14, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  selectInputText: { fontSize: 14, fontFamily: fonts.medium, color: colors.ink, flex: 1 },
+  selectInputText: { fontSize: 13, fontFamily: fonts.medium, color: colors.ink, flex: 1 },
   
   textAreaContainer: { backgroundColor: colors.surfaceSunken, borderWidth: 1, borderColor: colors.line, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, flexDirection: 'row', gap: 10, minHeight: 120, ...shadows.subtle },
-  textArea: { flex: 1, fontSize: 14, fontFamily: fonts.medium, color: colors.ink, textAlignVertical: 'top', paddingTop: 0, lineHeight: 19 },
+  textArea: { flex: 1, fontSize: 13, fontFamily: fonts.medium, color: colors.ink, textAlignVertical: 'top', paddingTop: 0, lineHeight: 18 },
   charRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, gap: 8 },
   charCount: { fontSize: 11, fontFamily: fonts.medium, color: colors.muted, fontVariant: ['tabular-nums'] as const },
 
   // Prototype slot rows with radio circles
-  textInputContainer: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.line, borderRadius: 14, paddingHorizontal: 14, backgroundColor: colors.surfaceSunken, gap: 10, minHeight: 52, ...shadows.subtle },
-  textInputSingle: { flex: 1, color: colors.ink, fontSize: 14, fontFamily: fonts.medium, paddingVertical: 12 },
+  textInputContainer: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.line, borderRadius: 14, paddingHorizontal: 14, backgroundColor: colors.surfaceSunken, gap: 10, minHeight: 52, elevation: 0 },
+  inputFocused: { borderColor: colors.customer, borderWidth: 1.5 },
+  textInputSingle: { flex: 1, color: colors.ink, fontSize: 13, fontFamily: fonts.medium, paddingVertical: 12 },
   slotList: { gap: 10, marginTop: 4 },
-  slotRow: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: 16, borderWidth: 2, borderColor: colors.line, backgroundColor: colors.canvas, ...shadows.subtle },
-  slotRowActive: { borderColor: colors.customer, backgroundColor: colors.customerSoft, ...shadows.card },
-  slotRadio: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.white, borderWidth: 2, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
+  slotRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.canvas, elevation: 0 },
+  slotRowActive: { borderColor: colors.customer, backgroundColor: colors.customerSoft },
+  slotRadio: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
   slotRadioActive: { backgroundColor: colors.customer, borderColor: colors.customer },
-  slotRowText: { fontSize: 15, fontFamily: fonts.semiBold, color: colors.ink },
+  slotRowText: { fontSize: 13, fontFamily: fonts.semiBold, color: colors.ink },
   slotChip: { flex: 1, minWidth: 140, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.canvas, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   slotChipActive: { backgroundColor: colors.customerSoft, borderColor: colors.customer },
   slotChipText: { fontSize: 12, fontFamily: fonts.semiBold, color: colors.muted, textAlign: 'center' as const, lineHeight: 16 },
@@ -1089,6 +1206,12 @@ const styles = StyleSheet.create({
   locationFieldWrap: { position: 'relative', zIndex: 20 },
   locateButton: { backgroundColor: colors.customer, height: 52, paddingHorizontal: 16, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 6, boxShadow: '0 4px 10px rgba(15,118,110,0.18)', elevation: 3, minWidth: 92, flex: 1, justifyContent: 'center' },
   locateButtonText: { color: colors.white, fontSize: 13, fontFamily: fonts.bold },
+  locateRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, borderRadius: 14, borderWidth: 1.5, borderColor: colors.customer, backgroundColor: colors.customerSoft, paddingHorizontal: 16, elevation: 0 },
+  locateRowText: { color: colors.customer, fontSize: 13, fontFamily: fonts.semiBold },
+  accuracyText: { fontSize: 11, fontFamily: fonts.medium, textAlign: 'center', marginTop: 6 },
+  accuracyGood: { color: colors.green },
+  accuracyOk: { color: colors.gold },
+  accuracyPoor: { color: colors.danger },
 
   suggestionsPanel: { position: 'absolute', top: 58, left: 0, right: 0, backgroundColor: colors.white, borderRadius: 14, borderWidth: 1, borderColor: colors.line, zIndex: 30, elevation: 8, boxShadow: '0 6px 12px rgba(16,42,67,0.15)', overflow: 'hidden' },
   suggestionsModalView: { backgroundColor: colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 24, paddingHorizontal: 12, paddingBottom: 10, maxHeight: '78%', boxShadow: '0 -4px 12px rgba(0,0,0,0.1)', elevation: 10 },

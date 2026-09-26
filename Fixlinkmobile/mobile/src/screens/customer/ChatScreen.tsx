@@ -86,7 +86,7 @@ const shouldShowDivider = (messages: ChatMessage[], index: number): boolean => {
 const statusIcon = (status: string | undefined): IconName =>
   getStatusIcon(status) as IconName;
 
-// ��� Messenger row ���
+// -  -  - Messenger row -  -  - 
 interface ConversationRowProps {
   item: Conversation;
   currentUid: string;
@@ -366,12 +366,12 @@ ChatScreenProps): React.JSX.Element {
   };
 
   const inboxSubtitle = totalUnread > 0
-    ? `${totalUnread} unread  �  ${conversations.length} conversation${conversations.length === 1 ? '' : 's'}`
+    ? `${totalUnread} unread  -  ${conversations.length} conversation${conversations.length === 1 ? '' : 's'}`
     : conversations.length > 0
       ? `${conversations.length} conversation${conversations.length === 1 ? '' : 's'}`
       : 'Your repair conversations will appear here.';
 
-  // -- Thread view � Messenger-style single header + context strip + bubbles + lightweight composer --
+  // -- Thread view - Messenger-style single header + context strip + bubbles + lightweight composer --
   if (selectedConversation) {
     const s = selectedConversation;
     const peerPhone = s.peerPhone ?? null;
@@ -447,7 +447,7 @@ ChatScreenProps): React.JSX.Element {
             {threadLoading && currentMessages.length === 0 ? (
               <View style={styles.chatLoading}>
                 <ActivityIndicator size="large" color={colors.customer} />
-                <Text style={styles.chatLoadingText}>Loading conversation�</Text>
+                <Text style={styles.chatLoadingText}>Loading conversation...</Text>
               </View>
             ) : currentMessages.length === 0 ? (
               <View style={styles.chatEmpty}>
@@ -509,12 +509,12 @@ ChatScreenProps): React.JSX.Element {
                           {msg.text}
                         </Text>
                       </View>
-                      {/* Timestamp shown only for last in group � keeps bubbles lightweight */}
+                      {/* Timestamp shown only for last in group - keeps bubbles lightweight */}
                       {isLastInGroup ? (
                         <Text style={[styles.bubbleTime, isMe ? styles.bubbleTimeMe : styles.bubbleTimeOther]}>
                           {formatMessageTime(msg.timestamp)}
-                          {isMe && read ? '  �  Read' : ''}
-                          {msg.pending ? '  �  Sending�' : ''}
+                          {isMe && read ? '  -  Read' : ''}
+                          {msg.pending ? '  -  Sending...' : ''}
                         </Text>
                       ) : null}
                     </View>
@@ -536,7 +536,7 @@ ChatScreenProps): React.JSX.Element {
             <View style={styles.composerInputWrap}>
               <TextInput
                 style={styles.composerInput}
-                placeholder={isTechnician ? 'Message the customer�' : 'Message the technician�'}
+                placeholder={isTechnician ? 'Message the customer...' : 'Message the technician...'}
                 placeholderTextColor="#8AA0B5"
                 value={inputText}
                 onChangeText={setInputText}
