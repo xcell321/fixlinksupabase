@@ -797,16 +797,8 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
       </View>
 
       <View style={styles.card}>
-        {/* Stepper header - distilled: ONE clear track (dots + labels). Kicker keeps step context; badge + segmented bar removed as duplicate signals. */}
+        {/* Compact stepper only (dots + labels) - matches reference, big header removed */}
         <View style={styles.stepperHeader}>
-          <View style={styles.stepperTopRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.stepKicker} accessibilityRole="text">STEP {currentStep} OF {TOTAL_STEPS} - {STEPS[currentStep - 1].label.toUpperCase()}</Text>
-              <Text style={styles.stepTitle}>{STEPS[currentStep - 1].title}</Text>
-              <Text style={styles.stepSubtitle}>{STEPS[currentStep - 1].subtitle}</Text>
-            </View>
-          </View>
-
           <View style={styles.stepDotsRow} accessibilityRole="progressbar" accessibilityValue={{ now: currentStep, min: 1, max: TOTAL_STEPS }}>
             {STEPS.map((s, idx) => {
               const stepNum = idx + 1;
