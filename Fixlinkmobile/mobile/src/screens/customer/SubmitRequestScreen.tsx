@@ -1053,8 +1053,8 @@ const styles = StyleSheet.create({
   // Prototype 2x2 device grid
   quickPickWrap: { gap: 14, marginTop: 12 },
   deviceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, width: '100%' },
-  deviceCard: { width: '48%', borderRadius: 14, borderWidth: 2, borderColor: colors.line, backgroundColor: colors.canvas, padding: 16, alignItems: 'center', gap: 12, minHeight: 130, justifyContent: 'center', ...shadows.subtle },
-  deviceCardActive: { borderColor: colors.customer, backgroundColor: colors.customerSoft, ...shadows.card },
+  deviceCard: { width: '48%', borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.canvas, padding: 16, alignItems: 'center', gap: 12, minHeight: 130, justifyContent: 'center', elevation: 0 },
+  deviceCardActive: { borderColor: colors.customer, borderWidth: 1.5, backgroundColor: colors.customerSoft, elevation: 0 },
   deviceIconTile: { width: 56, height: 56, borderRadius: 14, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.lineSoft },
   deviceIconTileActive: { backgroundColor: colors.customerMist, borderColor: colors.customer },
   deviceCardText: { fontSize: 13, fontFamily: fonts.semiBold, color: colors.ink, textAlign: 'center', lineHeight: 17 },
