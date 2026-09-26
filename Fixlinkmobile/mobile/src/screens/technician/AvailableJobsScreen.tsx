@@ -576,11 +576,6 @@ export default function AvailableJobsScreen({
             accessibilityLabel={`Available leads queue, ${pendingCount} jobs`}
             onPress={() => setFeedTab('queue')}
           >
-            <Ionicons
-              name="radio"
-              size={16}
-              color={feedTab === 'queue' ? '#FFFFFF' : colors.muted}
-            />
             <Text style={[styles.feedTabLabel, feedTab === 'queue' && styles.feedTabLabelActive]}>
               Available
             </Text>
@@ -602,11 +597,6 @@ export default function AvailableJobsScreen({
             accessibilityLabel={`Active jobs, ${activeCount} jobs`}
             onPress={() => setFeedTab('active')}
           >
-            <Ionicons
-              name="construct"
-              size={16}
-              color={feedTab === 'active' ? '#FFFFFF' : colors.muted}
-            />
             <Text style={[styles.feedTabLabel, feedTab === 'active' && styles.feedTabLabelActive]}>
               Assigned
             </Text>
