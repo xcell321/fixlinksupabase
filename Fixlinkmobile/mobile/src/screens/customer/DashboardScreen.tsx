@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
   homeWrap: { flex: 1 },
   aiFab: { position: 'absolute', right: 20, bottom: 90, width: 56, height: 56, borderRadius: 28, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center', elevation: 6, boxShadow: '0 6px 14px rgba(249,115,22,0.35)' },
   aiOverlay: { flex: 1, backgroundColor: 'rgba(16,42,67,0.4)', justifyContent: 'flex-end' },
-  aiSheet: { flex: 1, backgroundColor: '#FFFFFF', paddingTop: 56, paddingHorizontal: 16, paddingBottom: 20 },
+  aiSheet: { flex: 1, backgroundColor: '#FFFFFF', paddingTop: 12, paddingHorizontal: 16, paddingBottom: 20 },
   aiHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
   aiHeaderIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center' },
   aiTitle: { color: '#111827', fontSize: 15, fontFamily: fonts.bold },
