@@ -257,33 +257,25 @@ export default function AppNavigator() {
   };
 
   const handleNotificationPress = (notification) => {
-    const isFirstClick = !selectedNotification || String(selectedNotification.id) !== String(notification.id);
-    // Tap row → show details + mark read. Navigation is explicit via Open button.
-    if (isFirstClick) {
-      setSelectedNotification(notification);
-      setNotifDetailError(null);
-      if (!notification.read) {
-        setChatNotifications((prev) => prev.map((n) => String(n.id) === String(notification.id) ? { ...n, read: true, readAt: new Date().toISOString() } : n));
-        void markNotificationRead(notification.id).catch((error) => {
-          const status = error?.response?.status ?? error?.status;
-          const isNotFound = status === 404 || String(error?.message || '').includes('404') || String(error?.error || '').toLowerCase().includes('not found');
-          if (isNotFound) return;
-          console.warn('Unable to mark notification read:', error);
-          setChatNotifications((prev) => prev.map((n) => String(n.id) === String(notification.id) ? { ...n, read: false, readAt: null } : n));
-          setNotifDetailError('Could not mark as read. Please check your connection.');
-        });
-      }
-      return;
+    // One-tap direct: mark read, then navigate straight to the related job/chat.
+    if (!notification || notifNavLoading) return;
+    if (!notification.read) {
+      setChatNotifications((prev) => prev.map((n) => String(n.id) === String(notification.id) ? { ...n, read: true, readAt: new Date().toISOString() } : n));
+      void markNotificationRead(notification.id).catch((error) => {
+        const status = error?.response?.status ?? error?.status;
+        const isNotFound = status === 404 || String(error?.message || '').includes('404') || String(error?.error || '').toLowerCase().includes('not found');
+        if (isNotFound) return;
+        console.warn('Unable to mark notification read:', error);
+        setChatNotifications((prev) => prev.map((n) => String(n.id) === String(notification.id) ? { ...n, read: false, readAt: null } : n));
+      });
     }
-    // Already selected — keep details visible; use Open button to navigate.
-    setSelectedNotification(notification);
-    setNotifDetailError(null);
+    void handleOpenNotification(notification);
   };
 
   const handleOpenNotification = async (notification) => {
     if (!notification) return;
     if (!notification.jobId) {
-      setNotifDetailError('This notification has no related request to open.');
+      Alert.alert('No related request', 'This notification has no related request to open.');
       return;
     }
     if (notifNavLoading) return;
@@ -297,15 +289,14 @@ export default function AppNavigator() {
       } catch (fetchError) {
         const msg = String(fetchError?.error || fetchError?.message || '');
         if (/not found/i.test(msg) || /job not found/i.test(msg)) {
-          setNotifDetailError('The related request no longer exists. It may have been deleted. The notification has been kept for your records.');
+          Alert.alert('Request gone', 'The related request no longer exists. It may have been deleted.');
           return;
         }
         if (/not authorized/i.test(msg) || /permission/i.test(msg)) {
-          setNotifDetailError('You no longer have permission to view this request.');
+          Alert.alert('Not allowed', 'You no longer have permission to view this request.');
           return;
         }
-        if (msg) setNotifDetailError(msg);
-        else setNotifDetailError('Unable to open the related request. Please try again.');
+        Alert.alert('Unable to open', msg || 'Unable to open the related request. Please try again.');
         return;
       }
       if (notification.type === 'chat') {
@@ -422,55 +413,6 @@ export default function AppNavigator() {
               )}
             </View>
 
-            {/* Detail card: first click shows details */}
-            {selectedNotification ? (
-              <View style={styles.detailCard}>
-                <View style={styles.detailCardTop}>
-                  <View style={[
-                    styles.detailIcon,
-                    { backgroundColor: selectedNotification.type === 'job'
-                        ? (isCustomer ? colors.customer : colors.tech)
-                        : (isCustomer ? colors.tech : '#6366F1') },
-                  ]}>
-                    <Ionicons name={selectedNotification.type === 'job' ? 'construct' : 'chatbubble-ellipses'} size={18} color={colors.white} />
-                  </View>
-                  <View style={styles.detailCardCopy}>
-                    <Text style={styles.detailTitle}>{selectedNotification.type === 'job' ? (selectedNotification.senderName ? `${selectedNotification.senderName} · request update` : 'Request update') : `New message from ${selectedNotification.senderName}`}</Text>
-                    <Text style={styles.detailSub}>{formatNotificationTime(selectedNotification.timestamp)}</Text>
-                  </View>
-                </View>
-                <Text style={styles.detailText}>{selectedNotification.text}</Text>
-                {notifDetailError ? (
-                  <View style={styles.detailError}>
-                    <Ionicons name="alert-circle-outline" size={14} color="#DC2626" />
-                    <Text style={styles.detailErrorText}>{notifDetailError}</Text>
-                  </View>
-                ) : null}
-                <View style={styles.detailActions}>
-                  <Pressable
-                    onPress={() => selectedNotification && handleOpenNotification(selectedNotification)}
-                    disabled={notifNavLoading === selectedNotification.id}
-                    style={({ pressed }) => [styles.detailPrimary, { backgroundColor: roleAccent }, pressed && { opacity: 0.9 }]}
-                  >
-                    {notifNavLoading === selectedNotification.id ? (
-                      <ActivityIndicator size="small" color={colors.white} />
-                    ) : (
-                      <>
-                        <Text style={styles.detailPrimaryText}>{selectedNotification.type === 'chat' ? 'View conversation' : 'View request'}</Text>
-                        <Ionicons name="arrow-forward" size={14} color={colors.white} style={{ marginLeft: 6 }} />
-                      </>
-                    )}
-                  </Pressable>
-                  <Pressable
-                    onPress={() => { setSelectedNotification(null); setNotifDetailError(null); }}
-                    style={({ pressed }) => [styles.detailSecondary, pressed && { opacity: 0.85 }]}
-                  >
-                    <Text style={styles.detailSecondaryText}>Dismiss</Text>
-                  </Pressable>
-                </View>
-              </View>
-            ) : null}
-
             <ScrollView showsVerticalScrollIndicator={false} style={styles.notifList} contentContainerStyle={styles.notifListContent}>
               {chatNotifications.length === 0 ? (
                 <View style={styles.emptyNotif}>
@@ -513,7 +455,11 @@ export default function AppNavigator() {
                         </Text>
                       </View>
 
-                      {!isRead && <View style={[styles.notifUnreadDot, { backgroundColor: roleAccent }]} />}
+                      {notifNavLoading === notification.id ? (
+                        <ActivityIndicator size="small" color={roleAccent} />
+                      ) : (
+                        !isRead && <View style={[styles.notifUnreadDot, { backgroundColor: roleAccent }]} />
+                      )}
                     </Pressable>
                   );
                 })
