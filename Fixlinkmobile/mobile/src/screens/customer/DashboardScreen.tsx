@@ -280,7 +280,6 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
       {/* FixLink Assistant sheet (Image 3, no Estimate price) */}
       <Modal visible={aiVisible} transparent animationType="slide" onRequestClose={() => setAiVisible(false)}>
         <View style={styles.aiOverlay}>
-          <TouchableOpacity style={{ flex: 1 }} onPress={() => setAiVisible(false)} activeOpacity={1} accessibilityRole="button" accessibilityLabel="Dismiss assistant" />
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.aiSheet}>
             <View style={styles.aiHeader}>
               <View style={styles.aiHeaderIcon}>
