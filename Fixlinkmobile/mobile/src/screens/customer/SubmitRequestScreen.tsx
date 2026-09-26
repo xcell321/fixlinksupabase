@@ -40,7 +40,7 @@ const STEPS = [
   { key: 'appliance', label: 'Appliance', title: 'Select Device Type', subtitle: 'What needs fixing?' },
   { key: 'problem', label: 'Problem', title: 'Describe the Issue', subtitle: '' },
   { key: 'schedule', label: 'Schedule', title: 'Choose a Time Slot', subtitle: '' },
-  { key: 'location', label: 'Location', title: 'Where is the service?', subtitle: 'Pin the address so the technician can find you.' },
+  { key: 'location', label: 'Location', title: 'Repair Location', subtitle: '' },
 ];
 
 const TOTAL_STEPS = 4;
@@ -1142,6 +1142,8 @@ const styles = StyleSheet.create({
   locationFieldWrap: { position: 'relative', zIndex: 20 },
   locateButton: { backgroundColor: colors.customer, height: 52, paddingHorizontal: 16, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 6, boxShadow: '0 4px 10px rgba(15,118,110,0.18)', elevation: 3, minWidth: 92, flex: 1, justifyContent: 'center' },
   locateButtonText: { color: colors.white, fontSize: 13, fontFamily: fonts.bold },
+  locateRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, borderRadius: 14, borderWidth: 1.5, borderColor: colors.customer, backgroundColor: colors.customerSoft, paddingHorizontal: 16, elevation: 0 },
+  locateRowText: { color: colors.customer, fontSize: 13, fontFamily: fonts.semiBold },
 
   suggestionsPanel: { position: 'absolute', top: 58, left: 0, right: 0, backgroundColor: colors.white, borderRadius: 14, borderWidth: 1, borderColor: colors.line, zIndex: 30, elevation: 8, boxShadow: '0 6px 12px rgba(16,42,67,0.15)', overflow: 'hidden' },
   suggestionsModalView: { backgroundColor: colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 24, paddingHorizontal: 12, paddingBottom: 10, maxHeight: '78%', boxShadow: '0 -4px 12px rgba(0,0,0,0.1)', elevation: 10 },
