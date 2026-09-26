@@ -62,6 +62,44 @@ router.post('/detect-category', async (req, res) => {
   }
 });
 
+// POST /api/ai/assistant — Customer floating FixLink Assistant.
+// Grounded in the customer's live FixLink data sent by the app. Real AI via
+// the OmniRoute gateway (billed per prompt); the app falls back to local
+// replies when the gateway is unavailable.
+router.post('/assistant', async (req, res) => {
+  try {
+    const { message, context } = req.body || {};
+    const text = String(message || '').trim().slice(0, 500);
+    if (!text) {
+      return res.status(400).json({ error: 'A message is required.' });
+    }
+    if (!isOmniRouteConfigured()) {
+      return res.status(502).json({ error: 'AI service is not configured.', ai: 'degraded' });
+    }
+    const c = context && typeof context === 'object' ? context : {};
+    const live = {
+      customerName: c.customerName || null,
+      activeJob: c.activeJob || null,
+      activeCount: c.activeCount ?? null,
+      pendingCount: c.pendingCount ?? null,
+      completedCount: c.completedCount ?? null,
+    };
+    const system = [
+      "You are FixLink Assistant, the in-app helper for FixLink customers (repair request + technician dispatch, Philippines).",
+      'Reply in at most 3 short sentences, plain text, no markdown.',
+      'Use ONLY the provided live FixLink data for statuses, names, and times. Never invent technician names, statuses, or prices.',
+      'Do NOT provide price estimates. FixLink matching itself is free.',
+      'If the data does not answer the question, say what the customer should tap (Book service, Repairs, Messages).',
+    ].join(' ');
+    const user = `Customer message: ${text}\nLive FixLink data: ${JSON.stringify(live).slice(0, 1200)}`;
+    const { content } = await chatComplete({ system, user, json: false, temperature: 0.4, maxTokens: 220 });
+    return res.status(200).json({ reply: String(content).trim().slice(0, 800), ai: 'ai' });
+  } catch (error) {
+    console.error('AI assistant error:', error.message);
+    return res.status(502).json({ error: 'AI service unavailable.', ai: 'degraded' });
+  }
+});
+
 // GET /api/ai/recommend?jobId= — Requirement 2: AI-assisted technician
 // recommendation. Objective ranking is the foundation; the AI interprets the
 // request (feeding candidate selection) and explains why each matches.

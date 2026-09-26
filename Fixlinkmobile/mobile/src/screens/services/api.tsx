@@ -200,6 +200,8 @@ export const verifyCompletionCode = async (jobId: string, code: string): Promise
   (await api.post(`/requests/${jobId}/verify-completion`, { code })).data;
 export const fetchTechnicianRecommendations = async (jobId: string): Promise<unknown> =>
   (await api.get('/ai/recommend', { params: { jobId } })).data;
+export const askAssistant = async (message: string, context?: unknown): Promise<{ reply?: string; error?: string }> =>
+  (await api.post('/ai/assistant', { message, context })).data;
 
 export const uploadPortfolioPhotos = async (uid: string, photos: Array<{ uri: string; fileName?: string; name?: string; mimeType?: string; type?: string }>): Promise<unknown> => {
   const formData = new FormData();

@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl, Modal, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { fetchCompletedJobs, fetchCustomerRequests, fetchPlatformCategories } from '../services/api';
+import { fetchCompletedJobs, fetchCustomerRequests, fetchPlatformCategories, askAssistant } from '../services/api';
 import { colors, fonts } from '../../theme';
 import { getApplianceIcon, getStatusColor, getStatusIcon } from '../../utils/applianceIcons';
 
@@ -122,11 +122,27 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
     setAiMessages((cur) => [...cur, { id: `me-${Date.now()}`, from: 'me', text }]);
     setAiInput('');
     setAiTyping(true);
-    const reply = aiReplyFor(text);
-    setTimeout(() => {
+    // Real AI via OmniRoute (billed per prompt); local reply is the fallback.
+    const ctx = {
+      customerName: fullName,
+      activeJob: heroJob ? {
+        applianceType: heroJob.applianceType || null,
+        status: heroJob.status || null,
+        technicianName: heroJob.technicianName || null,
+        preferredTime: heroJob.preferredTime || null,
+      } : null,
+      activeCount,
+      pendingCount,
+      completedCount,
+    };
+    askAssistant(text, ctx).then((r) => {
+      const reply = String(r?.reply || '').trim() || aiReplyFor(text);
       setAiMessages((cur) => [...cur, { id: `ai-${Date.now()}`, from: 'ai', text: reply }]);
       setAiTyping(false);
-    }, 650);
+    }).catch(() => {
+      setAiMessages((cur) => [...cur, { id: `ai-${Date.now()}`, from: 'ai', text: aiReplyFor(text) }]);
+      setAiTyping(false);
+    });
   };
 
   return (
