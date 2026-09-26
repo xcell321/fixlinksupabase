@@ -451,8 +451,16 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
                     style={[styles.deviceCard, isActive && styles.deviceCardActive]}
                     onPress={() => {
                       const cat = categoryOptions.find((c) => String(c.name || '').trim() === name);
-                      if (cat) pickCategory(cat);
-                      else { setSelectedCategoryName(name); setSelectedDevice(''); }
+                      const devices = cat && Array.isArray(cat.devices) ? cat.devices.map((d) => String(d).trim()).filter(Boolean) : [];
+                      // Auto-select instantly (orange highlight); if it has devices, open picker to choose one.
+                      setSelectedCategoryName(cat ? cat.name : name);
+                      setSelectedDevice('');
+                      if (devices.length > 0) {
+                        setDrillCategory({ ...cat, devices });
+                        setModalVisible(true);
+                      } else {
+                        setModalVisible(false);
+                      }
                       if (stepErrors.category) setStepErrors((p) => { const n = { ...p }; delete n.category; return n; });
                     }}
                     activeOpacity={0.7}
