@@ -3,7 +3,11 @@ import Constants from 'expo-constants';
 
 const devHost: string = String((Constants.expoConfig as { hostUri?: string } | undefined)?.hostUri ?? '').split(':')[0] || 'localhost';
 
-export const API_BASE_URL: string = `http://${devHost}:5050/api`;
+// EXPO_PUBLIC_API_URL lets the app reach a tunneled backend (e.g. cloudflared) or LAN IP.
+// Example: EXPO_PUBLIC_API_URL=https://my-backend.trycloudflare.com/api
+// When unset, fall back to the Metro dev host on the default port 5050.
+const envApiUrl = process.env.EXPO_PUBLIC_API_URL;
+export const API_BASE_URL: string = envApiUrl && envApiUrl.trim() !== '' ? envApiUrl.trim() : `http://${devHost}:5050/api`;
 
 const api = axios.create({
   baseURL: API_BASE_URL,

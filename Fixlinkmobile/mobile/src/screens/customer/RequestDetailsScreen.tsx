@@ -31,7 +31,7 @@ function StarRating({ rating }) {
   );
 }
 
-export default function RequestDetailsScreen({ request, onBack, onMessageTechnician, onTrackMap }) {
+export default function RequestDetailsScreen({ request, onBack, onMessageTechnician, onTrackMap, onViewTechnicianProfile }) {
   const [techProfile, setTechProfile] = useState(null);
   const [workflowLoading, setWorkflowLoading] = useState(null);
   const [photoViewerVisible, setPhotoViewerVisible] = useState(false);
@@ -223,6 +223,18 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
                   <Text style={styles.callText}>Call</Text>
                 </TouchableOpacity>
               </View>
+              {request.technicianUid && onViewTechnicianProfile ? (
+                <TouchableOpacity
+                  style={styles.viewProfileBtn}
+                  onPress={() => onViewTechnicianProfile({ uid: request.technicianUid, name: request.technicianName })}
+                  activeOpacity={0.88}
+                  accessibilityRole="button"
+                  accessibilityLabel="View technician profile"
+                >
+                  <Ionicons name="person-outline" size={16} color={colors.customer} />
+                  <Text style={styles.viewProfileText}>View Profile</Text>
+                </TouchableOpacity>
+              ) : null}
             </>
           ) : (
             <Text style={styles.waitingText}>Waiting for a technician to accept this request.</Text>
@@ -352,6 +364,8 @@ const styles = StyleSheet.create({
   messageText: { color: '#EA580C', fontSize: 14, fontFamily: fonts.semiBold },
   callBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#F9FAFB', borderRadius: 12, paddingVertical: 10 },
   callText: { color: '#374151', fontSize: 14, fontFamily: fonts.semiBold },
+  viewProfileBtn: { marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: colors.line, borderRadius: 12, paddingVertical: 12, minHeight: 48 },
+  viewProfileText: { color: colors.customer, fontSize: 14, fontFamily: fonts.bold },
   codeHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   codeTitle: { color: '#111827', fontSize: 14, fontFamily: fonts.bold },
   codeDigitsRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
