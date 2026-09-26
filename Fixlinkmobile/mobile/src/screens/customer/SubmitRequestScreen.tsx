@@ -257,8 +257,8 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
       }
     }
     if (step === 2) {
-      if (!description.trim()) {
-        next.description = 'Add a short description so the technician can prepare.';
+      if (!description.trim() && !brandModel.trim()) {
+        next.description = 'Put a brand name or a problem description to proceed.';
         valid = false;
       } else {
         delete next.description;
@@ -288,7 +288,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
 
   const canContinueForStep = (step) => {
     if (step === 1) return !!selectedCategoryName.trim();
-    if (step === 2) return !!description.trim();
+    if (step === 2) return !!description.trim() || !!brandModel.trim();
     if (step === 3) {
       const today = new Date(); today.setHours(0,0,0,0);
       const d = new Date(date); d.setHours(0,0,0,0);
@@ -318,9 +318,10 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
   const handleSubmit = async () => {
     const fullLocation = composedLocation + (notes.trim() ? ` (${notes.trim()})` : '');
     // Final guard: validate all steps inline before network call
+    const step2Ok = !!description.trim() || !!brandModel.trim();
     const allValid = [1,2,3,4].every((s) => {
       if (s === 1 && !selectedCategoryName.trim()) return false;
-      if (s === 2 && !description.trim()) return false;
+      if (s === 2 && !step2Ok) return false;
       if (s === 3) {
         const today = new Date(); today.setHours(0,0,0,0);
         const d = new Date(date); d.setHours(0,0,0,0);
@@ -333,22 +334,22 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
       // surface inline errors and jump to first failing step
       const next = {};
       if (!selectedCategoryName.trim()) next.category = 'Choose the appliance that needs repair.';
-      if (!description.trim()) next.description = 'Add a short description so the technician can prepare.';
+      if (!step2Ok) next.description = 'Put a brand name or a problem description to proceed.';
       const today = new Date(); today.setHours(0,0,0,0);
       const d = new Date(date); d.setHours(0,0,0,0);
       if (d < today) next.date = 'Choose today or a future date.';
       if (!street.trim()) next.location = 'Enter the street address.';
       setStepErrors(next);
       if (!selectedCategoryName.trim()) setCurrentStep(1);
-      else if (!description.trim()) setCurrentStep(2);
+      else if (!step2Ok) setCurrentStep(2);
       else if (d < today) setCurrentStep(3);
       else setCurrentStep(4);
       return;
     }
 
-    if (!selectedCategoryName || !description || !street.trim()) {
+    if (!selectedCategoryName || (!description && !brandModel.trim()) || !street.trim()) {
       // fallback generic alert for any edge path, but inline is primary
-      const missing = !selectedCategoryName ? 'appliance' : !description ? 'description' : 'location';
+      const missing = !selectedCategoryName ? 'appliance' : (!description && !brandModel.trim()) ? 'description' : 'location';
       setStepErrors((p) => ({ ...p, [missing]: 'This field is required.' }));
       return;
     }
@@ -500,7 +501,10 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
                 placeholder="e.g. Dell XPS 15 9530"
                 placeholderTextColor={colors.muted}
                 value={brandModel}
-                onChangeText={setBrandModel}
+                onChangeText={(t) => {
+                  setBrandModel(t);
+                  if (stepErrors.description && t.trim()) setStepErrors((p) => { const n = { ...p }; delete n.description; return n; });
+                }}
                 accessibilityLabel="Device brand and model"
                 maxLength={80}
               />
@@ -508,10 +512,9 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
           </View>
 
           <View style={styles.inputGroup}>
-            <View style={styles.labelRow}>
-              <Text style={styles.inputLabel}>Problem description</Text>
-              <Text style={styles.requiredMark}> *</Text>
-            </View>
+              <View style={styles.labelRow}>
+                <Text style={styles.inputLabel}>Problem description</Text>
+              </View>
             <View style={[styles.textAreaContainer, !!stepErrors.description && styles.inputError]}>
               <TextInput
                 style={styles.textArea}
