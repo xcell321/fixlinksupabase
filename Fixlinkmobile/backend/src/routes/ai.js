@@ -77,23 +77,43 @@ router.post('/assistant', async (req, res) => {
       return res.status(502).json({ error: 'AI service is not configured.', ai: 'degraded' });
     }
     const c = context && typeof context === 'object' ? context : {};
+    // Top technicians by rating for ranking/recommendation questions (real data only).
+    let topTechnicians = [];
+    try {
+      const { data: techRows } = await supabase
+        .from('users')
+        .select('name, rating, total_reviews, years_experience, skills')
+        .eq('role', 'technician')
+        .order('rating', { ascending: false, nullsFirst: false })
+        .limit(5);
+      topTechnicians = (techRows || []).map((t) => ({
+        name: t.name,
+        rating: t.rating != null ? Number(Number(t.rating).toFixed(1)) : null,
+        reviews: t.total_reviews != null ? Number(t.total_reviews) : 0,
+        yearsExperience: t.years_experience ?? null,
+        skills: Array.isArray(t.skills) ? t.skills.slice(0, 5) : [],
+      }));
+    } catch (_) {}
     const live = {
       customerName: c.customerName || null,
       activeJob: c.activeJob || null,
       activeCount: c.activeCount ?? null,
       pendingCount: c.pendingCount ?? null,
       completedCount: c.completedCount ?? null,
+      topTechnicians,
     };
     const system = [
-      "You are FixLink Assistant, the in-app helper for FixLink customers (repair request + technician dispatch, Philippines).",
-      'Reply in at most 3 short sentences, plain text, no markdown.',
-      'Use ONLY the provided live FixLink data for statuses, names, and times. Never invent technician names, statuses, or prices.',
+      "You are FixLink Assistant, the friendly in-app helper for FixLink customers (repair request + technician dispatch, Philippines).",
+      'Reply warmly and directly, at most 4 short sentences, plain text, no markdown.',
+      'Greet by first name only when the customer greets you.',
+      'For ranking or recommendation questions, rank using ONLY topTechnicians (rating, then reviews). Name names with rating and review count, e.g. "1. Dustine Villaruz - 4.9 (12 reviews)".',
+      'For status or time questions, use ONLY activeJob (status, technicianName, preferredTime). Never invent names, statuses, times, or prices.',
       'Do NOT provide price estimates. FixLink matching itself is free.',
       'If the data does not answer the question, say what the customer should tap (Book service, Repairs, Messages).',
     ].join(' ');
-    const user = `Customer message: ${text}\nLive FixLink data: ${JSON.stringify(live).slice(0, 1200)}`;
-    const { content } = await chatComplete({ system, user, json: false, temperature: 0.4, maxTokens: 220 });
-    return res.status(200).json({ reply: String(content).trim().slice(0, 800), ai: 'ai' });
+    const user = `Customer message: ${text}\nLive FixLink data: ${JSON.stringify(live).slice(0, 2000)}`;
+    const { content } = await chatComplete({ system, user, json: false, temperature: 0.4, maxTokens: 260 });
+    return res.status(200).json({ reply: String(content).trim().slice(0, 900), ai: 'ai' });
   } catch (error) {
     console.error('AI assistant error:', error.message);
     return res.status(502).json({ error: 'AI service unavailable.', ai: 'degraded' });
