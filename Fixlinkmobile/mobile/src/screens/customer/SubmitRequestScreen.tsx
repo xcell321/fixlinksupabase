@@ -257,8 +257,14 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
       }
     }
     if (step === 2) {
-      if (!description.trim() && !brandModel.trim()) {
-        next.description = 'Put a brand name or a problem description to proceed.';
+      if (!brandModel.trim()) {
+        next.brand = 'Enter the device brand and model.';
+        valid = false;
+      } else {
+        delete next.brand;
+      }
+      if (!description.trim()) {
+        next.description = 'Add a short description so the technician can prepare.';
         valid = false;
       } else {
         delete next.description;
@@ -288,7 +294,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
 
   const canContinueForStep = (step) => {
     if (step === 1) return !!selectedCategoryName.trim();
-    if (step === 2) return !!description.trim() || !!brandModel.trim();
+    if (step === 2) return !!description.trim() && !!brandModel.trim();
     if (step === 3) {
       const today = new Date(); today.setHours(0,0,0,0);
       const d = new Date(date); d.setHours(0,0,0,0);
@@ -318,7 +324,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
   const handleSubmit = async () => {
     const fullLocation = composedLocation + (notes.trim() ? ` (${notes.trim()})` : '');
     // Final guard: validate all steps inline before network call
-    const step2Ok = !!description.trim() || !!brandModel.trim();
+    const step2Ok = !!description.trim() && !!brandModel.trim();
     const allValid = [1,2,3,4].every((s) => {
       if (s === 1 && !selectedCategoryName.trim()) return false;
       if (s === 2 && !step2Ok) return false;
@@ -334,7 +340,8 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
       // surface inline errors and jump to first failing step
       const next = {};
       if (!selectedCategoryName.trim()) next.category = 'Choose the appliance that needs repair.';
-      if (!step2Ok) next.description = 'Put a brand name or a problem description to proceed.';
+      if (!brandModel.trim()) next.brand = 'Enter the device brand and model.';
+      if (!description.trim()) next.description = 'Add a short description so the technician can prepare.';
       const today = new Date(); today.setHours(0,0,0,0);
       const d = new Date(date); d.setHours(0,0,0,0);
       if (d < today) next.date = 'Choose today or a future date.';
@@ -347,9 +354,9 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
       return;
     }
 
-    if (!selectedCategoryName || (!description && !brandModel.trim()) || !street.trim()) {
+    if (!selectedCategoryName || !description.trim() || !brandModel.trim() || !street.trim()) {
       // fallback generic alert for any edge path, but inline is primary
-      const missing = !selectedCategoryName ? 'appliance' : (!description && !brandModel.trim()) ? 'description' : 'location';
+      const missing = !selectedCategoryName ? 'appliance' : (!brandModel.trim() ? 'brand' : (!description.trim() ? 'description' : 'location'));
       setStepErrors((p) => ({ ...p, [missing]: 'This field is required.' }));
       return;
     }
@@ -494,8 +501,9 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
               <Text style={styles.inputLabel}>Device brand & model</Text>
+              <Text style={styles.requiredMark}> *</Text>
             </View>
-            <View style={styles.textInputContainer}>
+            <View style={[styles.textInputContainer, !!stepErrors.brand && styles.inputError]}>
               <TextInput
                 style={styles.textInputSingle}
                 placeholder="e.g. Dell XPS 15 9530"
@@ -503,17 +511,21 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
                 value={brandModel}
                 onChangeText={(t) => {
                   setBrandModel(t);
-                  if (stepErrors.description && t.trim()) setStepErrors((p) => { const n = { ...p }; delete n.description; return n; });
+                  if (stepErrors.brand && t.trim()) setStepErrors((p) => { const n = { ...p }; delete n.brand; return n; });
                 }}
                 accessibilityLabel="Device brand and model"
                 maxLength={80}
               />
             </View>
+            {!!stepErrors.brand && (
+              <Text style={styles.errorText} accessibilityLiveRegion="polite">{stepErrors.brand}</Text>
+            )}
           </View>
 
           <View style={styles.inputGroup}>
               <View style={styles.labelRow}>
                 <Text style={styles.inputLabel}>Problem description</Text>
+                <Text style={styles.requiredMark}> *</Text>
               </View>
             <View style={[styles.textAreaContainer, !!stepErrors.description && styles.inputError]}>
               <TextInput
