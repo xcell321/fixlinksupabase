@@ -37,7 +37,7 @@ const TIME_SLOTS = [
 ];
 
 const STEPS = [
-  { key: 'appliance', label: 'Appliance', title: 'What needs repair?', subtitle: 'Choose the appliance or device that needs service.' },
+  { key: 'appliance', label: 'Appliance', title: 'Select Device Type', subtitle: 'What needs fixing?' },
   { key: 'problem', label: 'Problem', title: "What's wrong?", subtitle: 'Describe the issue and add a photo if it helps.' },
   { key: 'schedule', label: 'Schedule', title: 'When should we come?', subtitle: 'Pick a preferred date and time window.' },
   { key: 'location', label: 'Location', title: 'Where is the service?', subtitle: 'Pin the address so the technician can find you.' },
@@ -826,6 +826,11 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
 
         <View style={styles.divider} />
 
+        <View style={styles.stepHeadBlock}>
+          <Text style={styles.stepHeadTitle}>{STEPS[currentStep - 1].title}</Text>
+          <Text style={styles.stepHeadSub}>{STEPS[currentStep - 1].subtitle}</Text>
+        </View>
+
         {renderStepContent()}
 
         {/* Nav row */}
@@ -1023,6 +1028,9 @@ const styles = StyleSheet.create({
   dotConnector: { position: 'absolute' as const, top: 20, left: '62%', right: '-38%', height: 2, backgroundColor: colors.line, zIndex: 0 },
   dotConnectorCompleted: { backgroundColor: colors.customer, opacity: 0.9 },
   divider: { height: 1, backgroundColor: colors.lineSoft, marginTop: 18, marginBottom: 18 },
+  stepHeadBlock: { marginBottom: 4 },
+  stepHeadTitle: { fontSize: 17, fontFamily: fonts.bold, color: colors.ink, letterSpacing: -0.2 },
+  stepHeadSub: { fontSize: 13, fontFamily: fonts.regular, color: colors.muted, marginTop: 2 },
 
   stepBody: { gap: 20, marginTop: 8 },
   stepIntroBlock: { backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, borderRadius: 14, padding: 14, gap: 6, ...shadows.subtle },
