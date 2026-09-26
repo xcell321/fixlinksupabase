@@ -554,7 +554,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
               </View>
               <View style={styles.infoCardTextWrap}>
                 <Text style={styles.infoCardLabel}>Email</Text>
-                <Text style={styles.infoCardValue} numberOfLines={1}>marcus.rivera@email.com</Text>
+                <Text style={styles.infoCardValue} numberOfLines={1}>{profile.email || 'Not provided'}</Text>
               </View>
             </View>
             <View style={styles.infoCardWhite}>
