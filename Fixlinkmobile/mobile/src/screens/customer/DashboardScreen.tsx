@@ -1,6 +1,6 @@
 ﻿// @ts-nocheck - migrated from .js, preserve working state; types to be refined incrementally
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl, Modal, TextInput, KeyboardAvoidingView, Platform, Image } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl, Modal, TextInput, KeyboardAvoidingView, Platform, Image, Animated, PanResponder, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { fetchCompletedJobs, fetchCustomerRequests, fetchPlatformCategories, askAssistant } from '../services/api';
 import { colors, fonts } from '../../theme';
@@ -32,6 +32,34 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
   const [tipDismissed, setTipDismissed] = useState(false);
 
   // Customer-only floating AI assistant (working, no Estimate price)
+  // Draggable robot: user can move it anywhere on screen, stays in bounds.
+  const [homeSize, setHomeSize] = useState({ w: Dimensions.get('window').width, h: Dimensions.get('window').height });
+  const fabPos = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const fabLast = useRef({ x: 0, y: 0 });
+  useEffect(() => {
+    const id = fabPos.addListener((v) => { fabLast.current = { x: v.x, y: v.y }; });
+    return () => fabPos.removeListener(id);
+  }, [fabPos]);
+  const clampFab = (x, y) => ({
+    x: Math.max(-(homeSize.w - 56 - 40), Math.min(0, x)),
+    y: Math.max(-(homeSize.h - 56 - 200), Math.min(40, y)),
+  });
+  const fabPan = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => false,
+    onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 3 || Math.abs(g.dy) > 3,
+    onPanResponderGrant: () => {
+      fabPos.setOffset({ x: fabLast.current.x, y: fabLast.current.y });
+      fabPos.setValue({ x: 0, y: 0 });
+    },
+    onPanResponderMove: Animated.event([null, { dx: fabPos.x, dy: fabPos.y }], { useNativeDriver: false }),
+    onPanResponderRelease: () => {
+      fabPos.flattenOffset();
+      const c = clampFab(fabLast.current.x, fabLast.current.y);
+      fabLast.current = c;
+      Animated.spring(fabPos, { toValue: c, friction: 7, useNativeDriver: false }).start();
+    },
+    onPanResponderTerminate: () => { fabPos.flattenOffset(); },
+  })).current;
   const [aiVisible, setAiVisible] = useState(false);
   const [aiInput, setAiInput] = useState('');
   const [aiTyping, setAiTyping] = useState(false);
@@ -123,7 +151,7 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
   };
 
   return (
-    <View style={styles.homeWrap}>
+    <View style={styles.homeWrap} onLayout={(e) => setHomeSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={ORANGE} />} showsVerticalScrollIndicator={false}>
       {/* Dark header — prototype MAIN APP */}
       <View style={styles.header}>
@@ -265,17 +293,19 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
       </View>
     </ScrollView>
 
-      {/* Customer-only floating AI (Image 1) */}
-      <TouchableOpacity
-        style={styles.aiFab}
-        onPress={() => setAiVisible(true)}
-        activeOpacity={0.88}
-        accessibilityRole="button"
-        accessibilityLabel="Open FixLink Assistant"
-        hitSlop={8}
-      >
-        <Image source={require('../../../assets/ai-assistant.png')} style={styles.aiFabImage} accessibilityLabel="FixLink Assistant" />
-      </TouchableOpacity>
+      {/* Customer-only draggable AI robot */}
+      <Animated.View style={[styles.aiFabWrap, { transform: fabPos.getTranslateTransform() }]} {...fabPan.panHandlers}>
+        <TouchableOpacity
+          style={styles.aiFab}
+          onPress={() => setAiVisible(true)}
+          activeOpacity={0.88}
+          accessibilityRole="button"
+          accessibilityLabel="Open FixLink Assistant. Drag to move."
+          hitSlop={8}
+        >
+          <Image source={require('../../../assets/ai-assistant.png')} style={styles.aiFabImage} accessibilityLabel="FixLink Assistant" />
+        </TouchableOpacity>
+      </Animated.View>
 
       {/* FixLink Assistant sheet (Image 3, no Estimate price) */}
       <Modal visible={aiVisible} transparent animationType="slide" onRequestClose={() => setAiVisible(false)}>
@@ -393,7 +423,8 @@ const styles = StyleSheet.create({
   tipCopy: { color: '#9A711E', fontSize: 12, lineHeight: 16, fontFamily: fonts.regular },
   tipDismiss: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   homeWrap: { flex: 1 },
-  aiFab: { position: 'absolute', right: 20, bottom: 90, width: 56, height: 56, borderRadius: 28, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', elevation: 6, boxShadow: '0 6px 14px rgba(16,42,67,0.25)', overflow: 'hidden' },
+  aiFabWrap: { position: 'absolute', right: 20, bottom: 90 },
+  aiFab: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', elevation: 6, boxShadow: '0 6px 14px rgba(16,42,67,0.25)', overflow: 'hidden' },
   aiFabImage: { width: 56, height: 56, borderRadius: 28 },
   aiHeaderImage: { width: 32, height: 32, borderRadius: 10 },
   aiMiniImage: { width: 20, height: 20, borderRadius: 10 },
