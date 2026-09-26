@@ -12,6 +12,10 @@ const { chatComplete, isOmniRouteConfigured } = require('../utils/omniRoute');
 const { getSchedulesForTechnicians, dayKeyOf, availabilityForDay } = require('../utils/techSchedule');
 const { getActiveJobCountsForTechnicians, getWorkloadStatus } = require('../utils/workload');
 
+// Per-customer assistant language preference. Module-level so it survives
+// across requests (resets on backend restart).
+const langPrefs = new Map();
+
 router.use(requireAuth);
 
 // Resolve a job by its own id or the legacy original request id (same lookup
@@ -76,10 +80,8 @@ router.post('/assistant', async (req, res) => {
     if (!isOmniRouteConfigured()) {
       return res.status(502).json({ error: 'AI service is not configured.', ai: 'degraded' });
     }
-    // Per-customer language preference (memory, resets on backend restart).
     // Once the customer asks to switch (e.g. "can we speak english"), later
     // messages stay in that language until they switch again.
-    const langPrefs = router.locals.langPrefs || (router.locals.langPrefs = new Map());
     const switchTarget = (t) => {
       const s = ` ${String(t || '').toLowerCase()} `;
       const wants = (names) => names.some((n) => s.includes(` ${n} `) || s.includes(` ${n}?`) || s.includes(` ${n}.`) || s.includes(` ${n},`) || s.includes(` ${n}!`));
