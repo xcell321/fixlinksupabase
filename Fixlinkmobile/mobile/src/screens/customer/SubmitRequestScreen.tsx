@@ -59,6 +59,9 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
   const [zipCode, setZipCode] = useState("");
   const [notes, setNotes] = useState("");
   const [coords, setCoords] = useState(null);
+  // Smart opacity: manual text = 50%, GPS autofill = 100% (medium weight, never bold)
+  const [locationFromGps, setLocationFromGps] = useState(false);
+  const locTextStyle = [styles.textInputSingle, { opacity: locationFromGps ? 1 : 0.5 }];
   const [categoryOptions, setCategoryOptions] = useState([]);
   const [date, setDate] = useState(new Date());
   const [selectedTimeSlot, setSelectedTimeSlot] = useState('Afternoon (1PM-5PM)');
@@ -129,6 +132,8 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
         if (a.postalCode) setZipCode(a.postalCode);
         else if (a.postalCode === null && a.region) setZipCode('');
       }
+      // GPS autofill done - full 100% opacity text (medium, not bold)
+      setLocationFromGps(true);
     } catch (e: any) {
       Alert.alert('Error', e?.message || 'Failed to fetch location details.');
     } finally {
@@ -746,11 +751,11 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
           <Text style={styles.refLabel}>Street Address</Text>
           <View style={[styles.textInputContainer, !!stepErrors.location && styles.inputError]}>
             <TextInput
-              style={styles.textInputSingle}
+              style={locTextStyle}
               placeholder="142 Oak Street, Apt 3B"
               placeholderTextColor={colors.muted}
               value={street}
-              onChangeText={(t) => { setStreet(t); setCoords(null); clearLocationError(); }}
+              onChangeText={(t) => { setStreet(t); setCoords(null); setLocationFromGps(false); clearLocationError(); }}
               accessibilityLabel="Street address"
               autoCorrect={false}
             />
@@ -762,11 +767,11 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
             <Text style={styles.refLabel}>City</Text>
             <View style={styles.textInputContainer}>
               <TextInput
-                style={styles.textInputSingle}
+                style={locTextStyle}
                 placeholder="Bogo City"
                 placeholderTextColor={colors.muted}
                 value={city}
-                onChangeText={(t) => { setCity(t); setCoords(null); }}
+                onChangeText={(t) => { setCity(t); setCoords(null); setLocationFromGps(false); }}
                 accessibilityLabel="City"
                 autoCorrect={false}
               />
@@ -776,11 +781,11 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
             <Text style={styles.refLabel}>ZIP Code</Text>
             <View style={styles.textInputContainer}>
               <TextInput
-                style={styles.textInputSingle}
+                style={locTextStyle}
                 placeholder="6005"
                 placeholderTextColor={colors.muted}
                 value={zipCode}
-                onChangeText={setZipCode}
+                onChangeText={(t) => { setZipCode(t); setLocationFromGps(false); }}
                 accessibilityLabel="ZIP code"
                 keyboardType="number-pad"
               />
@@ -1122,7 +1127,7 @@ const styles = StyleSheet.create({
 
   // Prototype slot rows with radio circles
   textInputContainer: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.line, borderRadius: 14, paddingHorizontal: 14, backgroundColor: colors.surfaceSunken, gap: 10, minHeight: 52, elevation: 0 },
-  textInputSingle: { flex: 1, color: colors.ink, fontSize: 13, fontFamily: fonts.medium, paddingVertical: 12, opacity: 0.75 },
+  textInputSingle: { flex: 1, color: colors.ink, fontSize: 13, fontFamily: fonts.medium, paddingVertical: 12 },
   slotList: { gap: 10, marginTop: 4 },
   slotRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.canvas, elevation: 0 },
   slotRowActive: { borderColor: colors.customer, backgroundColor: colors.customerSoft },
