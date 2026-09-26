@@ -62,6 +62,8 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
   // Smart opacity: manual text = 50%, GPS autofill = 100% (medium weight, never bold)
   const [locationFromGps, setLocationFromGps] = useState(false);
   const locTextStyle = [styles.textInputSingle, { opacity: locationFromGps ? 1 : 0.5 }];
+  // Consistent focus ring for all step 4 boxes (orange when focused)
+  const [focusedField, setFocusedField] = useState(null);
   const [categoryOptions, setCategoryOptions] = useState([]);
   const [date, setDate] = useState(new Date());
   const [selectedTimeSlot, setSelectedTimeSlot] = useState('Afternoon (1PM-5PM)');
@@ -749,13 +751,15 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
         </TouchableOpacity>
         <View style={styles.inputGroup}>
           <Text style={styles.refLabel}>Street Address</Text>
-          <View style={[styles.textInputContainer, !!stepErrors.location && styles.inputError]}>
+          <View style={[styles.textInputContainer, focusedField === 'street' && styles.inputFocused, !!stepErrors.location && styles.inputError]}>
             <TextInput
               style={locTextStyle}
               placeholder="142 Oak Street, Apt 3B"
               placeholderTextColor={colors.muted}
               value={street}
               onChangeText={(t) => { setStreet(t); setCoords(null); setLocationFromGps(false); clearLocationError(); }}
+              onFocus={() => setFocusedField('street')}
+              onBlur={() => setFocusedField(null)}
               accessibilityLabel="Street address"
               autoCorrect={false}
             />
@@ -765,13 +769,15 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
         <View style={styles.twoColGrid}>
           <View style={[styles.inputGroup, styles.twoColCell]}>
             <Text style={styles.refLabel}>City</Text>
-            <View style={styles.textInputContainer}>
+            <View style={[styles.textInputContainer, focusedField === 'city' && styles.inputFocused]}>
               <TextInput
                 style={locTextStyle}
                 placeholder="Bogo City"
                 placeholderTextColor={colors.muted}
                 value={city}
                 onChangeText={(t) => { setCity(t); setCoords(null); setLocationFromGps(false); }}
+                onFocus={() => setFocusedField('city')}
+                onBlur={() => setFocusedField(null)}
                 accessibilityLabel="City"
                 autoCorrect={false}
               />
@@ -779,13 +785,15 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
           </View>
           <View style={[styles.inputGroup, styles.twoColCell]}>
             <Text style={styles.refLabel}>ZIP Code</Text>
-            <View style={styles.textInputContainer}>
+            <View style={[styles.textInputContainer, focusedField === 'zip' && styles.inputFocused]}>
               <TextInput
                 style={locTextStyle}
                 placeholder="6005"
                 placeholderTextColor={colors.muted}
                 value={zipCode}
                 onChangeText={(t) => { setZipCode(t); setLocationFromGps(false); }}
+                onFocus={() => setFocusedField('zip')}
+                onBlur={() => setFocusedField(null)}
                 accessibilityLabel="ZIP code"
                 keyboardType="number-pad"
               />
@@ -794,13 +802,15 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
         </View>
         <View style={styles.inputGroup}>
           <Text style={styles.refLabel}>Additional Notes</Text>
-          <View style={styles.textInputContainer}>
+          <View style={[styles.textInputContainer, focusedField === 'notes' && styles.inputFocused]}>
             <TextInput
               style={styles.textInputSingle}
               placeholder="Landmark, gate code, leave at door, etc."
               placeholderTextColor={colors.muted}
               value={notes}
               onChangeText={setNotes}
+              onFocus={() => setFocusedField('notes')}
+              onBlur={() => setFocusedField(null)}
               accessibilityLabel="Additional notes"
             />
           </View>
@@ -1127,6 +1137,7 @@ const styles = StyleSheet.create({
 
   // Prototype slot rows with radio circles
   textInputContainer: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.line, borderRadius: 14, paddingHorizontal: 14, backgroundColor: colors.surfaceSunken, gap: 10, minHeight: 52, elevation: 0 },
+  inputFocused: { borderColor: colors.customer, borderWidth: 1.5 },
   textInputSingle: { flex: 1, color: colors.ink, fontSize: 13, fontFamily: fonts.medium, paddingVertical: 12 },
   slotList: { gap: 10, marginTop: 4 },
   slotRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.canvas, elevation: 0 },
