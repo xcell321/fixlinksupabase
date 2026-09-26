@@ -7,7 +7,7 @@ import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from "../../components/DateTimePicker";
 import { PhotoLightbox } from "../../components/RequestPhoto";
 import { submitRepairRequest, fetchPlatformCategories } from "../services/api";
-import { geocodeAddress } from "../services/locationIq";
+import { geocodeAddress, geocodeAddressPrecise } from "../services/locationIq";
 import CustomerLocationMap from "../../components/CustomerLocationMap";
 import { colors, fonts, shadows } from '../../theme';
 import { getApplianceIcon } from '../../utils/applianceIcons';
@@ -165,15 +165,16 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
         if (resolvedZip) setZipCode(resolvedZip);
         else if (a.postalCode === null && a.region) setZipCode('');
       }
-      // Indoor snap: weak GPS (>30m, typical inside a house) gets snapped to
-      // the rooftop of the resolved street address via LocationIQ forward
-      // geocode. Good GPS (<=30m) is kept as-is since it is already best.
+      // Indoor snap: weak GPS (>30m, typical inside a house) gets snapped to the
+      // rooftop of the resolved street address via API-only forward geocode.
+      // Good GPS (<=30m) is kept as-is since it is already best. The coarse
+      // dict is never used here so it cannot drag the pin offshore again.
       let finalLat = lat;
       let finalLon = lon;
       const fullAddr = [resolvedStreet, resolvedCity, resolvedZip].filter(Boolean).join(', ');
       if (bestAcc > 30 && fullAddr.length > 5) {
         try {
-          const snap = await geocodeAddress(fullAddr);
+          const snap = await geocodeAddressPrecise(fullAddr);
           if (snap && Number.isFinite(snap.latitude) && Number.isFinite(snap.longitude)) {
             finalLat = snap.latitude;
             finalLon = snap.longitude;

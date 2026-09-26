@@ -57,15 +57,17 @@ export const getDrivingRoute = async (startCoords: LatLng, endCoords: LatLng): P
   return fallbackRoute;
 };
 
+// Coarse offline fallback ONLY (barangay centers, land-verified). The live
+// LocationIQ API is always tried first for rooftop accuracy. NOTE: there is
+// no "Lepiten" barangay (it is a street name) so it must resolve via API.
 const BOGO_LOCAL_COORDS: Record<string, LatLng> = {
-  lepiten: { latitude: 11.0278, longitude: 124.0355 },
-  'san vicente': { latitude: 11.055, longitude: 124.0216 },
+  'san vicente': { latitude: 11.05, longitude: 124.005 },
   'p. rodriguez': { latitude: 11.0485, longitude: 124.0038 },
   rodriguez: { latitude: 11.0485, longitude: 124.0038 },
   poblacion: { latitude: 11.0485, longitude: 124.0038 },
   taytayan: { latitude: 11.043, longitude: 124.008 },
   gairan: { latitude: 11.0554, longitude: 124.0217 },
-  cogon: { latitude: 11.038, longitude: 124.015 },
+  cogon: { latitude: 11.0463, longitude: 124.0028 },
   dakit: { latitude: 11.058, longitude: 124.008 },
   nailon: { latitude: 11.085, longitude: 124.035 },
   libertad: { latitude: 11.031, longitude: 124.002 },
@@ -88,19 +90,40 @@ const searchLocationIq = async (rawQuery: string, suffix: string | null): Promis
 const resolveGeocode = async (query: string, useCompact: boolean): Promise<LatLng | null> => {
   const clean: string = String(query ?? '').trim();
   if (!clean) return null;
+  if (geocodeCache.has(clean)) return geocodeCache.get(clean) ?? null;
+  // Live API first (rooftop-accurate). Coarse dict is offline fallback only,
+  // so a wrong dict entry can never override a real street position again.
+  for (const suffix of [null, 'Philippines', 'Bogo City, Cebu'] as const) {
+    try {
+      const coords: LatLng | null = await searchLocationIq(clean, suffix);
+      if (coords) {
+        geocodeCache.set(clean, coords);
+        return coords;
+      }
+    } catch {}
+  }
   const compact = (value: string): string => value.toLowerCase().replace(/[^a-z0-9]/g, '');
   const compareValue: string = useCompact ? compact(clean) : clean.toLowerCase();
   for (const [key, coords] of Object.entries(BOGO_LOCAL_COORDS)) {
     const dictKey: string = useCompact ? compact(key) : key;
     if (dictKey && compareValue.includes(dictKey)) return coords;
   }
-  if (geocodeCache.has(clean)) return geocodeCache.get(clean) ?? null;
+  return null;
+};
+
+// API-only forward geocode (LocationIQ rooftop). Never touches the coarse
+// local dict, so it is safe to OVERRIDE a weak GPS fix (snap-to-house).
+export const geocodeAddressPrecise = async (address: string): Promise<LatLng | null> => {
+  const clean: string = String(address ?? '').trim();
+  if (!clean) return null;
   for (const suffix of [null, 'Philippines', 'Bogo City, Cebu'] as const) {
-    const coords: LatLng | null = await searchLocationIq(clean, suffix);
-    if (coords) {
-      geocodeCache.set(clean, coords);
-      return coords;
-    }
+    try {
+      const coords: LatLng | null = await searchLocationIq(clean, suffix);
+      if (coords) {
+        geocodeCache.set(clean, coords);
+        return coords;
+      }
+    } catch {}
   }
   return null;
 };
