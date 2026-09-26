@@ -84,7 +84,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
     : APPLIANCE_OPTIONS;
 
   const displayAppliance = selectedDevice
-    ? `${selectedCategoryName} � ${selectedDevice}`
+    ? `${selectedCategoryName} - ${selectedDevice}`
     : selectedCategoryName || "Select appliance type";
 
   const selectedCategoryObj = categoryOptions.find((c) => String(c.name || '').trim() === selectedCategoryName) || null;
@@ -571,7 +571,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
                     </View>
                     <View style={styles.photoPickerCopy}>
                       <Text style={styles.photoPickerTitle}>Add a photo of the problem</Text>
-                      <Text style={styles.photoPickerSub}>Camera or gallery � JPG / PNG up to 5MB</Text>
+                      <Text style={styles.photoPickerSub}>Camera or gallery - JPG / PNG up to 5MB</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={16} color={colors.muted} />
                   </>
@@ -672,7 +672,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
             <View style={{ flex: 1 }}>
               <Text style={styles.locationConfirmTitle}>Appointment set</Text>
               <Text style={styles.locationConfirmSub} numberOfLines={2}>
-                {date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} � {selectedTimeSlot}
+                {date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} - {selectedTimeSlot}
               </Text>
             </View>
             <Ionicons name="shield-checkmark" size={16} color={colors.customer} />
@@ -792,11 +792,11 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
       </View>
 
       <View style={styles.card}>
-        {/* Stepper header � distilled: ONE clear track (dots + labels). Kicker keeps step context; badge + segmented bar removed as duplicate signals. */}
+        {/* Stepper header - distilled: ONE clear track (dots + labels). Kicker keeps step context; badge + segmented bar removed as duplicate signals. */}
         <View style={styles.stepperHeader}>
           <View style={styles.stepperTopRow}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.stepKicker} accessibilityRole="text">STEP {currentStep} OF {TOTAL_STEPS} � {STEPS[currentStep - 1].label.toUpperCase()}</Text>
+              <Text style={styles.stepKicker} accessibilityRole="text">STEP {currentStep} OF {TOTAL_STEPS} - {STEPS[currentStep - 1].label.toUpperCase()}</Text>
               <Text style={styles.stepTitle}>{STEPS[currentStep - 1].title}</Text>
               <Text style={styles.stepSubtitle}>{STEPS[currentStep - 1].subtitle}</Text>
             </View>
@@ -959,7 +959,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
                         </View>
                         <View style={{ flex: 1 }}>
                           <Text style={[styles.modalItemText, isSelected && styles.modalItemTextSelected]}>{item}</Text>
-                          {deviceCount > 0 ? <Text style={styles.modalItemHint}>{deviceCount} device{deviceCount !== 1 ? 's' : ''} � tap to choose</Text> : null}
+                          {deviceCount > 0 ? <Text style={styles.modalItemHint}>{deviceCount} device{deviceCount !== 1 ? 's' : ''} - tap to choose</Text> : null}
                         </View>
                       </View>
                       {isSelected ? <Ionicons name="checkmark-circle" size={18} color={colors.customer} /> : <Ionicons name="chevron-forward" size={16} color={colors.muted} />}
@@ -996,7 +996,7 @@ const styles = StyleSheet.create({
 
   card: { backgroundColor: colors.white, borderRadius: 20, padding: 24, borderWidth: 1, borderColor: colors.line, ...shadows.card, gap: 0 },
 
-  // Stepper � tight within, generous separation between sections (spacing thesis)
+  // Stepper - tight within, generous separation between sections (spacing thesis)
   stepperHeader: { gap: 18, paddingBottom: 8 },
   stepperTopRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
   stepKicker: { color: colors.customer, fontSize: 10, letterSpacing: 1.2, fontFamily: fonts.extraBold, textTransform: 'uppercase' as const },
@@ -1040,7 +1040,7 @@ const styles = StyleSheet.create({
   inputIconTile: { width: 32, height: 32, borderRadius: 10, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
   inputIconTileActive: { backgroundColor: colors.customerSoft, borderColor: colors.hudBorder },
 
-  // quick picks � grouped tight (8) within, generous (16) from next input
+  // quick picks - grouped tight (8) within, generous (16) from next input
   // Prototype 2x2 device grid
   quickPickWrap: { gap: 14, marginTop: 12 },
   deviceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, width: '100%' },

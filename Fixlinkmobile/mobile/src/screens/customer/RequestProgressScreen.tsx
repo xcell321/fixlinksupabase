@@ -241,7 +241,7 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
     </View>
   );
 
-  // De-emphasized progress history � small, muted, supporting element. Never competes with status.
+  // De-emphasized progress history - small, muted, supporting element. Never competes with status.
   const renderProgressRail = (status: string | undefined): React.JSX.Element | null => {
     const current = progressIndexOf(status);
     if (current < 0) return null;
@@ -440,7 +440,7 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
         <View style={styles.techMetaRow}>
           <View style={styles.techMetaItem}>
             <Ionicons name="star" size={12} color={colors.gold} accessible={false} />
-            <Text style={styles.techMetaText}>{tech.rating ? Number(tech.rating).toFixed(1) : '�'}</Text>
+            <Text style={styles.techMetaText}>{tech.rating ? Number(tech.rating).toFixed(1) : '...'}</Text>
           </View>
           <View style={styles.techMetaItem}>
             <Ionicons name="people-outline" size={12} color={colors.muted} accessible={false} />
@@ -464,7 +464,7 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
           <View style={styles.workloadRow}>
             <Ionicons name={tech.workloadStatus === 'busy' ? 'time-outline' : 'checkmark-circle-outline'} size={12} color={tech.workloadStatus === 'busy' ? colors.gold : colors.customer} accessible={false} />
             <Text style={[styles.workloadText, tech.workloadStatus === 'busy' && styles.workloadTextBusy]}>
-              {tech.workloadStatus === 'busy' ? `Busy � ${tech.activeJobs ?? 0} active jobs` : `Available � ${tech.activeJobs ?? 0} active jobs`}
+              {tech.workloadStatus === 'busy' ? `Busy - ${tech.activeJobs ?? 0} active jobs` : `Available - ${tech.activeJobs ?? 0} active jobs`}
             </Text>
           </View>
         ) : null}
@@ -504,7 +504,7 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
                   <View style={styles.schedLine}>
                     <Ionicons name="time-outline" size={13} color={colors.customer} accessible={false} />
                     <Text style={styles.schedTime} numberOfLines={1}>
-                      {shown.preferredTime || 'Time to confirm'} � {shown.applianceType}
+                      {shown.preferredTime || 'Time to confirm'} - {shown.applianceType}
                     </Text>
                   </View>
                 </View>
@@ -570,7 +570,7 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
     return (
       <View style={styles.aiLoading}>
         <ActivityIndicator size="small" color={colors.customer} />
-        <Text style={styles.aiLoadingText}>Finding matches�</Text>
+        <Text style={styles.aiLoadingText}>Finding matches...</Text>
       </View>
     );
   };
@@ -746,7 +746,7 @@ const styles = StyleSheet.create({
   pressed: { transform: [{ scale: 0.97 }], opacity: 0.96 },
   pressedSoft: { transform: [{ scale: 0.97 }], opacity: 0.94 },
 
-  // Filters � tight within (6), generous below (18), touch-safe 44
+  // Filters - tight within (6), generous below (18), touch-safe 44
   segmentRow: { flexDirection: 'row', gap: 6, marginBottom: 20, flexWrap: 'wrap' as const },
   segment: { flex: 1, minWidth: 72, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, minHeight: 44, paddingHorizontal: 6, borderRadius: 12, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line },
   segmentActive: { backgroundColor: colors.customer, borderColor: colors.customerDark },
@@ -757,14 +757,14 @@ const styles = StyleSheet.create({
   segmentCountText: { color: colors.muted, fontSize: 11, fontFamily: fonts.bold, fontVariant: ['tabular-nums'] },
   segmentCountTextActive: { color: colors.white },
 
-  // Section headers � more space above than below (rhythm)
+  // Section headers - more space above than below (rhythm)
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, marginTop: 20, gap: 12 },
   sectionHeaderCopy: { flex: 1, marginRight: 10, gap: 2 },
   sectionKicker: { fontSize: 10, letterSpacing: 1.2, fontFamily: fonts.bold, marginBottom: 1, textTransform: 'uppercase' as const },
   countBadge: { minWidth: 28, height: 28, borderRadius: 14, paddingHorizontal: 9, alignItems: 'center', justifyContent: 'center' },
   countBadgeText: { fontSize: 12, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
 
-  // Cards � generous inner (18), systematic gap rhythm
+  // Cards - generous inner (18), systematic gap rhythm
   card: { backgroundColor: colors.white, borderRadius: 20, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: colors.line, gap: 0, ...shadows.card },
   cardFocused: { borderColor: colors.customer, borderWidth: 2, ...shadows.cardStrong },
   // Reference Repairs / History cards (compact, tap-to-detail)
@@ -809,7 +809,7 @@ const styles = StyleSheet.create({
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1 },
   metaText: { color: colors.muted, fontSize: 12, fontFamily: fonts.medium, flex: 1 },
 
-  // Current status hero � STRONGEST visual on card (distilled: larger, bolder, quiet surroundings)
+  // Current status hero - STRONGEST visual on card (distilled: larger, bolder, quiet surroundings)
   statusHero: { flexDirection: 'row', alignItems: 'flex-start', gap: 11, paddingHorizontal: 13, paddingVertical: 13, borderRadius: 14, borderWidth: 1, marginBottom: 12 },
   statusHeroIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, marginTop: 1 },
   statusHeroCopy: { flex: 1 },
@@ -818,7 +818,7 @@ const styles = StyleSheet.create({
   statusHeroTitle: { color: colors.ink, fontSize: 15, fontFamily: fonts.extraBold, marginBottom: 3, lineHeight: 18, letterSpacing: -0.2 },
   statusHeroBody: { color: colors.muted, fontSize: 11.5, lineHeight: 15.5, fontFamily: fonts.regular },
 
-  // Next action � ONE primary dominates, secondary is ghost. Calm hierarchy.
+  // Next action - ONE primary dominates, secondary is ghost. Calm hierarchy.
   nextActionBlock: { gap: 8, marginBottom: 11 },
   nextActionKicker: { color: colors.customer, fontSize: 11, letterSpacing: 1.1, fontFamily: fonts.bold },
   nextActionPrimary: { flex: 1.6 },
@@ -827,7 +827,7 @@ const styles = StyleSheet.create({
   calmingInfo: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.canvas, borderRadius: 10, borderWidth: 1, borderColor: colors.lineSoft, paddingHorizontal: 11, paddingVertical: 9 },
   calmingInfoText: { flex: 1, color: colors.muted, fontSize: 11.5, lineHeight: 15, fontFamily: fonts.medium },
 
-  // De-emphasized progress history � muted, compact, never competes with statusHero
+  // De-emphasized progress history - muted, compact, never competes with statusHero
   rail: { marginBottom: 11, paddingVertical: 7, paddingHorizontal: 8, backgroundColor: 'transparent', borderRadius: 10, borderWidth: 1, borderColor: colors.lineSoft, opacity: 0.88 },
   railHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 5, paddingHorizontal: 1 },
   railKicker: { color: colors.muted, fontSize: 10, letterSpacing: 1.1, fontFamily: fonts.bold, opacity: 0.9 },
@@ -895,7 +895,7 @@ const styles = StyleSheet.create({
   retryButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.customer, borderRadius: 14, paddingHorizontal: 22, minHeight: 48, marginTop: 6, ...shadows.card },
   retryButtonText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
 
-  // AI recommendations � SECONDARY disclosure, collapsed by default. Never competes with status.
+  // AI recommendations - SECONDARY disclosure, collapsed by default. Never competes with status.
   aiPanel: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.lineSoft, borderRadius: 12, marginBottom: 11, overflow: 'hidden' as const },
   aiPanelExpanded: { borderColor: colors.hudBorder, backgroundColor: colors.canvas },
   aiPanelToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 10, minHeight: 44, gap: 8 },
