@@ -68,7 +68,8 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
     { id: 'ai-hello', from: 'ai', text: 'Hi! I am your FixLink Assistant. Ask me about repairs, technicians, or tracking.' },
   ]);
   // Persisted conversation: survives reload/restart, per customer.
-  const aiChatKey = `fixlink_ai_chat_${uid || 'guest'}`;
+  // NOTE: uses user?.uid directly (uid const is declared further below).
+  const aiChatKey = `fixlink_ai_chat_${user?.uid || 'guest'}`;
   const [aiChatReady, setAiChatReady] = useState(false);
   useEffect(() => {
     let on = true;
