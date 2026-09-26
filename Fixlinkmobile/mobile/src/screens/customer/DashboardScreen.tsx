@@ -1,6 +1,6 @@
 ﻿// @ts-nocheck - migrated from .js, preserve working state; types to be refined incrementally
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl, Modal, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl, Modal, TextInput, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { fetchCompletedJobs, fetchCustomerRequests, fetchPlatformCategories, askAssistant } from '../services/api';
 import { colors, fonts } from '../../theme';
@@ -274,7 +274,7 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
         accessibilityLabel="Open FixLink Assistant"
         hitSlop={8}
       >
-        <Ionicons name="sparkles" size={22} color="#FFFFFF" />
+        <Image source={require('../../assets/ai-assistant.png')} style={styles.aiFabImage} accessibilityLabel="FixLink Assistant" />
       </TouchableOpacity>
 
       {/* FixLink Assistant sheet (Image 3, no Estimate price) */}
@@ -282,9 +282,7 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
         <View style={styles.aiOverlay}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.aiSheet}>
             <View style={styles.aiHeader}>
-              <View style={styles.aiHeaderIcon}>
-                <Ionicons name="sparkles" size={16} color="#FFFFFF" />
-              </View>
+              <Image source={require('../../assets/ai-assistant.png')} style={styles.aiHeaderImage} accessibilityLabel="FixLink Assistant" />
               <View style={{ flex: 1 }}>
                 <Text style={styles.aiTitle}>FixLink Assistant</Text>
                 <View style={styles.aiReadyRow}>
@@ -301,9 +299,7 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
               {aiMessages.map((m) => (
                 <View key={m.id} style={[styles.aiBubbleRow, m.from === 'me' ? styles.aiBubbleRowMe : styles.aiBubbleRowAi]}>
                   {m.from === 'ai' ? (
-                    <View style={styles.aiMiniIcon}>
-                      <Ionicons name="sparkles" size={10} color="#FFFFFF" />
-                    </View>
+                    <Image source={require('../../assets/ai-assistant.png')} style={styles.aiMiniImage} accessibilityLabel="FixLink Assistant" />
                   ) : null}
                   <View style={[styles.aiBubble, m.from === 'me' ? styles.aiBubbleMe : styles.aiBubbleAi]}>
                     <Text style={[styles.aiBubbleText, m.from === 'me' ? styles.aiBubbleTextMe : styles.aiBubbleTextAi]}>{m.text}</Text>
@@ -312,9 +308,7 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
               ))}
               {aiTyping ? (
                 <View style={[styles.aiBubbleRow, styles.aiBubbleRowAi]}>
-                  <View style={styles.aiMiniIcon}>
-                    <Ionicons name="sparkles" size={10} color="#FFFFFF" />
-                  </View>
+                  <Image source={require('../../assets/ai-assistant.png')} style={styles.aiMiniImage} accessibilityLabel="FixLink Assistant" />
                   <View style={[styles.aiBubble, styles.aiBubbleAi]}>
                     <Text style={styles.aiBubbleTextAi}>Typing...</Text>
                   </View>
@@ -399,7 +393,10 @@ const styles = StyleSheet.create({
   tipCopy: { color: '#9A711E', fontSize: 12, lineHeight: 16, fontFamily: fonts.regular },
   tipDismiss: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   homeWrap: { flex: 1 },
-  aiFab: { position: 'absolute', right: 20, bottom: 90, width: 56, height: 56, borderRadius: 28, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center', elevation: 6, boxShadow: '0 6px 14px rgba(249,115,22,0.35)' },
+  aiFab: { position: 'absolute', right: 20, bottom: 90, width: 56, height: 56, borderRadius: 28, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', elevation: 6, boxShadow: '0 6px 14px rgba(16,42,67,0.25)', overflow: 'hidden' },
+  aiFabImage: { width: 56, height: 56, borderRadius: 28 },
+  aiHeaderImage: { width: 32, height: 32, borderRadius: 10 },
+  aiMiniImage: { width: 20, height: 20, borderRadius: 10 },
   aiOverlay: { flex: 1, backgroundColor: 'rgba(16,42,67,0.4)', justifyContent: 'flex-end' },
   aiSheet: { flex: 1, backgroundColor: '#FFFFFF', paddingTop: 12, paddingHorizontal: 16, paddingBottom: 20 },
   aiHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
