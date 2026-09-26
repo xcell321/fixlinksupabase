@@ -811,13 +811,15 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
           {!readOnly && onLogout && (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Log out"
+              accessibilityLabel="Sign out"
               hitSlop={6}
               onPress={onLogout}
               style={({ pressed }) => [styles.logoutButton, pressed && styles.pressedSoft]}
             >
-              <Ionicons name="log-out-outline" size={18} color={colors.danger} />
-              <Text style={styles.logoutButtonText}>Log Out</Text>
+              <View style={styles.logoutIcon}>
+                <Ionicons name="close" size={18} color="#EF4444" />
+              </View>
+              <Text style={styles.logoutButtonText}>Sign Out</Text>
             </Pressable>
           )}
         </View>
@@ -1061,8 +1063,9 @@ const styles = StyleSheet.create({
   helpCopy: { flex: 1, minWidth: 0 },
   helpTitle: { color: colors.ink, fontSize: 13, fontFamily: fonts.bold },
   helpSub: { color: colors.muted, fontSize: 11, fontFamily: fonts.regular, marginTop: 2 },
-  logoutButton: { minHeight: 48, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 16, backgroundColor: '#FFF5F5', borderWidth: 1, borderColor: '#FECACA' },
-  logoutButtonText: { color: colors.danger, fontSize: 13, fontFamily: fonts.bold },
+  logoutButton: { backgroundColor: '#FEF2F2', borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: '#FECACA' },
+  logoutIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center' },
+  logoutButtonText: { color: '#EF4444', fontSize: 14, fontFamily: fonts.semiBold },
 
   // Loading / Error
   skeletonAvatar: { width: 68, height: 68, borderRadius: 20 },
