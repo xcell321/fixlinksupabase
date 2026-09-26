@@ -24,9 +24,11 @@ export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile,
   const [completedCount, setCompletedCount] = useState(0);
   const [activeCount, setActiveCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
+  const [statsLoading, setStatsLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
+    setStatsLoading(true);
     Promise.all([
       fetchCompletedJobs(user?.name, user?.uid).catch(() => []),
       fetchCustomerRequests(user?.name, user?.uid).catch(() => []),
@@ -37,6 +39,7 @@ export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile,
       setCompletedCount(c.length);
       setActiveCount(t.filter((r) => ACTIVE_STATUSES.includes(String(r.status || '').toLowerCase())).length);
       setTotalCount(c.length + t.length);
+      setStatsLoading(false);
     });
     return () => { active = false; };
   }, [user?.name, user?.uid]);
@@ -136,7 +139,11 @@ export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile,
         <View style={styles.statsRow}>
           {[{ v: String(totalCount), l: 'Requests' }, { v: String(activeCount), l: 'Active' }, { v: String(completedCount), l: 'Completed' }].map((s) => (
             <View key={s.l} style={styles.stat}>
-              <Text style={styles.statValue}>{s.v}</Text>
+              {statsLoading ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.statValue}>{s.v}</Text>
+              )}
               <Text style={styles.statLabel}>{s.l}</Text>
             </View>
           ))}
