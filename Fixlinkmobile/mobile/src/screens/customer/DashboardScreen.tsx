@@ -1,6 +1,6 @@
 ﻿// @ts-nocheck - migrated from .js, preserve working state; types to be refined incrementally
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl, Modal, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { fetchCompletedJobs, fetchCustomerRequests, fetchPlatformCategories } from '../services/api';
 import { colors, fonts } from '../../theme';
@@ -30,6 +30,14 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [tipDismissed, setTipDismissed] = useState(false);
+
+  // Customer-only floating AI assistant (working, no Estimate price)
+  const [aiVisible, setAiVisible] = useState(false);
+  const [aiInput, setAiInput] = useState('');
+  const [aiTyping, setAiTyping] = useState(false);
+  const [aiMessages, setAiMessages] = useState([
+    { id: 'ai-hello', from: 'ai', text: 'Hi! I am your FixLink Assistant. Ask me about repairs, technicians, or tracking.' },
+  ]);
 
   const firstName = (user?.name || 'there').split(' ')[0];
   const fullName = user?.name || 'there';
@@ -82,7 +90,47 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
     { key: 'Pending', value: String(pendingCount) },
   ];
 
+  const aiReplyFor = (raw) => {
+    const q = String(raw || '').toLowerCase();
+    const job = heroJob;
+    if (!q.trim()) return 'Type a question, for example "Track my repair" or "Find nearby technician".';
+    if (q.includes('track') || q.includes('status') || q.includes('where') || q.includes('my repair')) {
+      if (!job) return 'You have no active repairs right now. Tap Book service to submit your first request.';
+      const tech = job.technicianName ? ` ${job.technicianName} is assigned.` : '';
+      const when = job.preferredTime ? ` Expected: ${job.preferredTime}.` : '';
+      return `Your ${job.applianceType || 'repair'} is ${job.status || 'Pending'}.${tech}${when}`;
+    }
+    if (q.includes('find') || q.includes('nearby') || q.includes('technician') || q.includes('pro')) {
+      if (job && job.technicianName) return `${job.technicianName} is on your ${job.applianceType || 'repair'}. Open Repairs to track them live.`;
+      return 'Tap Book service, choose your device, describe the issue, set a schedule and location. I will match a verified nearby technician for you.';
+    }
+    if (q.includes('book') || q.includes('submit') || q.includes('request')) {
+      return 'To book: tap Book service, pick a device, add the problem and a photo, choose date and time, then pin your location and submit.';
+    }
+    if (q.includes('history') || q.includes('completed') || q.includes('done')) {
+      return completedCount > 0 ? `You have ${completedCount} completed repair${completedCount === 1 ? '' : 's'}. Open Repairs to view them.` : 'No completed repairs yet. Your finished jobs will appear under Repairs.';
+    }
+    if (q.includes('hi') || q.includes('hello') || q.includes('hey')) {
+      return `Hi ${firstName}! I can help you track repairs or find a technician. Try "Track my repair".`;
+    }
+    return 'I can help with tracking repairs and finding technicians. Try "Track my repair" or "Find nearby technician".';
+  };
+
+  const aiSend = (preset) => {
+    const text = String(preset ?? aiInput).trim();
+    if (!text || aiTyping) return;
+    setAiMessages((cur) => [...cur, { id: `me-${Date.now()}`, from: 'me', text }]);
+    setAiInput('');
+    setAiTyping(true);
+    const reply = aiReplyFor(text);
+    setTimeout(() => {
+      setAiMessages((cur) => [...cur, { id: `ai-${Date.now()}`, from: 'ai', text: reply }]);
+      setAiTyping(false);
+    }, 650);
+  };
+
   return (
+    <View style={styles.homeWrap}>
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={ORANGE} />} showsVerticalScrollIndicator={false}>
       {/* Dark header — prototype MAIN APP */}
       <View style={styles.header}>
@@ -223,6 +271,92 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
         )}
       </View>
     </ScrollView>
+
+      {/* Customer-only floating AI (Image 1) */}
+      <TouchableOpacity
+        style={styles.aiFab}
+        onPress={() => setAiVisible(true)}
+        activeOpacity={0.88}
+        accessibilityRole="button"
+        accessibilityLabel="Open FixLink Assistant"
+        hitSlop={8}
+      >
+        <Ionicons name="sparkles" size={22} color="#FFFFFF" />
+      </TouchableOpacity>
+
+      {/* FixLink Assistant sheet (Image 3, no Estimate price) */}
+      <Modal visible={aiVisible} transparent animationType="slide" onRequestClose={() => setAiVisible(false)}>
+        <View style={styles.aiOverlay}>
+          <TouchableOpacity style={{ flex: 1 }} onPress={() => setAiVisible(false)} activeOpacity={1} accessibilityRole="button" accessibilityLabel="Dismiss assistant" />
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.aiSheet}>
+            <View style={styles.aiHeader}>
+              <View style={styles.aiHeaderIcon}>
+                <Ionicons name="sparkles" size={16} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.aiTitle}>FixLink Assistant</Text>
+                <View style={styles.aiReadyRow}>
+                  <View style={styles.aiReadyDot} />
+                  <Text style={styles.aiReadyText}>Ready to help</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setAiVisible(false)} hitSlop={8} style={styles.aiClose} accessibilityRole="button" accessibilityLabel="Close assistant">
+                <Ionicons name="close" size={18} color={colors.ink} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.aiMessages} contentContainerStyle={{ gap: 8, paddingBottom: 4 }} showsVerticalScrollIndicator={false}>
+              {aiMessages.map((m) => (
+                <View key={m.id} style={[styles.aiBubbleRow, m.from === 'me' ? styles.aiBubbleRowMe : styles.aiBubbleRowAi]}>
+                  {m.from === 'ai' ? (
+                    <View style={styles.aiMiniIcon}>
+                      <Ionicons name="sparkles" size={10} color="#FFFFFF" />
+                    </View>
+                  ) : null}
+                  <View style={[styles.aiBubble, m.from === 'me' ? styles.aiBubbleMe : styles.aiBubbleAi]}>
+                    <Text style={[styles.aiBubbleText, m.from === 'me' ? styles.aiBubbleTextMe : styles.aiBubbleTextAi]}>{m.text}</Text>
+                  </View>
+                </View>
+              ))}
+              {aiTyping ? (
+                <View style={[styles.aiBubbleRow, styles.aiBubbleRowAi]}>
+                  <View style={styles.aiMiniIcon}>
+                    <Ionicons name="sparkles" size={10} color="#FFFFFF" />
+                  </View>
+                  <View style={[styles.aiBubble, styles.aiBubbleAi]}>
+                    <Text style={styles.aiBubbleTextAi}>Typing...</Text>
+                  </View>
+                </View>
+              ) : null}
+            </ScrollView>
+
+            <View style={styles.aiChips}>
+              {['Find nearby technician', 'Track my repair'].map((c) => (
+                <TouchableOpacity key={c} style={styles.aiChip} onPress={() => aiSend(c)} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={c}>
+                  <Text style={styles.aiChipText}>{c}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.aiInputRow}>
+              <TextInput
+                style={styles.aiInput}
+                value={aiInput}
+                onChangeText={setAiInput}
+                placeholder="Ask FixLink AI..."
+                placeholderTextColor="#9CA3AF"
+                onSubmitEditing={() => aiSend()}
+                returnKeyType="send"
+                accessibilityLabel="Ask FixLink AI"
+              />
+              <TouchableOpacity style={styles.aiSend} onPress={() => aiSend()} activeOpacity={0.88} accessibilityRole="button" accessibilityLabel="Send message">
+                <Ionicons name="send" size={16} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+    </View>
   );
 }
 
@@ -272,4 +406,32 @@ const styles = StyleSheet.create({
   tipTitle: { color: '#8A5B00', fontFamily: fonts.bold, fontSize: 12, lineHeight: 15 },
   tipCopy: { color: '#9A711E', fontSize: 12, lineHeight: 16, fontFamily: fonts.regular },
   tipDismiss: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  homeWrap: { flex: 1 },
+  aiFab: { position: 'absolute', right: 20, bottom: 90, width: 56, height: 56, borderRadius: 28, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center', elevation: 6, boxShadow: '0 6px 14px rgba(249,115,22,0.35)' },
+  aiOverlay: { flex: 1, backgroundColor: 'rgba(16,42,67,0.4)', justifyContent: 'flex-end' },
+  aiSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 16, paddingHorizontal: 16, paddingBottom: 20, maxHeight: '82%' },
+  aiHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  aiHeaderIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center' },
+  aiTitle: { color: '#111827', fontSize: 15, fontFamily: fonts.bold },
+  aiReadyRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
+  aiReadyDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#10B981' },
+  aiReadyText: { color: '#6B7280', fontSize: 11, fontFamily: fonts.regular },
+  aiClose: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
+  aiMessages: { maxHeight: 320 },
+  aiBubbleRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 6 },
+  aiBubbleRowMe: { justifyContent: 'flex-end' },
+  aiBubbleRowAi: { justifyContent: 'flex-start' },
+  aiMiniIcon: { width: 20, height: 20, borderRadius: 10, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center' },
+  aiBubble: { maxWidth: '80%', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 9 },
+  aiBubbleMe: { backgroundColor: ORANGE, borderTopRightRadius: 4 },
+  aiBubbleAi: { backgroundColor: '#F3F4F6', borderTopLeftRadius: 4 },
+  aiBubbleText: { fontSize: 13, lineHeight: 18, fontFamily: fonts.regular },
+  aiBubbleTextMe: { color: '#FFFFFF' },
+  aiBubbleTextAi: { color: '#374151' },
+  aiChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+  aiChip: { borderWidth: 1, borderColor: '#FDBA74', backgroundColor: '#FFF7ED', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
+  aiChipText: { color: '#EA580C', fontSize: 12, fontFamily: fonts.semiBold },
+  aiInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
+  aiInput: { flex: 1, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#F9FAFB', borderRadius: 999, paddingHorizontal: 14, minHeight: 44, fontSize: 13, fontFamily: fonts.regular, color: '#111827' },
+  aiSend: { width: 44, height: 44, borderRadius: 22, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center' },
 });
