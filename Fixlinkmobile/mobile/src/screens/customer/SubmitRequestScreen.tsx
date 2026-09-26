@@ -495,7 +495,6 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
               <Text style={styles.inputLabel}>Device brand & model</Text>
             </View>
             <View style={styles.textInputContainer}>
-              <Ionicons name="hardware-chip-outline" size={18} color={colors.muted} />
               <TextInput
                 style={styles.textInputSingle}
                 placeholder="e.g. Dell XPS 15 9530"
