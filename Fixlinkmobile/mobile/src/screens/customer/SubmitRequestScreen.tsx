@@ -719,7 +719,6 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
     const clearLocationError = () => { if (stepErrors.location) setStepErrors((p) => { const n = { ...p }; delete n.location; return n; }); };
     return (
       <View style={styles.stepBody}>
-        <Text style={styles.stepSectionTitle}>Repair Location</Text>
         <View style={styles.mapBox}>
           {coords ? (
             <CustomerLocationMap
