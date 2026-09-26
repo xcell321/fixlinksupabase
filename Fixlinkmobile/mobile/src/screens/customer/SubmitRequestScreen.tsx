@@ -39,7 +39,7 @@ const TIME_SLOTS = [
 const STEPS = [
   { key: 'appliance', label: 'Appliance', title: 'Select Device Type', subtitle: 'What needs fixing?' },
   { key: 'problem', label: 'Problem', title: 'Describe the Issue', subtitle: '' },
-  { key: 'schedule', label: 'Schedule', title: 'When should we come?', subtitle: 'Pick a preferred date and time window.' },
+  { key: 'schedule', label: 'Schedule', title: 'Choose a Time Slot', subtitle: '' },
   { key: 'location', label: 'Location', title: 'Where is the service?', subtitle: 'Pin the address so the technician can find you.' },
 ];
 
@@ -1114,7 +1114,7 @@ const styles = StyleSheet.create({
   photoBadgeText: { fontSize: 11, fontFamily: fonts.semiBold, color: colors.customer, letterSpacing: 0.2 },
   
   selectInput: { height: 52, backgroundColor: colors.surfaceSunken, borderWidth: 1, borderColor: colors.line, borderRadius: 14, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  selectInputText: { fontSize: 14, fontFamily: fonts.medium, color: colors.ink, flex: 1 },
+  selectInputText: { fontSize: 13, fontFamily: fonts.medium, color: colors.ink, flex: 1 },
   
   textAreaContainer: { backgroundColor: colors.surfaceSunken, borderWidth: 1, borderColor: colors.line, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, flexDirection: 'row', gap: 10, minHeight: 120, ...shadows.subtle },
   textArea: { flex: 1, fontSize: 13, fontFamily: fonts.medium, color: colors.ink, textAlignVertical: 'top', paddingTop: 0, lineHeight: 18 },
@@ -1125,11 +1125,11 @@ const styles = StyleSheet.create({
   textInputContainer: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.line, borderRadius: 14, paddingHorizontal: 14, backgroundColor: colors.surfaceSunken, gap: 10, minHeight: 52, ...shadows.subtle },
   textInputSingle: { flex: 1, color: colors.ink, fontSize: 13, fontFamily: fonts.medium, paddingVertical: 12 },
   slotList: { gap: 10, marginTop: 4 },
-  slotRow: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: 16, borderWidth: 2, borderColor: colors.line, backgroundColor: colors.canvas, ...shadows.subtle },
-  slotRowActive: { borderColor: colors.customer, backgroundColor: colors.customerSoft, ...shadows.card },
-  slotRadio: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.white, borderWidth: 2, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
+  slotRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.canvas, elevation: 0 },
+  slotRowActive: { borderColor: colors.customer, backgroundColor: colors.customerSoft },
+  slotRadio: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
   slotRadioActive: { backgroundColor: colors.customer, borderColor: colors.customer },
-  slotRowText: { fontSize: 15, fontFamily: fonts.semiBold, color: colors.ink },
+  slotRowText: { fontSize: 13, fontFamily: fonts.semiBold, color: colors.ink },
   slotChip: { flex: 1, minWidth: 140, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.canvas, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   slotChipActive: { backgroundColor: colors.customerSoft, borderColor: colors.customer },
   slotChipText: { fontSize: 12, fontFamily: fonts.semiBold, color: colors.muted, textAlign: 'center' as const, lineHeight: 16 },
