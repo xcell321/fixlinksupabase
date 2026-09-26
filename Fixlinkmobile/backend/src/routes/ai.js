@@ -76,6 +76,20 @@ router.post('/assistant', async (req, res) => {
     if (!isOmniRouteConfigured()) {
       return res.status(502).json({ error: 'AI service is not configured.', ai: 'degraded' });
     }
+    // Per-customer language preference (memory, resets on backend restart).
+    // Once the customer asks to switch (e.g. "can we speak english"), later
+    // messages stay in that language until they switch again.
+    const langPrefs = router.locals.langPrefs || (router.locals.langPrefs = new Map());
+    const switchTarget = (t) => {
+      const s = ` ${String(t || '').toLowerCase()} `;
+      const wants = (names) => names.some((n) => s.includes(` ${n} `) || s.includes(` ${n}?`) || s.includes(` ${n}.`) || s.includes(` ${n},`) || s.includes(` ${n}!`));
+      const verbs = ['speak', 'switch', 'use', 'using', 'only', 'convers', 'istorya', 'mag ', 'prefer', 'let us', 'lets ', 'lang ', ' lang'];
+      const hasVerb = verbs.some((v) => s.includes(v));
+      if ((wants(['english']) || s.includes(' mag english') || s.includes(' in english')) && (hasVerb || s.trim().length < 30)) return 'English';
+      if (wants(['tagalog']) && (hasVerb || s.trim().length < 30)) return 'Tagalog';
+      if ((wants(['bisaya', 'cebuano', 'binisaya']) || s.includes(' mag bisaya') || s.includes(' sa bisaya')) && (hasVerb || s.trim().length < 30)) return 'Bisaya';
+      return null;
+    };
     // Language detection (logic only, no canned answers): Bisaya, Tagalog, or English.
     const detectLanguage = (t) => {
       const s = ` ${String(t || '').toLowerCase()} `;
@@ -86,8 +100,20 @@ router.post('/assistant', async (req, res) => {
       if (has(tagalog)) return 'Tagalog';
       return 'English';
     };
-    const lang = detectLanguage(text);
     const c = context && typeof context === 'object' ? context : {};
+    const customerKey = String(c.customerUid || c.customerName || '').trim().toLowerCase();
+    let lang;
+    let switched = false;
+    const target = switchTarget(text);
+    if (target) {
+      lang = target;
+      switched = true;
+      if (customerKey) langPrefs.set(customerKey, target);
+    } else if (customerKey && langPrefs.get(customerKey)) {
+      lang = langPrefs.get(customerKey);
+    } else {
+      lang = detectLanguage(text);
+    }
     // Top technicians by rating for ranking/recommendation questions (real data only).
     let topTechnicians = [];
     try {
@@ -116,6 +142,7 @@ router.post('/assistant', async (req, res) => {
     const system = [
       "You are FixLink Assistant, the friendly in-app helper for FixLink customers (repair request + technician dispatch, Philippines).",
       'Reply ONLY in the detected customer language. Never mix languages: English messages get English-only replies, Bisaya gets Bisaya-only, Tagalog gets Tagalog-only.',
+      'If the customer just asked to switch languages, confirm briefly in the NEW language (e.g. "Sure! Let us continue in English.") and then answer their question in that language.',
       'Reply warmly and directly, at most 4 short sentences, plain text, no markdown.',
       'Greet by first name only when the customer greets you.',
       'You know the FixLink mobile system: customer submits a repair in 4 steps (Appliance, Problem, Schedule, Location with GPS + map), tracks it under Repairs with live map, chats via Messages, verifies completion with a 4-digit OTP code, and rates the technician. Technicians see Available/Assigned jobs within 20km, accept jobs, navigate on the in-app map, and complete via OTP. Customer login and technician login are separate; a customer account cannot log in as technician and vice versa.',
@@ -125,7 +152,7 @@ router.post('/assistant', async (req, res) => {
       'Do NOT provide price estimates. FixLink matching itself is free.',
       'If the data does not answer the question, say what the customer should tap (Book service, Repairs, Messages).',
     ].join(' ');
-    const user = `Detected language: ${lang}. Reply ONLY in ${lang}.\nCustomer message: ${text}\nLive FixLink data: ${JSON.stringify(live).slice(0, 2000)}`;
+    const user = `Detected language: ${lang}.${switched ? ' The customer just requested this language; confirm briefly, then answer.' : ''} Reply ONLY in ${lang}.\nCustomer message: ${text}\nLive FixLink data: ${JSON.stringify(live).slice(0, 2000)}`;
     const { content } = await chatComplete({ system, user, json: false, temperature: 0.4, maxTokens: 260 });
     return res.status(200).json({ reply: String(content).trim().slice(0, 900), ai: 'ai' });
   } catch (error) {

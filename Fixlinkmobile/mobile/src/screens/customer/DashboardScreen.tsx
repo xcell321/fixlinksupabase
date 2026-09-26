@@ -101,6 +101,7 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
     setAiTyping(true);
     const ctx = {
       customerName: fullName,
+      customerUid: uid || null,
       activeJob: heroJob ? {
         applianceType: heroJob.applianceType || null,
         status: heroJob.status || null,
