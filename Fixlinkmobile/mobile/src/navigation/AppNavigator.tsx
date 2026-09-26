@@ -393,9 +393,8 @@ export default function AppNavigator() {
 
       <View style={styles.screenContainer}>{screen}</View>
 
-      <Modal visible={notificationsOpen} transparent animationType="slide" onRequestClose={handleCloseNotifications}>
+      <Modal visible={notificationsOpen} animationType="slide" onRequestClose={handleCloseNotifications}>
         <View style={styles.modalBackdrop}>
-          <Pressable style={styles.backdropPress} onPress={handleCloseNotifications} />
           <View style={styles.notificationPanel}>
             <View style={styles.notifHeader}>
               <Pressable style={styles.notifBackBtn} onPress={handleCloseNotifications} hitSlop={12}>
@@ -531,9 +530,9 @@ export default function AppNavigator() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.canvas }, authContainer: { flex: 1, backgroundColor: colors.canvas }, screenContainer: { flex: 1, width: '100%' as const, alignSelf: 'center' as const },
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(16,42,67,0.4)', justifyContent: 'flex-end' },
+  modalBackdrop: { flex: 1, backgroundColor: colors.white },
   backdropPress: { flex: 1 },
-  notificationPanel: { width: '100%', backgroundColor: colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24, maxHeight: '90%', elevation: 12, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.15, shadowRadius: 16 },
+  notificationPanel: { flex: 1, width: '100%', backgroundColor: colors.white, paddingHorizontal: 16, paddingTop: 56, paddingBottom: 24 },
   notifHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, gap: 12 },
   notifBackBtn: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', minHeight: 44, minWidth: 44 },
   notifHeaderTitle: { color: colors.ink, fontSize: 18, fontFamily: fonts.bold, flex: 1, textAlign: 'center' },
@@ -558,7 +557,7 @@ const styles = StyleSheet.create({
   detailSecondary: { flex: 1, minHeight: 44, borderRadius: 12, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   detailSecondaryText: { color: colors.muted, fontSize: 13, fontFamily: fonts.semiBold },
 
-  notifList: { maxHeight: 420 },
+  notifList: { flex: 1 },
   notifListContent: { gap: 12, paddingBottom: 8 },
   emptyNotif: { alignItems: 'center', paddingVertical: 40, gap: 10 },
   emptyNotifText: { color: colors.ink, fontSize: 15, fontFamily: fonts.bold },
