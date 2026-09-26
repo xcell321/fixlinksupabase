@@ -38,7 +38,7 @@ const TIME_SLOTS = [
 
 const STEPS = [
   { key: 'appliance', label: 'Appliance', title: 'Select Device Type', subtitle: 'What needs fixing?' },
-  { key: 'problem', label: 'Problem', title: "What's wrong?", subtitle: 'Describe the issue and add a photo if it helps.' },
+  { key: 'problem', label: 'Problem', title: 'Describe the Issue', subtitle: '' },
   { key: 'schedule', label: 'Schedule', title: 'When should we come?', subtitle: 'Pick a preferred date and time window.' },
   { key: 'location', label: 'Location', title: 'Where is the service?', subtitle: 'Pin the address so the technician can find you.' },
 ];
@@ -514,7 +514,6 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
               <Text style={styles.requiredMark}> *</Text>
             </View>
             <View style={[styles.textAreaContainer, !!stepErrors.description && styles.inputError]}>
-              <Ionicons name="chatbox-ellipses-outline" size={18} color={!!stepErrors.description ? colors.danger : colors.muted} style={{ marginTop: 2 }} />
               <TextInput
                 style={styles.textArea}
                 placeholder="Example: Refrigerator not cooling, makes a humming noise. Started yesterday..."
@@ -836,7 +835,9 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
 
         <View style={styles.stepHeadBlock}>
           <Text style={styles.stepHeadTitle}>{STEPS[currentStep - 1].title}</Text>
-          <Text style={styles.stepHeadSub}>{STEPS[currentStep - 1].subtitle}</Text>
+          {!!STEPS[currentStep - 1].subtitle && (
+            <Text style={styles.stepHeadSub}>{STEPS[currentStep - 1].subtitle}</Text>
+          )}
         </View>
 
         {renderStepContent()}
