@@ -1121,8 +1121,8 @@ const styles = StyleSheet.create({
   charCount: { fontSize: 11, fontFamily: fonts.medium, color: colors.muted, fontVariant: ['tabular-nums'] as const },
 
   // Prototype slot rows with radio circles
-  textInputContainer: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.line, borderRadius: 14, paddingHorizontal: 14, backgroundColor: colors.surfaceSunken, gap: 10, minHeight: 52, ...shadows.subtle },
-  textInputSingle: { flex: 1, color: colors.ink, fontSize: 13, fontFamily: fonts.medium, paddingVertical: 12 },
+  textInputContainer: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.line, borderRadius: 14, paddingHorizontal: 14, backgroundColor: colors.surfaceSunken, gap: 10, minHeight: 52, elevation: 0 },
+  textInputSingle: { flex: 1, color: colors.ink, fontSize: 13, fontFamily: fonts.medium, paddingVertical: 12, opacity: 0.75 },
   slotList: { gap: 10, marginTop: 4 },
   slotRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.canvas, elevation: 0 },
   slotRowActive: { borderColor: colors.customer, backgroundColor: colors.customerSoft },
