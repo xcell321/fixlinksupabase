@@ -680,18 +680,18 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
 
 
 
-        {/* 8. SCHEDULE (read-only customer view) */}
-        {ptab === 'info' && readOnly && (
-          <View style={styles.cardSurface}>
-            <View style={styles.cardSurfaceHeader}>
-              <View style={styles.cardSurfaceIconWell}>
-                <Ionicons name="calendar-outline" size={16} color={colors.tech} />
-              </View>
-              <View style={styles.cardSurfaceTitleWrap}>
-                <Text style={styles.sectionEyebrow}>SCHEDULE</Text>
-                <Text style={styles.cardSurfaceTitle}>Current & Upcoming Bookings</Text>
-              </View>
+        {/* 8. SCHEDULE - technician view (read-only customer view kept too) */}
+        {ptab === 'info' && (
+        <View style={styles.cardSurface}>
+          <View style={styles.cardSurfaceHeader}>
+            <View style={styles.cardSurfaceIconWell}>
+              <Ionicons name="calendar-outline" size={16} color={colors.tech} />
             </View>
+            <View style={styles.cardSurfaceTitleWrap}>
+              <Text style={styles.sectionEyebrow}>SCHEDULE</Text>
+              <Text style={styles.cardSurfaceTitle}>Current & Upcoming Bookings</Text>
+            </View>
+          </View>
 
             {scheduleLoading ? (
               <View style={styles.emptyRow}>
@@ -910,7 +910,7 @@ const styles = StyleSheet.create({
   headerStatDivider: { width: 1, height: 28, backgroundColor: 'rgba(255,255,255,0.12)' },
   editProfileButtonDarkCentered: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#2563EB', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, marginTop: 12 },
   infoCardsContainer: { gap: 12, marginBottom: 16 },
-  infoCardWhite: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#F3F4F6', borderRadius: 16, padding: 14 },
+  infoCardWhite: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#F3F4F6', borderRadius: 16, padding: 14, elevation: 0 },
   infoCardIconBox: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   infoCardTextWrap: { flex: 1, minWidth: 0 },
   infoCardLabel: { color: '#6B7280', fontSize: 11, fontFamily: fonts.medium },
@@ -950,7 +950,7 @@ const styles = StyleSheet.create({
   saveButtonText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
 
   // Shared Card Surface (About, Skills, Service Area, Schedule)
-  cardSurface: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 20, padding: 18, marginBottom: 18, ...shadows.card },
+  cardSurface: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 20, padding: 18, marginBottom: 18, elevation: 0 },
   cardSurfaceHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
   cardSurfaceIconWell: { width: 34, height: 34, borderRadius: 10, backgroundColor: colors.techSoft, borderWidth: 1, borderColor: colors.hudBorder, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   cardSurfaceTitleWrap: { flex: 1 },
