@@ -68,7 +68,7 @@ export default function LoginScreen({ onLoginSuccess, switchToRegister, switchTo
           setFieldErrors(e => ({ ...e, password: '' }));
            }} /><TouchableOpacity onPress={() => setShowPassword(!showPassword)}
            ><Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={18} color={colors.muted} /></TouchableOpacity></View>{fieldErrors.password ? <Text style={styles.fieldError}>{fieldErrors.password}</Text> : null}
-      <TouchableOpacity style={styles.forgotWrap} onPress={switchToForgotPassword}><Text style={[styles.forgot, { color: accent }]}>Forgot password?</Text></TouchableOpacity>
+      <TouchableOpacity style={styles.forgotWrap} onPress={() => switchToForgotPassword(role)}><Text style={[styles.forgot, { color: accent }]}>Forgot password?</Text></TouchableOpacity>
       {loginError ? <Text style={styles.errorText}>{loginError}</Text>
        : null}<TouchableOpacity style={[styles.button, { backgroundColor: accent }]} onPress={handleLogin} disabled={loading} activeOpacity={0.88}>{loading ?
         <ActivityIndicator color={colors.white} /> : <Text style={styles.buttonText}>Sign In</Text>}</TouchableOpacity>
