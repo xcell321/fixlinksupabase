@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -120,6 +120,14 @@ export default function AvailableJobsScreen({
   const [selectedJobForOtp, setSelectedJobForOtp] = useState<JobItem | null>(null);
   const [otpCode, setOtpCode] = useState<string>('');
   const [verifyingOtp, setVerifyingOtp] = useState<boolean>(false);
+  const otpInputRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (otpModalVisible) {
+      const t = setTimeout(() => otpInputRef.current?.focus?.(), 300);
+      return () => clearTimeout(t);
+    }
+  }, [otpModalVisible]);
 
   const technicianName = technician?.name || 'Technician';
   const avatarInitial = technicianName.charAt(0).toUpperCase();
@@ -1090,34 +1098,44 @@ export default function AvailableJobsScreen({
               Ask the customer to display their 4-digit completion code on their FixLink phone screen to confirm repair closeout.
             </Text>
 
-            {/* Discrete 4-Box PIN Display */}
-            <View style={styles.pinBoxesContainer}>
-              {[0, 1, 2, 3].map((idx) => {
-                const digit = otpCode[idx] ?? '';
-                const isFocused = otpCode.length === idx;
-                return (
-                  <View
-                    key={idx}
-                    style={[
-                      styles.pinBox,
-                      digit !== '' && styles.pinBoxFilled,
-                      isFocused && styles.pinBoxActive
-                    ]}
-                  >
-                    <Text style={styles.pinDigit}>{digit}</Text>
-                  </View>
-                );
-              })}
-            </View>
+            {/* Tappable 4-Box PIN Display - tap to focus keyboard */}
+            <Pressable
+              onPress={() => otpInputRef.current?.focus?.()}
+              accessibilityRole="button"
+              accessibilityLabel="Enter 4-digit code"
+            >
+              <View style={styles.pinBoxesContainer}>
+                {[0, 1, 2, 3].map((idx) => {
+                  const digit = otpCode[idx] ?? '';
+                  const isFocused = otpCode.length === idx;
+                  return (
+                    <View
+                      key={idx}
+                      style={[
+                        styles.pinBox,
+                        digit !== '' && styles.pinBoxFilled,
+                        isFocused && styles.pinBoxActive
+                      ]}
+                    >
+                      <Text style={styles.pinDigit}>{digit}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </Pressable>
 
-            {/* Hidden Input field driving the 4-box display */}
+            {/* Visible numeric input - drives the 4-box display */}
             <TextInput
-              style={styles.hiddenPinInput}
+              ref={otpInputRef}
+              style={styles.otpVisibleInput}
               value={otpCode}
               onChangeText={(text) => setOtpCode(text.replace(/[^0-9]/g, '').slice(0, 4))}
               keyboardType="number-pad"
               maxLength={4}
               autoFocus={true}
+              placeholder="Type 4-digit code here"
+              placeholderTextColor={colors.muted}
+              textAlign="center"
             />
 
             <Pressable
@@ -1952,6 +1970,18 @@ alignSelf: 'center' },
     opacity: 0.01,
     width: 1,
     height: 1
+  },
+  otpVisibleInput: {
+    borderWidth: 1.5,
+    borderColor: colors.tech,
+    borderRadius: 12,
+    backgroundColor: colors.white,
+    minHeight: 48,
+    fontSize: 16,
+    fontFamily: fonts.bold,
+    color: colors.ink,
+    marginBottom: 8,
+    paddingHorizontal: 12,
   },
 
   pressedSoft: { opacity: 0.85, transform: [{ scale: 0.98 }] },
