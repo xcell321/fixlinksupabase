@@ -274,7 +274,7 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
         accessibilityLabel="Open FixLink Assistant"
         hitSlop={8}
       >
-        <Image source={require('../../assets/ai-assistant.png')} style={styles.aiFabImage} accessibilityLabel="FixLink Assistant" />
+        <Image source={require('../../../assets/ai-assistant.png')} style={styles.aiFabImage} accessibilityLabel="FixLink Assistant" />
       </TouchableOpacity>
 
       {/* FixLink Assistant sheet (Image 3, no Estimate price) */}
@@ -282,7 +282,7 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
         <View style={styles.aiOverlay}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.aiSheet}>
             <View style={styles.aiHeader}>
-              <Image source={require('../../assets/ai-assistant.png')} style={styles.aiHeaderImage} accessibilityLabel="FixLink Assistant" />
+              <Image source={require('../../../assets/ai-assistant.png')} style={styles.aiHeaderImage} accessibilityLabel="FixLink Assistant" />
               <View style={{ flex: 1 }}>
                 <Text style={styles.aiTitle}>FixLink Assistant</Text>
                 <View style={styles.aiReadyRow}>
@@ -299,7 +299,7 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
               {aiMessages.map((m) => (
                 <View key={m.id} style={[styles.aiBubbleRow, m.from === 'me' ? styles.aiBubbleRowMe : styles.aiBubbleRowAi]}>
                   {m.from === 'ai' ? (
-                    <Image source={require('../../assets/ai-assistant.png')} style={styles.aiMiniImage} accessibilityLabel="FixLink Assistant" />
+                    <Image source={require('../../../assets/ai-assistant.png')} style={styles.aiMiniImage} accessibilityLabel="FixLink Assistant" />
                   ) : null}
                   <View style={[styles.aiBubble, m.from === 'me' ? styles.aiBubbleMe : styles.aiBubbleAi]}>
                     <Text style={[styles.aiBubbleText, m.from === 'me' ? styles.aiBubbleTextMe : styles.aiBubbleTextAi]}>{m.text}</Text>
@@ -308,7 +308,7 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
               ))}
               {aiTyping ? (
                 <View style={[styles.aiBubbleRow, styles.aiBubbleRowAi]}>
-                  <Image source={require('../../assets/ai-assistant.png')} style={styles.aiMiniImage} accessibilityLabel="FixLink Assistant" />
+                  <Image source={require('../../../assets/ai-assistant.png')} style={styles.aiMiniImage} accessibilityLabel="FixLink Assistant" />
                   <View style={[styles.aiBubble, styles.aiBubbleAi]}>
                     <Text style={styles.aiBubbleTextAi}>Typing...</Text>
                   </View>
