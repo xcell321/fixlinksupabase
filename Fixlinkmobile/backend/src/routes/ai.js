@@ -152,7 +152,8 @@ router.post('/assistant', async (req, res) => {
       'Do NOT provide price estimates. FixLink matching itself is free.',
       'If the data does not answer the question, say what the customer should tap (Book service, Repairs, Messages).',
     ].join(' ');
-    const user = `Detected language: ${lang}.${switched ? ' The customer just requested this language; confirm briefly, then answer.' : ''} Reply ONLY in ${lang}.\nCustomer message: ${text}\nLive FixLink data: ${JSON.stringify(live).slice(0, 2000)}`;
+    const user = `Detected language: ${lang}.${switched ? ' The customer just requested this language; confirm briefly, then answer.' : ''} You MUST reply ONLY in ${lang}. Any other language is a wrong answer.\nCustomer message: ${text}\nLive FixLink data: ${JSON.stringify(live).slice(0, 2000)}`;
+    console.log(`AI assistant lang: ${lang}${switched ? ' (switched)' : ''} | msg: ${text.slice(0, 60)}`);
     const { content } = await chatComplete({ system, user, json: false, temperature: 0.4, maxTokens: 260 });
     return res.status(200).json({ reply: String(content).trim().slice(0, 900), ai: 'ai' });
   } catch (error) {
