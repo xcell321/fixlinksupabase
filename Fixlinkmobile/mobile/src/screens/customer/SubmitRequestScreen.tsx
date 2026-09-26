@@ -144,22 +144,43 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
         Alert.alert('No GPS fix', 'Could not get your location. Go outside and try again.');
         return;
       }
+      const bestAcc = best.coords.accuracy ?? 9999;
       const lat = best.coords.latitude;
       const lon = best.coords.longitude;
       setCoords({ latitude: lat, longitude: lon });
-      setLocateAccuracy(best.coords.accuracy ?? null);
+      setLocateAccuracy(bestAcc);
       if (stepErrors.location) setStepErrors((p) => { const n = { ...p }; delete n.location; return n; });
       const geocode = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lon });
+      let resolvedStreet = '';
+      let resolvedCity = '';
+      let resolvedZip = '';
       if (geocode && geocode.length > 0) {
         const a = geocode[0];
         // Use fresh reverseGeocode only - do not geocode the string "Gairan" again
-        if (a.street) setStreet(a.street);
-        else if (a.name) setStreet(a.name);
-        if (a.city) setCity(a.city);
-        else if (a.subregion) setCity(a.subregion);
-        if (a.postalCode) setZipCode(a.postalCode);
+        resolvedStreet = a.street || a.name || '';
+        resolvedCity = a.city || a.subregion || '';
+        resolvedZip = a.postalCode || '';
+        if (resolvedStreet) setStreet(resolvedStreet);
+        if (resolvedCity) setCity(resolvedCity);
+        if (resolvedZip) setZipCode(resolvedZip);
         else if (a.postalCode === null && a.region) setZipCode('');
       }
+      // Indoor snap: weak GPS (>30m, typical inside a house) gets snapped to
+      // the rooftop of the resolved street address via LocationIQ forward
+      // geocode. Good GPS (<=30m) is kept as-is since it is already best.
+      let finalLat = lat;
+      let finalLon = lon;
+      const fullAddr = [resolvedStreet, resolvedCity, resolvedZip].filter(Boolean).join(', ');
+      if (bestAcc > 30 && fullAddr.length > 5) {
+        try {
+          const snap = await geocodeAddress(fullAddr);
+          if (snap && Number.isFinite(snap.latitude) && Number.isFinite(snap.longitude)) {
+            finalLat = snap.latitude;
+            finalLon = snap.longitude;
+          }
+        } catch {}
+      }
+      setCoords({ latitude: finalLat, longitude: finalLon });
       // GPS autofill done - full 100% opacity text (medium, not bold)
       setLocationFromGps(true);
     } catch (e: any) {
