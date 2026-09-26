@@ -795,13 +795,8 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
           ) : (
             <Ionicons name="locate-outline" size={15} color={colors.customer} />
           )}
-          <Text style={styles.locateRowText}>{locating ? 'Locating... collecting best GPS fix' : 'Use my current location'}</Text>
+          <Text style={styles.locateRowText}>{locating ? 'Locating...' : 'Use my current location'}</Text>
         </TouchableOpacity>
-        {locateAccuracy != null && !locating ? (
-          <Text style={[styles.accuracyText, locateAccuracy <= 30 ? styles.accuracyGood : locateAccuracy <= 100 ? styles.accuracyOk : styles.accuracyPoor]}>
-            GPS accuracy ±{Math.round(locateAccuracy)} m{locateAccuracy > 100 ? ' - go outside and tap again for better accuracy' : ''}
-          </Text>
-        ) : null}
         <View style={styles.inputGroup}>
           <Text style={styles.refLabel}>Street Address</Text>
           <View style={[styles.textInputContainer, focusedField === 'street' && styles.inputFocused, !!stepErrors.location && styles.inputError]}>
