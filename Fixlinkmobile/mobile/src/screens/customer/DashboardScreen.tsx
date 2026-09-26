@@ -2,6 +2,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl, Modal, TextInput, KeyboardAvoidingView, Platform, Image, Animated, PanResponder, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fetchCompletedJobs, fetchCustomerRequests, fetchPlatformCategories, askAssistant } from '../services/api';
 import { colors, fonts } from '../../theme';
 import { getApplianceIcon, getStatusColor, getStatusIcon } from '../../utils/applianceIcons';
@@ -66,6 +67,28 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
   const [aiMessages, setAiMessages] = useState([
     { id: 'ai-hello', from: 'ai', text: 'Hi! I am your FixLink Assistant. Ask me about repairs, technicians, or tracking.' },
   ]);
+  // Persisted conversation: survives reload/restart, per customer.
+  const aiChatKey = `fixlink_ai_chat_${uid || 'guest'}`;
+  const [aiChatReady, setAiChatReady] = useState(false);
+  useEffect(() => {
+    let on = true;
+    setAiChatReady(false);
+    AsyncStorage.getItem(aiChatKey).then((raw) => {
+      if (!on) return;
+      try {
+        const saved = raw ? JSON.parse(raw) : null;
+        if (Array.isArray(saved) && saved.length > 0 && saved.every((m) => m && typeof m.text === 'string')) {
+          setAiMessages(saved.slice(-50));
+        }
+      } catch {}
+      setAiChatReady(true);
+    }).catch(() => { if (on) setAiChatReady(true); });
+    return () => { on = false; };
+  }, [aiChatKey]);
+  useEffect(() => {
+    if (!aiChatReady) return;
+    AsyncStorage.setItem(aiChatKey, JSON.stringify(aiMessages.slice(-50))).catch(() => {});
+  }, [aiMessages, aiChatReady, aiChatKey]);
 
   const firstName = (user?.name || 'there').split(' ')[0];
   const fullName = user?.name || 'there';
