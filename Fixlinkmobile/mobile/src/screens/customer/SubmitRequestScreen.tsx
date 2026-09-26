@@ -73,6 +73,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
   const [modalVisible, setModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [locateAccuracy, setLocateAccuracy] = useState(null);
   const [photo, setPhoto] = useState(null);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoViewerVisible, setPhotoViewerVisible] = useState(false);
@@ -109,19 +110,44 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
 
   const handleLocate = async () => {
     setLocating(true);
+    setLocateAccuracy(null);
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
       setLocating(false);
       Alert.alert('Permission Denied', 'Permission to access location was denied');
       return;
     }
+    let watcher = null;
     try {
-      // Always fresh GPS - never cached, High accuracy for Medellin/Dakit etc
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-      const lat = loc.coords.latitude;
-      const lon = loc.coords.longitude;
-      // Set coords immediately from GPS - never from old cache or Gairan fallback
+      // Multi-fix collection for ~99% accuracy: a single GPS shot is often a
+      // stale/cached fix (hundreds of meters off). Collect fixes for up to 12s
+      // with Highest accuracy and keep the most accurate one (lowest meters).
+      let best = null;
+      let finished = false;
+      watcher = await Location.watchPositionAsync(
+        { accuracy: Location.Accuracy.Highest, timeInterval: 1000, distanceInterval: 0 },
+        (pos) => {
+          const acc = pos.coords.accuracy ?? 9999;
+          if (!best || acc < (best.coords.accuracy ?? 9999)) {
+            best = pos;
+            setCoords({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+            setLocateAccuracy(acc);
+          }
+          if (acc <= 20) finished = true;
+        }
+      );
+      const start = Date.now();
+      while (!finished && Date.now() - start < 12000) {
+        await new Promise((r) => setTimeout(r, 500));
+      }
+      if (!best) {
+        Alert.alert('No GPS fix', 'Could not get your location. Go outside and try again.');
+        return;
+      }
+      const lat = best.coords.latitude;
+      const lon = best.coords.longitude;
       setCoords({ latitude: lat, longitude: lon });
+      setLocateAccuracy(best.coords.accuracy ?? null);
       if (stepErrors.location) setStepErrors((p) => { const n = { ...p }; delete n.location; return n; });
       const geocode = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lon });
       if (geocode && geocode.length > 0) {
@@ -139,6 +165,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
     } catch (e: any) {
       Alert.alert('Error', e?.message || 'Failed to fetch location details.');
     } finally {
+      try { watcher && watcher.remove(); } catch {}
       setLocating(false);
     }
   };
@@ -747,8 +774,13 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
           ) : (
             <Ionicons name="locate-outline" size={15} color={colors.customer} />
           )}
-          <Text style={styles.locateRowText}>{locating ? 'Locating...' : 'Use my current location'}</Text>
+          <Text style={styles.locateRowText}>{locating ? 'Locating... collecting best GPS fix' : 'Use my current location'}</Text>
         </TouchableOpacity>
+        {locateAccuracy != null && !locating ? (
+          <Text style={[styles.accuracyText, locateAccuracy <= 30 ? styles.accuracyGood : locateAccuracy <= 100 ? styles.accuracyOk : styles.accuracyPoor]}>
+            GPS accuracy ±{Math.round(locateAccuracy)} m{locateAccuracy > 100 ? ' - go outside and tap again for better accuracy' : ''}
+          </Text>
+        ) : null}
         <View style={styles.inputGroup}>
           <Text style={styles.refLabel}>Street Address</Text>
           <View style={[styles.textInputContainer, focusedField === 'street' && styles.inputFocused, !!stepErrors.location && styles.inputError]}>
@@ -1159,6 +1191,10 @@ const styles = StyleSheet.create({
   locateButtonText: { color: colors.white, fontSize: 13, fontFamily: fonts.bold },
   locateRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, borderRadius: 14, borderWidth: 1.5, borderColor: colors.customer, backgroundColor: colors.customerSoft, paddingHorizontal: 16, elevation: 0 },
   locateRowText: { color: colors.customer, fontSize: 13, fontFamily: fonts.semiBold },
+  accuracyText: { fontSize: 11, fontFamily: fonts.medium, textAlign: 'center', marginTop: 6 },
+  accuracyGood: { color: colors.green },
+  accuracyOk: { color: colors.gold },
+  accuracyPoor: { color: colors.danger },
 
   suggestionsPanel: { position: 'absolute', top: 58, left: 0, right: 0, backgroundColor: colors.white, borderRadius: 14, borderWidth: 1, borderColor: colors.line, zIndex: 30, elevation: 8, boxShadow: '0 6px 12px rgba(16,42,67,0.15)', overflow: 'hidden' },
   suggestionsModalView: { backgroundColor: colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 24, paddingHorizontal: 12, paddingBottom: 10, maxHeight: '78%', boxShadow: '0 -4px 12px rgba(0,0,0,0.1)', elevation: 10 },
