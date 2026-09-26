@@ -787,13 +787,13 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
   return (
     <ScrollView ref={scrollRef} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
       <View style={styles.centerWrap}>
-      <View style={styles.sectionHeaderContainer}>
-        <Text style={styles.screenKicker}>SUBMIT REPAIR REQUEST</Text>
+      <View style={styles.refHeader}>
         {onClose ? (
-          <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Close repair request" hitSlop={8}>
-            <Ionicons name="close" size={18} color={colors.ink} />
+          <TouchableOpacity onPress={onClose} style={styles.refBackBtn} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Back" hitSlop={8}>
+            <Ionicons name="arrow-back" size={20} color={colors.ink} />
           </TouchableOpacity>
         ) : null}
+        <Text style={styles.refHeaderTitle}>Repair Request</Text>
       </View>
 
       <View style={styles.card}>
@@ -995,6 +995,9 @@ const styles = StyleSheet.create({
   centerWrap: { width: '100%' as const, maxWidth: 480, alignSelf: 'center' as const },
   sectionHeaderContainer: { marginBottom: 20, marginTop: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center' },
+  refHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 6, marginBottom: 20 },
+  refBackBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  refHeaderTitle: { color: colors.ink, fontSize: 16, fontFamily: fonts.bold },
   kicker: { color: colors.customer, fontSize: 10, letterSpacing: 1.4, fontFamily: fonts.extraBold, marginBottom: 2, textTransform: 'uppercase' as const },
   screenKicker: { color: colors.muted, fontSize: 10, letterSpacing: 1.4, fontFamily: fonts.extraBold, textTransform: 'uppercase' as const },
   sectionTitle: { fontSize: 22, fontFamily: fonts.extraBold, color: colors.ink, letterSpacing: -0.3, lineHeight: 28 },
