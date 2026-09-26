@@ -348,7 +348,7 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F9FAFB' },
-  content: { paddingBottom: 28 },
+  content: { paddingBottom: 110 },
   header: { backgroundColor: DARK, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 32, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, gap: 10 },
   kicker: { color: '#9CA3AF', fontSize: 12, fontFamily: fonts.regular },
