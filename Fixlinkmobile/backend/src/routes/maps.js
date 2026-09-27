@@ -35,12 +35,18 @@ const fetchJson = async (url, timeoutMs = 6000) => {
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(url, { signal: controller.signal });
-    if (!response.ok) return null;
-    return await response.json();
+    // Return the status alongside the body so routes can forward upstream
+    // failures (401 bad key, 429 quota) instead of masking them as "no result".
+    const data = await response.json().catch(() => null);
+    return { ok: response.ok, status: response.status, data };
   } finally {
     clearTimeout(timer);
   }
 };
+
+// Shared LocationIQ query defaults: lock results to the Philippines and pin
+// response language so display names stay consistent app-wide.
+const PH_PARAMS = 'countrycodes=ph&accept-language=en';
 
 // GET /api/maps/tiles/:z/:x/:y.png — LocationIQ street tile proxy. Leaflet image
 // requests cannot carry Authorization headers, so this tile route stays open
@@ -86,14 +92,37 @@ router.get('/tiles/:z/:x/:y.png', async (req, res) => {
   }
 });
 
-// GET /api/maps/search?q= — forward-query geocoding (raw address first).
+// GET /api/maps/search?q= — forward-query geocoding, Philippines-locked.
+// Optional structured params (street/city/postalcode) boost rooftop accuracy.
 router.get('/search', async (req, res) => {
   const q = String(req.query.q || '').trim();
-  if (!q || q.length > 200) return res.status(400).json({ error: 'Valid search query is required.' });
+  const street = String(req.query.street || '').trim().slice(0, 120);
+  const city = String(req.query.city || '').trim().slice(0, 80);
+  const postalcode = String(req.query.postalcode || '').trim().slice(0, 12);
+  const hasStructured = Boolean(street || city || postalcode);
+  if ((!q && !hasStructured) || q.length > 200) {
+    return res.status(400).json({ error: 'Valid search query is required.' });
+  }
   if (!LOCATIONIQ_KEY) return res.status(502).json({ error: 'Geocoding is not configured.' });
 
-  const url = `${SEARCH_BASE_URL}/search?key=${encodeURIComponent(LOCATIONIQ_KEY)}&q=${encodeURIComponent(q)}&format=json&limit=1`;
-  const data = await fetchJson(url);
+  // Structured request when parts are supplied (LocationIQ /search structured
+  // mode); free-text otherwise. Either way results stay inside the PH.
+  const params = new URLSearchParams({ key: LOCATIONIQ_KEY, format: 'json', addressdetails: '1', limit: '1' });
+  if (hasStructured) {
+    if (street) params.set('street', street);
+    if (city) params.set('city', city);
+    if (postalcode) params.set('postalcode', postalcode);
+    if (q && q !== 'Philippines') params.set('state', q);
+  } else {
+    params.set('q', q);
+  }
+  params.set('countrycodes', 'ph');
+  params.set('accept-language', 'en');
+
+  const url = `${SEARCH_BASE_URL}/search?${params.toString()}`;
+  const { status, data } = await fetchJson(url);
+  if (status === 429) return res.status(429).json({ error: 'Geocoding quota exceeded. Try again shortly.' });
+  if (status === 401 || status === 403) return res.status(502).json({ error: 'Geocoding is misconfigured.' });
   res.json(Array.isArray(data) ? data : []);
 });
 
@@ -103,9 +132,28 @@ router.get('/autocomplete', async (req, res) => {
   if (!q || q.length > 100) return res.status(400).json({ error: 'Valid query is required.' });
   if (!LOCATIONIQ_KEY) return res.status(502).json({ error: 'Geocoding is not configured.' });
 
-  const url = `${SEARCH_BASE_URL}/autocomplete?key=${encodeURIComponent(LOCATIONIQ_KEY)}&q=${encodeURIComponent(q)}&limit=10&countrycodes=ph&dedupe=1&accept-language=en`;
-  const data = await fetchJson(url);
+  const url = `${SEARCH_BASE_URL}/autocomplete?key=${encodeURIComponent(LOCATIONIQ_KEY)}&q=${encodeURIComponent(q)}&limit=10&${PH_PARAMS}&dedupe=1&addressdetails=1`;
+  const { status, data } = await fetchJson(url);
+  if (status === 429) return res.status(429).json({ error: 'Geocoding quota exceeded. Try again shortly.' });
   res.json(Array.isArray(data) ? data : []);
+});
+
+// GET /api/maps/reverse?lat=&lon= — reverse geocode with full address parts
+// (street, city, state, postcode). Expo reverse-geocode fields vary by
+// platform and fail on some browsers, so this is the reliable parts source.
+router.get('/reverse', async (req, res) => {
+  const lat = Number(req.query.lat);
+  const lon = Number(req.query.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+    return res.status(400).json({ error: 'Valid lat and lon are required.' });
+  }
+  if (!LOCATIONIQ_KEY) return res.status(502).json({ error: 'Geocoding is not configured.' });
+
+  const url = `${SEARCH_BASE_URL}/reverse?key=${encodeURIComponent(LOCATIONIQ_KEY)}&lat=${lat}&lon=${lon}&format=json&addressdetails=1&zoom=18&accept-language=en`;
+  const { status, data } = await fetchJson(url);
+  if (status === 429) return res.status(429).json({ error: 'Geocoding quota exceeded. Try again shortly.' });
+  if (!data || data.error) return res.status(status >= 400 ? status : 502).json({ error: 'Reverse geocode unavailable.' });
+  res.json(data);
 });
 
 // GET /api/maps/directions/driving/:coords — driving directions between
@@ -119,9 +167,10 @@ router.get('/directions/driving/:coords', async (req, res) => {
   if (!LOCATIONIQ_KEY) return res.status(502).json({ error: 'Routing is not configured.' });
 
   const url = `${SEARCH_BASE_URL}/directions/driving/${encodeURIComponent(coords)}?key=${encodeURIComponent(LOCATIONIQ_KEY)}&steps=true&geometries=geojson`;
-  const data = await fetchJson(url, 9000);
+  const { status, data } = await fetchJson(url, 9000);
+  if (status === 429) return res.status(429).json({ error: 'Routing quota exceeded. Try again shortly.' });
   if (!data || !Array.isArray(data.routes)) {
-    return res.status(502).json({ error: 'Directions unavailable.' });
+    return res.status(status >= 400 ? status : 502).json({ error: 'Directions unavailable.' });
   }
   res.json({ routes: data.routes, code: data.code });
 });

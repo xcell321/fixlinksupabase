@@ -19,7 +19,7 @@ import {
   fetchTechnicianJobs,
   updateTechnicianLocation
 } from '../services/api';
-import { geocodeAddress, getDrivingRoute } from '../services/locationIq';
+import { geocodeAddressPrecise, getDrivingRoute } from '../services/locationIq';
 import { colors, fonts } from '../../theme';
 import { getApplianceIcon } from '../../utils/applianceIcons';
 
@@ -144,7 +144,9 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
     const lon = Number(activeJob.longitude);
     const hasValidCoords = Number.isFinite(lat) && Number.isFinite(lon) && lat !== 0;
     if (hasValidCoords) return;
-    geocodeAddress(activeJob.location).then((res) => {
+    // API-only precise geocode: the tracking destination must never snap to a
+    // coarse barangay-center fallback, or the technician navigates ~1km off.
+    geocodeAddressPrecise(activeJob.location).then((res) => {
       if (jobId !== activeJobIdRef.current) return;
       if (res?.latitude && res?.longitude) {
         setCustomerCoords((prev) => ({

@@ -16,6 +16,8 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [serviceArea, setServiceArea] = useState('');
@@ -175,6 +177,35 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
     </View>
   );
 
+  // Password inputs with a visibility toggle (eye icon) so users can verify
+  // what they typed. Applied to both roles since they share this screen.
+  const renderPasswordField = (label, value, onChange, fieldKey, visible, onToggleVisible) => (
+    <View style={styles.field}>
+      <Text style={styles.label}>{label}</Text>
+      <View style={[styles.passwordWrap, fieldErrors[fieldKey] && styles.inputError]}>
+        <TextInput
+          style={styles.passwordInput}
+          placeholder="••••••••"
+          placeholderTextColor="#9CA3AF"
+          value={value}
+          onChangeText={(t) => { onChange(t); clearFieldError(fieldKey); }}
+          secureTextEntry={!visible}
+          autoCapitalize="none"
+          accessibilityLabel={label}
+        />
+        <TouchableOpacity
+          onPress={onToggleVisible}
+          style={styles.eyeButton}
+          accessibilityRole="button"
+          accessibilityLabel={visible ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
+        >
+          <Ionicons name={visible ? 'eye-off-outline' : 'eye-outline'} size={20} color="#9CA3AF" />
+        </TouchableOpacity>
+      </View>
+      {fieldErrors[fieldKey] ? <Text style={styles.errorText}>{fieldErrors[fieldKey]}</Text> : null}
+    </View>
+  );
+
   const selectedSkills = skills.split(',').map((s) => s.trim()).filter(Boolean);
 
   return (
@@ -252,11 +283,11 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
 
         {isTechRole && renderField('Years of Experience', yearsExperience, setYearsExperience, 'yearsExperience', '5', { keyboardType: 'number-pad' })}
 
-        {renderField('Password', password, setPassword, 'password', '••••••••', { secureTextEntry: true })}
+        {renderPasswordField('Password', password, setPassword, 'password', showPassword, () => setShowPassword((v) => !v))}
         {!fieldErrors.password && (
           <Text style={styles.hintText}>Use at least 6 characters.</Text>
         )}
-        {renderField('Confirm Password', confirmPassword, setConfirmPassword, 'confirmPassword', '••••••••', { secureTextEntry: true })}
+        {renderPasswordField('Confirm Password', confirmPassword, setConfirmPassword, 'confirmPassword', showConfirmPassword, () => setShowConfirmPassword((v) => !v))}
 
         {isTechRole && (
           <>
@@ -328,6 +359,9 @@ const styles = StyleSheet.create({
   label: { color: '#6B7280', fontSize: 12, fontFamily: fonts.semiBold, letterSpacing: 0.4, marginBottom: 6, textTransform: 'uppercase' },
   input: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 16, minHeight: 52, fontSize: 14, fontFamily: fonts.medium, color: colors.ink, backgroundColor: '#F9FAFB' },
   inputError: { borderColor: '#FCA5A5' },
+  passwordWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 16, minHeight: 52, backgroundColor: '#F9FAFB' },
+  passwordInput: { flex: 1, fontSize: 14, fontFamily: fonts.medium, color: colors.ink, paddingVertical: 14 },
+  eyeButton: { paddingLeft: 12, paddingVertical: 8, marginLeft: 8 },
   errorText: { color: '#DC2626', fontSize: 12, fontFamily: fonts.medium, marginTop: 6 },
   hintText: { color: '#9CA3AF', fontSize: 12, fontFamily: fonts.medium, marginTop: -10, marginBottom: 16 },
   successBox: { backgroundColor: '#E6F6F3', borderWidth: 1, borderColor: '#B5E7DE', borderRadius: 12, padding: 14, marginBottom: 16 },

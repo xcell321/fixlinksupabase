@@ -7,7 +7,7 @@ import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from "../../components/DateTimePicker";
 import { PhotoLightbox } from "../../components/RequestPhoto";
 import { submitRepairRequest, fetchPlatformCategories } from "../services/api";
-import { geocodeAddress, geocodeAddressPrecise } from "../services/locationIq";
+import { geocodeAddress, geocodeAddressPrecise, geocodeAddressStructured, reverseGeocodePrecise } from "../services/locationIq";
 import CustomerLocationMap from "../../components/CustomerLocationMap";
 import { colors, fonts, shadows } from '../../theme';
 import { getApplianceIcon } from '../../utils/applianceIcons';
@@ -37,20 +37,65 @@ const TIME_SLOTS = [
 ];
 
 // Web fallback for the native date/time picker, which renders nothing on
-// browsers. Uses the browser date/time inputs through the same pick handler.
-const WebDateTimeInput = ({ mode, date, onPick }: { mode: string; date: Date; onPick: (picked: Date | undefined) => void }) => {
+// browsers. Auto-opens the browser picker right after the row is tapped so
+// the user never has to find and click this input manually.
+const WebDateTimeInput = ({ mode, date, onPick, onDismiss, openToken = 0 }: { mode: string; date: Date; onPick: (picked: Date | undefined) => void; onDismiss?: () => void; openToken?: number }) => {
   if (Platform.OS !== 'web') return null;
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const pickedRef = useRef(false);
+  const [manualPick, setManualPick] = useState(false);
   const pad = (n: number): string => String(n).padStart(2, '0');
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
   const value = mode === 'date'
     ? `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
     : `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+
+  // Open the native browser picker automatically. Runs after render so the
+  // input (with the freshly switched date/time type) exists in the DOM; the
+  // tap that triggered it still counts as user activation in Chrome/Edge.
+  useEffect(() => {
+    pickedRef.current = false;
+    const el = inputRef.current as HTMLInputElement | null;
+    if (!el) return;
+    const timer = setTimeout(() => {
+      try {
+        const anyEl = el as HTMLInputElement & { showPicker?: () => void };
+        if (typeof anyEl.showPicker === 'function') anyEl.showPicker();
+        else el.click();
+      } catch {
+        // Browser refused auto-open (no user activation). Reveal the input so
+        // the user can tap it directly instead of nothing happening.
+        setManualPick(true);
+      }
+    }, 30);
+    return () => clearTimeout(timer);
+  }, [mode, openToken]);
+
+  const baseStyle: Record<string, any> = manualPick
+    ? {
+        width: '100%',
+        minHeight: 48,
+        fontSize: 14,
+        paddingLeft: 14,
+        paddingRight: 14,
+        borderWidth: 1,
+        borderStyle: 'solid',
+        borderColor: '#E5E7EB',
+        borderRadius: 14,
+        backgroundColor: '#F9FAFB',
+        color: '#102A43',
+        marginTop: 8,
+      }
+    : { position: 'absolute' as const, opacity: 0, width: 1, height: 1, left: 0, bottom: 0, pointerEvents: 'none' as const };
+
   return React.createElement('input', {
+    ref: inputRef,
     type: mode === 'date' ? 'date' : 'time',
     value,
     min: mode === 'date' ? todayStr : undefined,
     onChange: (event: any) => {
+      pickedRef.current = true;
       const raw = String(event?.target?.value || '');
       if (!raw) return;
       if (mode === 'date') {
@@ -65,20 +110,12 @@ const WebDateTimeInput = ({ mode, date, onPick }: { mode: string; date: Date; on
         onPick(picked);
       }
     },
-    style: {
-      width: '100%',
-      minHeight: 48,
-      fontSize: 14,
-      paddingLeft: 14,
-      paddingRight: 14,
-      borderWidth: 1,
-      borderStyle: 'solid',
-      borderColor: '#E5E7EB',
-      borderRadius: 14,
-      backgroundColor: '#F9FAFB',
-      color: '#102A43',
-      marginTop: 8,
+    onBlur: () => {
+      // Picker closed without a selection (cancel/Esc/outside tap): hide the
+      // input so a stale hidden field doesn't linger.
+      setTimeout(() => { if (!pickedRef.current) onDismiss?.(); }, 150);
     },
+    style: baseStyle,
   }) as unknown as React.JSX.Element;
 };
 
@@ -115,11 +152,15 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
   const [selectedTimeSlot, setSelectedTimeSlot] = useState('Afternoon (1PM-5PM)');
   const [isCustomTime, setIsCustomTime] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  // Bumped on every picker open so the web input re-runs its auto-open effect
+  // even when the same mode is picked twice in a row.
+  const [pickerToken, setPickerToken] = useState(0);
   const [mode, setMode] = useState('date');
   const [modalVisible, setModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [locating, setLocating] = useState(false);
   const [locateAccuracy, setLocateAccuracy] = useState(null);
+  const [locateNote, setLocateNote] = useState(null);
   const [photo, setPhoto] = useState(null);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoViewerVisible, setPhotoViewerVisible] = useState(false);
@@ -159,6 +200,9 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
     if (locating) return;
     setLocating(true);
     setLocateAccuracy(null);
+    // Inline status, never Alert alone. Web popups can stay invisible, which
+    // looked like loading-then-nothing with zero explanation.
+    setLocateNote(null);
     // Every external call raced with a timeout. An unanswered permission
     // prompt or a hanging geocode service must never stick the spinner on.
     const withTimeout = (promise, ms, label) => {
@@ -169,13 +213,32 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
       ]).finally(() => clearTimeout(timer));
     };
     try {
+      // Read status first without prompting. A denied status never shows a
+      // phone prompt again, so say exactly where to re-enable instead.
       let permission;
       try {
-        permission = await withTimeout(Location.requestForegroundPermissionsAsync(), 10000, 'Location permission timed out.');
+        permission = await withTimeout(Location.getForegroundPermissionsAsync(), 10000, 'Location check timed out.');
       } catch {
-        permission = { status: 'denied' };
+        permission = { status: 'undetermined' };
+      }
+      if (permission.status === 'denied') {
+        const howTo = Platform.OS === 'web'
+          ? 'Location is blocked for this site. Tap the lock icon in the address bar, set Location to Allow, reload, then retry.'
+          : 'Location is blocked for FixLink. Open phone Settings, allow Location for this app, then retry.';
+        setLocateNote({ kind: 'error', text: `${howTo} Or type the address manually.` });
+        return;
       }
       if (permission.status !== 'granted') {
+        // Undetermined status triggers the phone prompt here. Allow = accurate
+        // GPS fix. Dismiss or Block = manual address instead.
+        try {
+          permission = await withTimeout(Location.requestForegroundPermissionsAsync(), 30000, 'Answer the location prompt, or type the address manually.');
+        } catch {
+          permission = { status: 'denied' };
+        }
+      }
+      if (permission.status !== 'granted') {
+        setLocateNote({ kind: 'error', text: 'Location permission denied. Allow access or type the address manually.' });
         Alert.alert('Permission Denied', 'Permission to access location was denied');
         return;
       }
@@ -195,6 +258,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
       let resolvedStreet = '';
       let resolvedCity = '';
       let resolvedZip = '';
+      let resolvedState = '';
       try {
         const geocode = await withTimeout(Location.reverseGeocodeAsync({ latitude: lat, longitude: lon }), 8000, 'Reverse geocode timed out.');
         if (geocode && geocode.length > 0) {
@@ -203,21 +267,33 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
           resolvedStreet = a.street || a.name || '';
           resolvedCity = a.city || a.subregion || '';
           resolvedZip = a.postalCode || '';
-          if (resolvedStreet) setStreet(resolvedStreet);
-          if (resolvedCity) setCity(resolvedCity);
-          if (resolvedZip) setZipCode(resolvedZip);
-          else if (a.postalCode === null && a.region) setZipCode('');
+          resolvedState = a.region || '';
         }
       } catch {
-        // Coords kept. User types street/city manually.
+        // Precise fallback below fills the parts.
       }
+      // LocationIQ precise reverse fills street, city, state, postal code and
+      // overrides weak expo fields so all four parts stay accurate.
+      try {
+        const precise = await reverseGeocodePrecise(lat, lon);
+        if (precise) {
+          if (precise.street) resolvedStreet = precise.street;
+          if (precise.city) resolvedCity = precise.city;
+          if (precise.postalCode) resolvedZip = precise.postalCode;
+          if (precise.state) resolvedState = precise.state;
+        }
+      } catch {}
+      if (resolvedStreet) setStreet(resolvedStreet);
+      if (resolvedCity) setCity(resolvedCity);
+      if (resolvedZip) setZipCode(resolvedZip);
+      else setZipCode('');
       // Indoor snap: weak GPS (>30m, typical inside a house) gets snapped to the
       // rooftop of the resolved street address via API-only forward geocode.
       // Good GPS (<=30m) is kept as-is since it is already best. The coarse
       // dict is never used here so it cannot drag the pin offshore again.
       let finalLat = lat;
       let finalLon = lon;
-      const fullAddr = [resolvedStreet, resolvedCity, resolvedZip].filter(Boolean).join(', ');
+      const fullAddr = [resolvedStreet, resolvedCity, resolvedState, resolvedZip].filter(Boolean).join(', ');
       if (acc > 30 && fullAddr.length > 5) {
         try {
           const snap = await geocodeAddressPrecise(fullAddr);
@@ -230,8 +306,11 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
       setCoords({ latitude: finalLat, longitude: finalLon });
       // GPS autofill done - full 100% opacity text (medium, not bold)
       setLocationFromGps(true);
+      setLocateNote({ kind: 'ok', text: 'Location found. Check the pin, then adjust the address if needed.' });
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to fetch location details.');
+      const message = e?.message || 'Failed to fetch location details.';
+      setLocateNote({ kind: 'error', text: `${message} Type the address manually instead.` });
+      Alert.alert('Error', message);
     } finally {
       setLocating(false);
     }
@@ -244,20 +323,34 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
     }
   }, [currentStep]);
 
-  // Auto-geocode as user types street/city/zip to keep map in sync
+  // Auto-geocode as user types street/city/zip to keep map in sync. Uses the
+  // structured endpoint when parts exist (rooftop accuracy); free-text otherwise.
   useEffect(() => {
     if (currentStep !== 4) return;
+    const hasParts = street.trim().length >= 3 || city.trim().length >= 3 || zipCode.trim().length >= 3;
     const q = composedLocation;
-    if (!q || q.length < 5) return;
+    if (!hasParts && (!q || q.length < 5)) return;
     let cancelled = false;
     const t = setTimeout(async () => {
       try {
-        const res = await geocodeAddress(q);
-        if (!cancelled && res) setCoords({ latitude: res.latitude, longitude: res.longitude });
+        const res = await geocodeAddressStructured({
+          street: street.trim() || undefined,
+          city: city.trim() || undefined,
+          postalCode: zipCode.trim() || undefined,
+          context: 'Philippines',
+        });
+        if (!cancelled && res) {
+          setCoords({ latitude: res.latitude, longitude: res.longitude });
+          return;
+        }
+        if (!cancelled && q && q.length >= 5) {
+          const fallbackRes = await geocodeAddress(q);
+          if (!cancelled && fallbackRes) setCoords({ latitude: fallbackRes.latitude, longitude: fallbackRes.longitude });
+        }
       } catch {}
     }, 700);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [composedLocation, currentStep]);
+  }, [composedLocation, currentStep, street, city, zipCode]);
 
   // Optional problem photo: helps the technician see the issue before
   // accepting. Kept local until submit; uploaded as multipart `photo`.
@@ -470,12 +563,23 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
     setLoading(true);
     try {
       let finalCoords = coords;
-      // Geocode the typed address so the technician can navigate to it
+      // Geocode the typed address so the technician can navigate to it.
+      // Structured parts first (most accurate), then free-text fallback.
       if (!finalCoords && composedLocation) {
         try {
-          const geocoded = await geocodeAddress(composedLocation);
-          if (geocoded) {
-            finalCoords = { latitude: geocoded.latitude, longitude: geocoded.longitude };
+          const structured = await geocodeAddressStructured({
+            street: street.trim() || undefined,
+            city: city.trim() || undefined,
+            postalCode: zipCode.trim() || undefined,
+            context: 'Philippines',
+          });
+          if (structured) {
+            finalCoords = { latitude: structured.latitude, longitude: structured.longitude };
+          } else {
+            const geocoded = await geocodeAddress(composedLocation);
+            if (geocoded) {
+              finalCoords = { latitude: geocoded.latitude, longitude: geocoded.longitude };
+            }
           }
         } catch (geoErr) {
           console.warn('Geocoding fallback failed:', geoErr);
@@ -722,7 +826,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
             </View>
             <TouchableOpacity 
               style={[styles.selectInput, !!stepErrors.date && styles.inputError]} 
-              onPress={() => { setMode('date'); setShowDatePicker(true); }} 
+              onPress={() => { setMode('date'); setShowDatePicker(true); setPickerToken((t) => t + 1); }} 
               activeOpacity={0.7}
               accessibilityRole="button"
               accessibilityLabel="Select preferred date"
@@ -777,6 +881,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
                 onPress={() => {
                   setMode('time');
                   setShowDatePicker(true);
+                  setPickerToken((t) => t + 1);
                 }}
                 activeOpacity={0.7}
                 accessibilityRole="button"
@@ -809,7 +914,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
 
           {showDatePicker && (
             Platform.OS === 'web' ? (
-              <WebDateTimeInput mode={mode} date={date} onPick={handleDateValue} />
+              <WebDateTimeInput mode={mode} date={date} onPick={handleDateValue} onDismiss={handleDateDismiss} openToken={pickerToken} />
             ) : (
               <DateTimePicker
                 value={date}
@@ -853,6 +958,9 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
           )}
           <Text style={styles.locateRowText}>{locating ? 'Locating...' : 'Use my current location'}</Text>
         </TouchableOpacity>
+        {locateNote ? (
+          <Text style={locateNote.kind === 'ok' ? styles.locateOkText : styles.locateErrorText}>{locateNote.text}</Text>
+        ) : null}
         <View style={styles.inputGroup}>
           <Text style={styles.refLabel}>Street Address</Text>
           <View style={[styles.textInputContainer, focusedField === 'street' && styles.inputFocused, !!stepErrors.location && styles.inputError]}>
@@ -1291,6 +1399,8 @@ const styles = StyleSheet.create({
   locateButtonText: { color: colors.white, fontSize: 13, fontFamily: fonts.bold },
   locateRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, borderRadius: 14, borderWidth: 1.5, borderColor: colors.customer, backgroundColor: colors.customerSoft, paddingHorizontal: 16, elevation: 0 },
   locateRowText: { color: colors.customer, fontSize: 13, fontFamily: fonts.semiBold },
+  locateErrorText: { color: '#B91C1C', fontSize: 12, fontFamily: fonts.semiBold, marginTop: 8, lineHeight: 17 },
+  locateOkText: { color: colors.customer, fontSize: 12, fontFamily: fonts.semiBold, marginTop: 8 },
   accuracyText: { fontSize: 11, fontFamily: fonts.medium, textAlign: 'center', marginTop: 6 },
   accuracyGood: { color: colors.green },
   accuracyOk: { color: colors.gold },

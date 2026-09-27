@@ -18,7 +18,7 @@ import {
   fetchJobLiveTracking,
   updateCustomerLocation
 } from '../services/api';
-import { geocodeAddress, getDrivingRoute } from '../services/locationIq';
+import { geocodeAddressPrecise, getDrivingRoute } from '../services/locationIq';
 import { colors, fonts } from '../../theme';
 
 // Derive the customer/destination marker strictly from the selected job.
@@ -119,7 +119,9 @@ export default function MapTrackerScreen({ currentUser, selectedJob: initialJob,
     const hasValidCoords = Number.isFinite(lat) && Number.isFinite(lon) && lat !== 0;
 
     if (!hasValidCoords) {
-      geocodeAddress(activeJob.location).then((res) => {
+      // API-only precise geocode: the tracking destination must never snap to
+      // a coarse barangay-center fallback, or the pin lands ~1km off.
+      geocodeAddressPrecise(activeJob.location).then((res) => {
         if (jobId !== activeJobIdRef.current) return;
         if (res?.latitude && res?.longitude) {
           setCustomerCoords((prev) => ({

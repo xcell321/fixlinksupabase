@@ -4,7 +4,10 @@ import { API_BASE_URL } from './api';
 export const getLocationIqTileUrl = (): string => `${API_BASE_URL}/maps/tiles/{z}/{x}/{y}.png`;
 
 const routeCache = new Map<string, unknown>();
-const geocodeCache = new Map<string, { latitude: number; longitude: number } | null>();
+// Geocode cache entries carry an expiry so long sessions revalidate stale
+// addresses instead of pinning them forever.
+const GEOCODE_TTL_MS = 24 * 60 * 60 * 1000;
+const geocodeCache = new Map<string, { value: { latitude: number; longitude: number } | null; expiresAt: number }>();
 const autocompleteCache = new Map<string, unknown[]>();
 let lastRouteRequestTime = 0;
 let lastAutocompleteRequestTime = 0;
@@ -79,29 +82,111 @@ const BOGO_LOCAL_COORDS: Record<string, LatLng> = {
   'cebu roosevelt': { latitude: 11.0505, longitude: 124.0045 },
 };
 
+export interface AddressParts {
+  street: string;
+  city: string;
+  state: string;
+  postalCode: string;
+}
+
+// Structured parts from a LocationIQ addressdetails block. Road plus house
+// number forms the street, city falls back through town, village, suburb,
+// county, and state plus postcode pass through when present.
+export const extractAddressParts = (details: Record<string, unknown> | null | undefined): AddressParts => {
+  const d = (details ?? {}) as Record<string, string>;
+  const text = (v: unknown): string => String(v ?? '').trim();
+  const house = text(d.house_number);
+  const road = text(d.road);
+  const street = [house, road].filter(Boolean).join(' ')
+    || text(d.residential) || text(d.pedestrian) || text(d.footway) || text(d.cycleway) || text(d.path);
+  const city = text(d.city) || text(d.town) || text(d.village) || text(d.suburb)
+    || text(d.neighbourhood) || text(d.county) || text(d.municipality);
+  return {
+    street,
+    city,
+    state: text(d.state) || text(d.region),
+    postalCode: text(d.postcode),
+  };
+};
+
+// Precise reverse geocode through the backend proxy. Returns coordinates plus
+// street, city, state, and postal code in one call.
+export const reverseGeocodePrecise = async (
+  latitude: number,
+  longitude: number,
+): Promise<(AddressParts & { latitude: number; longitude: number }) | null> => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/maps/reverse`, {
+      params: { lat: latitude, lon: longitude },
+      timeout: 8000,
+    });
+    const data = (response.data ?? {}) as { lat?: string; lon?: string; address?: Record<string, unknown> };
+    if (!data.lat || !data.lon) return null;
+    return {
+      latitude: Number(data.lat),
+      longitude: Number(data.lon),
+      ...extractAddressParts(data.address),
+    };
+  } catch {
+    return null;
+  }
+};
+
 const searchLocationIq = async (rawQuery: string, suffix: string | null): Promise<LatLng | null> => {
   const q: string = suffix ? `${rawQuery}, ${suffix}` : rawQuery;
-  const response = await axios.get(`${API_BASE_URL}/maps/search`, { params: { q }, timeout: 6000 });
-  const result = (response.data as Array<{ lat?: string; lon?: string }>)?.[0];
-  if (result?.lat && result?.lon) return { latitude: Number(result.lat), longitude: Number(result.lon) };
-  return null;
+  try {
+    const response = await axios.get(`${API_BASE_URL}/maps/search`, { params: { q }, timeout: 6000 });
+    const result = (response.data as Array<{ lat?: string; lon?: string }>)?.[0];
+    if (result?.lat && result?.lon) return { latitude: Number(result.lat), longitude: Number(result.lon) };
+    return null;
+  } catch (error: unknown) {
+    // Quota exhausted: throw so callers skip remaining retries — hammering a
+    // rate-limited key only burns time and gets more 429s.
+    const status = (error as { response?: { status?: number } })?.response?.status;
+    if (status === 429) throw new Error('GEOCODE_RATE_LIMITED');
+    throw error;
+  }
+};
+
+// One address → coordinates attempt. The backend now locks every search to
+// the Philippines (countrycodes=ph), so a single raw query is usually enough;
+// a city-context retry only runs when the raw form returns nothing.
+const geocodeOnce = async (clean: string): Promise<LatLng | null> => {
+  const coords = await searchLocationIq(clean, null);
+  if (coords) return coords;
+  return searchLocationIq(clean, 'Philippines');
+};
+
+const geocodeWithCache = async (cacheKey: string, clean: string, lookup: () => Promise<LatLng | null>): Promise<LatLng | null> => {
+  const cached = geocodeCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  if (cached) geocodeCache.delete(cacheKey);
+  try {
+    const coords = await lookup();
+    if (geocodeCache.size > 200) geocodeCache.clear();
+    geocodeCache.set(cacheKey, { value: coords, expiresAt: Date.now() + GEOCODE_TTL_MS });
+    return coords;
+  } catch (error) {
+    // Rate-limited: remember the miss briefly so a UI loop cannot re-burst the
+    // quota, then surface null (callers keep GPS/prior coords).
+    if (String((error as Error)?.message) === 'GEOCODE_RATE_LIMITED') {
+      geocodeCache.set(cacheKey, { value: null, expiresAt: Date.now() + 60 * 1000 });
+      return null;
+    }
+    throw error;
+  }
 };
 
 const resolveGeocode = async (query: string, useCompact: boolean): Promise<LatLng | null> => {
   const clean: string = String(query ?? '').trim();
   if (!clean) return null;
-  if (geocodeCache.has(clean)) return geocodeCache.get(clean) ?? null;
+  const cacheKey = `free:${clean.toLowerCase()}`;
   // Live API first (rooftop-accurate). Coarse dict is offline fallback only,
   // so a wrong dict entry can never override a real street position again.
-  for (const suffix of [null, 'Philippines', 'Bogo City, Cebu'] as const) {
-    try {
-      const coords: LatLng | null = await searchLocationIq(clean, suffix);
-      if (coords) {
-        geocodeCache.set(clean, coords);
-        return coords;
-      }
-    } catch {}
-  }
+  try {
+    const coords = await geocodeWithCache(cacheKey, clean, () => geocodeOnce(clean));
+    if (coords) return coords;
+  } catch {}
   const compact = (value: string): string => value.toLowerCase().replace(/[^a-z0-9]/g, '');
   const compareValue: string = useCompact ? compact(clean) : clean.toLowerCase();
   for (const [key, coords] of Object.entries(BOGO_LOCAL_COORDS)) {
@@ -116,16 +201,58 @@ const resolveGeocode = async (query: string, useCompact: boolean): Promise<LatLn
 export const geocodeAddressPrecise = async (address: string): Promise<LatLng | null> => {
   const clean: string = String(address ?? '').trim();
   if (!clean) return null;
-  for (const suffix of [null, 'Philippines', 'Bogo City, Cebu'] as const) {
-    try {
-      const coords: LatLng | null = await searchLocationIq(clean, suffix);
-      if (coords) {
-        geocodeCache.set(clean, coords);
-        return coords;
-      }
-    } catch {}
+  const cacheKey = `precise:${clean.toLowerCase()}`;
+  try {
+    return await geocodeWithCache(cacheKey, clean, () => geocodeOnce(clean));
+  } catch {
+    return null;
   }
-  return null;
+};
+
+export interface StructuredAddress {
+  street?: string;
+  city?: string;
+  postalCode?: string;
+  /** Extra free-text context (province/island) appended for disambiguation. */
+  context?: string;
+}
+
+// Structured forward geocode — sends the separate street/city/postal fields
+// straight to LocationIQ's structured search mode instead of one concatenated
+// free-text blob. This is the most accurate path when the caller already has
+// address parts (e.g. the submit form).
+export const geocodeAddressStructured = async (parts: StructuredAddress): Promise<LatLng | null> => {
+  const street = String(parts?.street ?? '').trim();
+  const city = String(parts?.city ?? '').trim();
+  const postalCode = String(parts?.postalCode ?? '').trim();
+  const context = String(parts?.context ?? '').trim();
+  if (!street && !city && !postalCode) return null;
+  const cacheKey = `struct:${street.toLowerCase()}|${city.toLowerCase()}|${postalCode}|${context.toLowerCase()}`;
+  const lookup = async (): Promise<LatLng | null> => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/maps/search`, {
+        params: {
+          ...(street ? { street } : {}),
+          ...(city ? { city } : {}),
+          ...(postalCode ? { postalcode: postalCode } : {}),
+          ...(context ? { q: context } : {}),
+        },
+        timeout: 6000,
+      });
+      const result = (response.data as Array<{ lat?: string; lon?: string }>)?.[0];
+      if (result?.lat && result?.lon) return { latitude: Number(result.lat), longitude: Number(result.lon) };
+      return null;
+    } catch (error: unknown) {
+      const status = (error as { response?: { status?: number } })?.response?.status;
+      if (status === 429) throw new Error('GEOCODE_RATE_LIMITED');
+      throw error;
+    }
+  };
+  try {
+    return await geocodeWithCache(cacheKey, context || city || street, lookup);
+  } catch {
+    return null;
+  }
 };
 
 export const geocodeAddress = async (address: string): Promise<LatLng | null> => resolveGeocode(address, false);

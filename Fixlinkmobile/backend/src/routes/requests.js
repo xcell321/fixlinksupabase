@@ -32,6 +32,52 @@ const unreadLimiter = createRateLimiter({
   message: 'Too many chat refresh requests, please try again later.',
 });
 
+// OTP verification guard: strict per-technician rate limit (10/min) plus a
+// per-job lockout after 5 wrong entries. A 4-digit code has only 9,000
+// combinations, so without a cap the endpoint could be brute-forced.
+const otpVerifyLimiter = createRateLimiter({
+  windowMs: 60000,
+  max: 10,
+  keyGenerator: (req) => (req.authUser ? `otp:${req.authUser.uid}` : req.ip),
+  message: 'Too many code attempts. Please wait a minute and try again.',
+});
+
+const OTP_MAX_ATTEMPTS = 5;
+const OTP_LOCKOUT_MS = 10 * 60 * 1000; // 10 minutes
+const otpAttempts = new Map(); // key: jobId:uid -> { fails: number, lockedUntil: number }
+
+const otpGate = (req, res, next) => {
+  const key = `${req.params.id}:${req.authUser?.uid || req.ip}`;
+  const entry = otpAttempts.get(key);
+  if (entry?.lockedUntil && entry.lockedUntil > Date.now()) {
+    const mins = Math.ceil((entry.lockedUntil - Date.now()) / 60000);
+    return res.status(429).json({ error: `Too many incorrect codes. Try again in ${mins} minute${mins === 1 ? '' : 's'}.` });
+  }
+  next();
+};
+
+const otpRecordFail = (jobId, uid) => {
+  const key = `${jobId}:${uid}`;
+  const entry = otpAttempts.get(key) || { fails: 0, lockedUntil: 0 };
+  entry.fails += 1;
+  if (entry.fails >= OTP_MAX_ATTEMPTS) {
+    entry.lockedUntil = Date.now() + OTP_LOCKOUT_MS;
+    entry.fails = 0; // counter resets; the lock itself is the penalty
+  }
+  otpAttempts.set(key, entry);
+};
+
+const otpRecordSuccess = (jobId, uid) => {
+  otpAttempts.delete(`${jobId}:${uid}`);
+  // Opportunistic sweep so the map cannot grow unbounded.
+  if (otpAttempts.size > 500) {
+    const now = Date.now();
+    for (const [k, v] of otpAttempts) {
+      if (v.lockedUntil && v.lockedUntil <= now) otpAttempts.delete(k);
+    }
+  }
+};
+
 const distanceInKm = (firstLatitude, firstLongitude, secondLatitude, secondLongitude) => {
   if (![firstLatitude, firstLongitude, secondLatitude, secondLongitude].every(Number.isFinite)) return null;
   const radians = (value) => value * Math.PI / 180;
@@ -81,7 +127,7 @@ const resolveLocalCoords = (latitude, longitude, locationText) => {
   return null;
 };
 
-const serializeJob = (row) => {
+const serializeJob = (row, { viewerUid = null } = {}) => {
   const job = {
     id: row.id,
     customerName: row.customer_name,
@@ -110,7 +156,12 @@ const serializeJob = (row) => {
   if (row.scheduled_date) job.scheduledDate = row.scheduled_date;
   if (row.photo_url) job.photoUrl = row.photo_url;
   if (row.declined_by) job.declinedBy = row.declined_by;
-  if (row.verification_code) job.verificationCode = row.verification_code;
+  // The completion OTP is the customer's proof-of-work signal: only the job's
+  // customer may ever see it. Technicians (and anyone else) get the field
+  // omitted so a job can never be completed without the customer's code.
+  if (row.verification_code && viewerUid && String(row.customer_uid) === String(viewerUid)) {
+    job.verificationCode = row.verification_code;
+  }
   if (row.accepted_at) job.acceptedAt = new Date(row.accepted_at).toISOString();
   if (row.customer_confirmation_timestamp) job.customerConfirmedAt = new Date(row.customer_confirmation_timestamp).toISOString();
   if (row.customer_ready_timestamp) job.customerReadyAt = new Date(row.customer_ready_timestamp).toISOString();
@@ -448,6 +499,8 @@ router.get('/', async (req, res) => {
 
       if ((!data.status || data.status === 'Pending') && skillMatch && data.declined_by !== technicianUid) {
         requests.push({
+          // Available-jobs feed: Pending rows have no code yet, and the viewer
+          // is a technician — OTP stays hidden either way.
           ...serializeJob(data),
           ...(jobCoords && { latitude: jobCoords.latitude, longitude: jobCoords.longitude }),
           ...(distanceKm !== null && { distanceKm: Number(distanceKm.toFixed(1)) })
@@ -765,7 +818,8 @@ router.get('/job/:id', async (req, res) => {
     if (!isOwner && !isPendingAndTech) {
       return res.status(403).json({ error: 'Not authorized to view this job.' });
     }
-    res.json(serializeJob(job));
+    // Single-job view: only the customer owner may see the completion OTP.
+    res.json(serializeJob(job, { viewerUid: uid === String(job.customer_uid || '') ? uid : null }));
   } catch (error) {
     console.error('Error loading job:', error);
     res.status(500).json({ error: 'Unable to load job.' });
@@ -849,8 +903,10 @@ router.get('/customer/:customerName', async (req, res) => {
       return (uidMatches || nameMatches) && String(job.status || '').toLowerCase() !== 'completed';
     });
 
+    // Customer-owned list (uid-verified above) — the completion OTP belongs
+    // to this viewer.
     const withTechnician = await Promise.all(jobs.map(async (job) => {
-      if (!job.technician_uid && !job.technician_name) return serializeJob(job);
+      if (!job.technician_uid && !job.technician_name) return serializeJob(job, { viewerUid: requestedUid });
       let technician = {};
       if (job.technician_uid) {
         const { data: techRow } = await supabase.from('users').select('*').eq('id', job.technician_uid).maybeSingle();
@@ -879,7 +935,7 @@ router.get('/customer/:customerName', async (req, res) => {
       }
 
       return {
-        ...serializeJob(job),
+        ...serializeJob(job, { viewerUid: requestedUid }),
         technicianPhone: technician.phone || null,
         technicianSkills: technician.skills || [],
         technicianRating,
@@ -910,6 +966,7 @@ router.get('/technician/:technicianUid', async (req, res) => {
   try {
     if (req.params.technicianUid !== req.authUser.uid) return res.status(403).json({ error: 'Technician identity does not match the authenticated account.' });
     const { data: rows } = await supabase.from('jobs').select('*').eq('technician_uid', req.params.technicianUid);
+    // Technician's own job list: OTP is customer-held, never sent here.
     res.json((rows || []).map(serializeJob));
   } catch (error) {
     console.error('Error loading technician jobs:', error);
@@ -1384,7 +1441,8 @@ router.get('/completed/:customerName', async (req, res) => {
       .eq('customer_name', req.params.customerName)
       .eq('status', 'Completed')
       .order('completed_at', { ascending: false });
-    res.json((rows || []).map(serializeJob));
+    // Completed history of the authenticated customer — OTP still theirs.
+    res.json((rows || []).map((row) => serializeJob(row, { viewerUid: requestedUid })));
   } catch (error) {
     console.error('Error loading completed jobs:', error);
     res.status(500).json({ error: 'Unable to load completed jobs.' });
@@ -1504,7 +1562,7 @@ router.put('/:id/accept', async (req, res) => {
 });
 
 // Route to verify completion code
-router.post('/:id/verify-completion', async (req, res) => {
+router.post('/:id/verify-completion', otpVerifyLimiter, otpGate, async (req, res) => {
   try {
     const { code } = req.body;
     const job = await resolveJob(req.params.id);
@@ -1512,7 +1570,12 @@ router.post('/:id/verify-completion', async (req, res) => {
     if (!job) return res.status(404).json({ error: 'Job not found.' });
     if (job.technician_uid !== req.authUser.uid) return res.status(403).json({ error: 'Only the assigned technician can verify completion.' });
     if (job.status !== 'In Progress') return res.status(409).json({ error: 'Job must be in progress before completion can be verified.' });
-    if (job.verification_code !== String(code).trim()) return res.status(400).json({ error: 'Invalid verification code.' });
+    if (job.verification_code !== String(code).trim()) {
+      otpRecordFail(job.id, req.authUser.uid);
+      const left = OTP_MAX_ATTEMPTS - (otpAttempts.get(`${job.id}:${req.authUser.uid}`)?.fails ?? 0);
+      return res.status(400).json({ error: `Invalid verification code.${left > 0 && left < OTP_MAX_ATTEMPTS ? ` ${left} attempt${left === 1 ? '' : 's'} remaining.` : ''}` });
+    }
+    otpRecordSuccess(job.id, req.authUser.uid);
 
     await supabase
       .from('jobs')

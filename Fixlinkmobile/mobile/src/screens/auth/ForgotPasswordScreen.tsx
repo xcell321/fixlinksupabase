@@ -81,7 +81,9 @@ export default function ForgotPasswordScreen({ switchToLogin, role = 'customer' 
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#FFFFFF' },
-  backHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 56, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  // SafeAreaView in AppNavigator already clears the status bar; keep only a
+  // small gap so the back row sits at the top instead of floating mid-screen.
+  backHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
   backBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   backTitle: { color: '#111827', fontSize: 15, fontFamily: fonts.semiBold },
   body: { flex: 1, paddingHorizontal: 24, paddingTop: 40, gap: 4 },
