@@ -14,9 +14,50 @@ const upload = multer({
     const allowedExtensions = ['.jpg', '.jpeg', '.png', '.pdf'];
     const dotIndex = file.originalname.lastIndexOf('.');
     const extension = dotIndex >= 0 ? file.originalname.slice(dotIndex).toLowerCase() : '';
-    callback(null, allowedMimeTypes.includes(file.mimetype) || allowedExtensions.includes(extension));
+    // Rejecting with an error (instead of a silent false) matters: a silent
+    // drop makes the route report both files as missing even though the user
+    // attached them, which hides the real problem (wrong file type).
+    if (allowedMimeTypes.includes(file.mimetype) || allowedExtensions.includes(extension)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`UNSUPPORTED_FILE_TYPE:${file.fieldname || 'document'}`));
+    }
   }
 });
+
+// Multer errors default to an HTML 500 page, which the app cannot display.
+// Convert them to JSON so the register screen always shows a readable message
+// instead of spinning with no result.
+const registerUpload = upload.fields([
+  { name: 'governmentIdFile', maxCount: 1 },
+  { name: 'certificateFile', maxCount: 1 }
+]);
+
+const handleUploadErrors = (req, res, next) => {
+  registerUpload(req, res, (err) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ error: 'Each document must be 10MB or smaller. Please use a smaller file.' });
+      }
+      if (String(err.message || '').startsWith('UNSUPPORTED_FILE_TYPE')) {
+        return res.status(400).json({ error: 'Verification documents must be JPG, PNG, or PDF. Please pick a different file.' });
+      }
+      return res.status(400).json({ error: 'Document upload failed. Use JPG, PNG, or PDF files.' });
+    }
+    next();
+  });
+};
+
+// Bounds any promise that has no built-in timeout (Supabase storage writes can
+// hang on slow networks). The spinner on the register screen always resolves
+// because the request can never hang forever.
+function withTimeout(promise, ms, message) {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(message)), ms); })
+  ]).finally(() => clearTimeout(timer));
+}
 
 // POST: Login user - enforces role: customer cannot log in as technician and vice versa
 router.post('/login', async (req, res) => {
@@ -94,10 +135,7 @@ router.post('/login', async (req, res) => {
 });
 
 // POST: Register a new user (Customer or Technician)
-router.post('/register', upload.fields([
-  { name: 'governmentIdFile', maxCount: 1 },
-  { name: 'certificateFile', maxCount: 1 }
-]), async (req, res) => {
+router.post('/register', handleUploadErrors, async (req, res) => {
   try {
     const { email, password, role, name, skills, phone, address, bio, yearsExperience, governmentIdNumber, latitude, longitude } = req.body || {};
 
@@ -119,19 +157,56 @@ router.post('/register', upload.fields([
     }
 
     // 1. Create user in Supabase Auth (service role -> confirmed immediately, no confirmation email needed)
-    const { data: signUpData, error: signUpError } = await supabase.auth.admin.createUser({
+    const createAuthUser = () => withTimeout(supabase.auth.admin.createUser({
       email: sanitizedEmail,
       password,
       email_confirm: true,
       user_metadata: { displayName: name },
-    });
+    }), 30000, 'Account creation timed out. Please try again.');
+
+    let { data: signUpData, error: signUpError } = await createAuthUser();
 
     if (signUpError) {
       console.error('Registration error:', signUpError.message);
+
       if (/user_already_exists|already been registered|already registered/i.test(String(signUpError.message))) {
-        return res.status(409).json({ error: 'This email is already registered.' });
+        // Self-heal: the email exists in Supabase Auth, but it may be an ORPHAN left
+        // behind by a previous failed/partial registration (auth user with no profile
+        // row). If no profile exists, delete the stale auth user and retry so the
+        // person can register normally instead of being stuck on "already registered".
+        const { data: existingProfile } = await supabase
+          .from('users')
+          .select('id')
+          .eq('email', sanitizedEmail)
+          .maybeSingle();
+
+        if (!existingProfile) {
+          let orphan = null;
+          let page = 1;
+          for (;;) {
+            const { data } = await supabase.auth.admin.listUsers({ page, perPage: 200 });
+            orphan = (data?.users || []).find((u) => (u.email || '').toLowerCase() === sanitizedEmail) || null;
+            if (orphan || (data?.users || []).length < 200) break;
+            page += 1;
+          }
+          if (orphan) {
+            const { error: deleteError } = await supabase.auth.admin.deleteUser(orphan.id);
+            if (!deleteError) {
+              console.log(`[register] Removed orphaned auth user for ${sanitizedEmail} — retrying registration.`);
+              const retry = await createAuthUser();
+              signUpData = retry.data;
+              signUpError = retry.error;
+            }
+          }
+        }
       }
-      return res.status(500).json({ error: 'Unable to create the account. Please try again.' });
+
+      if (signUpError) {
+        if (/user_already_exists|already been registered|already registered/i.test(String(signUpError.message))) {
+          return res.status(409).json({ error: 'This email is already registered. Please log in instead.' });
+        }
+        return res.status(500).json({ error: 'Unable to create the account. Please try again.' });
+      }
     }
     if (!signUpData.user || !signUpData.user.id) {
       return res.status(500).json({ error: 'Unable to create the account. Please try again.' });
@@ -179,20 +254,20 @@ router.post('/register', upload.fields([
 
       try {
         if (verificationFiles.governmentIdFile?.[0]) {
-          userData.government_id_file_url = await uploadBuffer({
+          userData.government_id_file_url = await withTimeout(uploadBuffer({
             folder: 'technician-documents',
             file: verificationFiles.governmentIdFile[0],
             buffer: verificationFiles.governmentIdFile[0].buffer,
             contentType: verificationFiles.governmentIdFile[0].mimetype,
-          });
+          }), 45000, 'Government ID upload timed out. Please try again with a smaller file.');
         }
         if (verificationFiles.certificateFile?.[0]) {
-          userData.certificate_file_url = await uploadBuffer({
+          userData.certificate_file_url = await withTimeout(uploadBuffer({
             folder: 'technician-documents',
             file: verificationFiles.certificateFile[0],
             buffer: verificationFiles.certificateFile[0].buffer,
             contentType: verificationFiles.certificateFile[0].mimetype,
-          });
+          }), 45000, 'Certificate upload timed out. Please try again with a smaller file.');
         }
       } catch (uploadError) {
         console.error('Document upload failed:', uploadError.message);
@@ -208,23 +283,10 @@ const { error: insertError } = await supabase.from('users').insert(userData);
     }
 
     if (role === 'customer') {
-      const { data: signInData, error: signInError } = await supabaseAuth.auth.signInWithPassword({ email: sanitizedEmail, password });
-      if (signInError || !signInData?.session) {
-        return res.status(201).json({ message: 'User registered successfully', uid, status: initialStatus });
-      }
       return res.status(201).json({
-        message: 'Account created successfully',
+        message: 'Account created successfully. You can now log in.',
         uid,
-        role: userData.role,
-        name: userData.name,
-        email: userData.email,
-        phone: userData.phone || '',
-        address: userData.address || '',
-        profileImage: userData.profile_image || null,
         status: initialStatus,
-        idToken: signInData.session.access_token,
-        refreshToken: signInData.session.refresh_token,
-        expiresIn: signInData.session.expires_in,
       });
     }
 
@@ -301,7 +363,13 @@ router.post('/forgot-password', async (req, res) => {
     query.set('token', token);
     const deepLink = `fixlink://recovery?${query.toString()}`;
 
-    sendPasswordResetEmail(sanitizedEmail, deepLink, req.headers?.host).catch((err) =>
+    sendPasswordResetEmail(
+      sanitizedEmail,
+      deepLink,
+      req.headers?.host,
+      req.headers?.['x-forwarded-proto'],
+      req.headers?.['x-forwarded-host'],
+    ).catch((err) =>
       console.error('Failed to send reset email:', err)
     );
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -17,14 +17,16 @@ import { geocodeAddressStrict } from '../services/locationIq';
 import Skeleton from '../../components/Skeleton';
 import HelpSheet from '../../components/HelpSheet';
 import { PhotoLightbox } from '../../components/RequestPhoto';
-import { colors, fonts, shadows } from '../../theme';
+import { colors, fonts } from '../../theme';
 import type { TechnicianScheduleItem, TechnicianScheduleResponse } from '../../types/schedule';
 import {
   draftFromProfile,
   formatExperience,
+  formatMonthYear,
   formatRating,
   formatReviewDate,
   formatSkillList,
+  getSkillLevel,
   getVerificationBadge,
   EMPTY_DRAFT,
   type TechnicianDraft,
@@ -69,6 +71,8 @@ interface TechnicianProfile {
   reviews?: Review[];
   portfolio?: PortfolioPhoto[];
   profileImage?: string | null;
+  createdAt?: string | null;
+  skillStats?: Array<{ name?: string; completedJobs?: number }>;
 }
 
 interface Coords {
@@ -116,6 +120,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
   const [showAllReviews, setShowAllReviews] = useState<boolean>(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [ptab, setPtab] = useState<'info' | 'skills' | 'reviews' | 'portfolio'>('info');
+  const profileBusyRef = useRef<boolean>(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -141,20 +146,28 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
     return () => { cancelled = true; clearTimeout(timer); };
   }, [draft.address, editing]);
 
-  const loadProfile = async (): Promise<void> => {
-    setLoadError(null);
-    setLoading(true);
+  const loadProfile = async (silent = false): Promise<void> => {
+    if (profileBusyRef.current) return;
+    profileBusyRef.current = true;
+    if (!silent) {
+      setLoadError(null);
+      setLoading(true);
+    }
     try {
       const result = await fetchTechnicianProfile(technician.uid) as TechnicianProfile;
+      // Never clobber in-progress edits with a background refresh.
       setProfile(result);
-      setDraft(draftFromProfile(result));
+      if (!silent) setDraft(draftFromProfile(result));
     } catch (error) {
-      const message = (error as { response?: { data?: { error?: string } }; message?: string }).response?.data?.error
-        || (error as Error).message
-        || 'Unable to load this profile.';
-      setLoadError(message);
+      if (!silent) {
+        const message = (error as { response?: { data?: { error?: string } }; message?: string }).response?.data?.error
+          || (error as Error).message
+          || 'Unable to load this profile.';
+        setLoadError(message);
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
+      profileBusyRef.current = false;
     }
   };
 
@@ -185,7 +198,14 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
     }
   };
 
-  useEffect(() => { loadProfile(); }, []);
+  useEffect(() => {
+    loadProfile();
+    // Silent 15s refresh. New reviews, ratings, and completed counts appear
+    // without manual reload. Silent sync never touches the edit draft.
+    const interval = setInterval(() => { void loadProfile(true); }, 15000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Customer-visible upcoming schedule (read-only view only).
   useEffect(() => {
@@ -290,7 +310,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Retry loading profile"
-          onPress={loadProfile}
+          onPress={() => loadProfile()}
           style={({ pressed }) => [styles.primaryButtonSolid, pressed && styles.pressed]}
         >
           <Ionicons name="refresh-outline" size={16} color={colors.white} />
@@ -308,7 +328,10 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
     setDraft((current) => ({ ...current, [key]: value }));
   const visibleReviews = showAllReviews ? reviews : reviews.slice(0, 2);
   const hasMoreReviews = reviews.length > 2;
-  const verification = getVerificationBadge(profile.verified);
+  const verification = getVerificationBadge(profile.verified, profile.createdAt ?? null);
+  const verifiedSince = verification.isVerified
+    ? (formatMonthYear(verification.verifiedSince ?? null) ?? 'Verified')
+    : 'Pending verification';
 
   return (
     <ScrollView contentContainerStyle={styles.screen} showsVerticalScrollIndicator={false}>
@@ -345,18 +368,18 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
               </View>
             )}
           </View>
-          <Text style={styles.headerNameCentered} numberOfLines={1}>{profile.name || 'Marcus Rivera'}</Text>
+          <Text style={styles.headerNameCentered} numberOfLines={1}>{profile.name || 'Technician'}</Text>
           <Text style={styles.headerSubCentered} numberOfLines={1}>
             Verified Technician · {formatExperience(profile.yearsExperience)} exp.
           </Text>
           <View style={styles.headerStatsRowCentered}>
             <View style={styles.headerStatCentered}>
-              <Text style={styles.headerStatValue}>{profile.completedJobs ?? 340}</Text>
+              <Text style={styles.headerStatValue}>{profile.completedJobs ?? 0}</Text>
               <Text style={styles.headerStatLabel}>Completed</Text>
             </View>
             <View style={styles.headerStatDivider} />
             <View style={styles.headerStatCentered}>
-              <Text style={styles.headerStatValue}>{rating > 0 ? rating.toFixed(1) : '4.9'}</Text>
+              <Text style={styles.headerStatValue}>{rating > 0 ? rating.toFixed(1) : '0.0'}</Text>
               <Text style={styles.headerStatLabel}>Rating</Text>
             </View>
           </View>
@@ -404,7 +427,9 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Full Name</Text>
               <View style={styles.inputContainer}>
-                <Ionicons name="person-outline" size={18} color={colors.muted} style={styles.inputIcon} />
+                <View style={styles.editInputIconBox}>
+                  <Ionicons name="person-outline" size={16} color="#2563EB" />
+                </View>
                 <TextInput
                   style={styles.textInput}
                   value={draft.name}
@@ -419,7 +444,9 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Phone Number</Text>
               <View style={styles.inputContainer}>
-                <Ionicons name="call-outline" size={18} color={colors.muted} style={styles.inputIcon} />
+                <View style={styles.editInputIconBox}>
+                  <Ionicons name="call-outline" size={16} color="#2563EB" />
+                </View>
                 <TextInput
                   style={styles.textInput}
                   value={draft.phone}
@@ -435,7 +462,9 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Service Base Address</Text>
               <View style={[styles.inputContainer, styles.inputContainerMulti]}>
-                <Ionicons name="location-outline" size={18} color={colors.muted} style={[styles.inputIcon, styles.inputIconMulti]} />
+                <View style={styles.editInputIconBoxMulti}>
+                  <Ionicons name="location-outline" size={16} color="#2563EB" />
+                </View>
                 <TextInput
                   style={[styles.textInput, styles.textInputMulti]}
                   value={draft.address}
@@ -473,7 +502,9 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Professional Bio</Text>
               <View style={[styles.inputContainer, styles.inputContainerMulti]}>
-                <Ionicons name="document-text-outline" size={18} color={colors.muted} style={[styles.inputIcon, styles.inputIconMulti]} />
+                <View style={styles.editInputIconBoxMulti}>
+                  <Ionicons name="document-text-outline" size={16} color="#2563EB" />
+                </View>
                 <TextInput
                   style={[styles.textInput, styles.textInputMulti]}
                   value={draft.bio}
@@ -489,7 +520,9 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Skills (comma-separated)</Text>
               <View style={styles.inputContainer}>
-                <Ionicons name="construct-outline" size={18} color={colors.muted} style={styles.inputIcon} />
+                <View style={styles.editInputIconBox}>
+                  <Ionicons name="construct-outline" size={16} color="#2563EB" />
+                </View>
                 <TextInput
                   style={styles.textInput}
                   value={draft.skills}
@@ -504,7 +537,9 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Years of Experience</Text>
               <View style={styles.inputContainer}>
-                <Ionicons name="time-outline" size={18} color={colors.muted} style={styles.inputIcon} />
+                <View style={styles.editInputIconBox}>
+                  <Ionicons name="time-outline" size={16} color="#2563EB" />
+                </View>
                 <TextInput
                   style={styles.textInput}
                   value={draft.yearsExperience}
@@ -563,7 +598,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
               </View>
               <View style={styles.infoCardTextWrap}>
                 <Text style={styles.infoCardLabel}>Phone</Text>
-                <Text style={styles.infoCardValue} numberOfLines={1}>{profile.phone || '+1 555 012 3456'}</Text>
+                <Text style={styles.infoCardValue} numberOfLines={1}>{profile.phone || 'Not provided'}</Text>
               </View>
             </View>
             <View style={styles.infoCardWhite}>
@@ -572,7 +607,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
               </View>
               <View style={styles.infoCardTextWrap}>
                 <Text style={styles.infoCardLabel}>Service Area</Text>
-                <Text style={styles.infoCardValue} numberOfLines={2}>{profile.address || 'Manhattan, Brooklyn, Queens'}</Text>
+                <Text style={styles.infoCardValue} numberOfLines={2}>{profile.address || 'Not provided'}</Text>
               </View>
             </View>
             <View style={styles.infoCardWhite}>
@@ -581,7 +616,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
               </View>
               <View style={styles.infoCardTextWrap}>
                 <Text style={styles.infoCardLabel}>Verified Since</Text>
-                <Text style={styles.infoCardValue} numberOfLines={1}>{verification.isVerified ? 'January 2022' : 'Pending verification'}</Text>
+                <Text style={styles.infoCardValue} numberOfLines={1}>{verifiedSince}</Text>
               </View>
             </View>
           </View>
@@ -589,45 +624,37 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
 
 
 
-        {/* 5. REVIEWS - Match Make image 2: auto customer name like Oten */}
+        {/* 5. REVIEWS - real reviews only. New technicians show zero. */}
         {ptab === 'reviews' && (
           <View style={{ gap: 12 }}>
-            {(() => {
-              const defaultReviews = [
-                { name: 'Alex M.', initials: 'AM', date: 'Aug 28', rating: 5, text: 'Marcus was incredibly professional. Fixed my laptop quickly!' },
-                { name: 'Jordan K.', initials: 'JK', date: 'Aug 20', rating: 5, text: 'Arrived on time, cleaned up after, and explained everything.' },
-                { name: 'Sam T.', initials: 'ST', date: 'Aug 14', rating: 4, text: 'Great work on the screen replacement.' },
-              ];
-              const displayReviews = reviews.length > 0
-                ? visibleReviews.map((r: any, i: number) => {
-                    const def = defaultReviews[i % defaultReviews.length]!;
-                    const customerName = r.customerName || r.name || r.customer || `Customer ${i+1}`;
-                    const initials = customerName.split(' ').map((n: string) => n[0]).join('').slice(0,2).toUpperCase() || def.initials;
-                    return {
-                      name: customerName,
-                      initials,
-                      date: r.createdAt ? formatReviewDate(r.createdAt) : def.date,
-                      rating: Number(r.rating) || def.rating,
-                      text: r.comment || def.text,
-                    };
-                  })
-                : defaultReviews;
-              return displayReviews.map((r) => (
-                <View key={r.name + r.date} style={styles.reviewCardWhite}>
-                  <View style={styles.reviewCardHeader}>
-                    <View style={styles.reviewAvatarOrange}>
-                      <Text style={styles.reviewAvatarText}>{r.initials}</Text>
+            {reviews.length === 0 ? (
+              <View style={styles.emptyTabBox}>
+                <Text style={styles.emptyTabText}>No reviews yet.</Text>
+                <Text style={styles.emptyTabSub}>Ratings appear after completed jobs.</Text>
+              </View>
+            ) : (
+              visibleReviews.map((r: any, i: number) => {
+                const customerName = r.customerName || r.name || r.customer || `Customer ${i + 1}`;
+                const initials = customerName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || 'CU';
+                const date = r.createdAt ? formatReviewDate(r.createdAt) : '';
+                const value = Number(r.rating) || 0;
+                return (
+                  <View key={`${customerName}-${date}-${i}`} style={styles.reviewCardWhite}>
+                    <View style={styles.reviewCardHeader}>
+                      <View style={styles.reviewAvatarOrange}>
+                        <Text style={styles.reviewAvatarText}>{initials}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.reviewName}>{customerName}</Text>
+                        <StarRow value={value} size={12} />
+                      </View>
+                      {date ? <Text style={styles.reviewDate}>{date}</Text> : null}
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.reviewName}>{r.name}</Text>
-                      <StarRow value={r.rating} size={12} />
-                    </View>
-                    <Text style={styles.reviewDate}>{r.date}</Text>
+                    {r.comment ? <Text style={styles.reviewText}>{r.comment}</Text> : null}
                   </View>
-                  <Text style={styles.reviewText}>{r.text}</Text>
-                </View>
-              ));
-            })()}
+                );
+              })
+            )}
             {reviews.length > 0 && hasMoreReviews && (
               <Pressable
                 accessibilityRole="button"
@@ -644,37 +671,34 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
           </View>
         )}
 
-        {/* 6. SKILLS - Match Make image 1: progress cards */}
+        {/* 6. SKILLS - badge plus bar derive from real completed jobs per category. */}
         {ptab === 'skills' && (
           <View style={{ gap: 12 }}>
-            {(() => {
-              const defaultSkills = [
-                { name: 'Laptop Repair', badge: 'Expert', level: 95 },
-                { name: 'Smartphone Repair', badge: 'Advanced', level: 88 },
-                { name: 'TV / Display', badge: 'Proficient', level: 75 },
-                { name: 'Tablet Repair', badge: 'Advanced', level: 80 },
-                { name: 'Desktop / PC', badge: 'Proficient', level: 70 },
-              ];
-              const displaySkills = skills.length > 0
-                ? skills.map((s, i) => {
-                    const def = defaultSkills[i % defaultSkills.length]!;
-                    return { name: s, badge: def.badge, level: def.level };
-                  })
-                : defaultSkills;
-              return displaySkills.map((s) => (
-                <View key={s.name} style={styles.skillProgressCard}>
-                  <View style={styles.skillProgressHeader}>
-                    <Text style={styles.skillProgressName} numberOfLines={1}>{s.name}</Text>
-                    <View style={[styles.skillBadge, s.badge === 'Expert' ? styles.skillBadgeExpert : s.badge === 'Advanced' ? styles.skillBadgeAdvanced : styles.skillBadgeProficient]}>
-                      <Text style={[styles.skillBadgeText, s.badge === 'Expert' ? styles.skillBadgeTextExpert : s.badge === 'Advanced' ? styles.skillBadgeTextAdvanced : styles.skillBadgeTextProficient]}>{s.badge}</Text>
+            {skills.length > 0 ? (
+              skills.map((s) => {
+                const stat = (profile.skillStats ?? []).find((entry) => entry.name === s);
+                const { badge, level } = getSkillLevel(stat?.completedJobs);
+                const count = stat?.completedJobs ?? 0;
+                return (
+                  <View key={s} style={styles.skillProgressCard}>
+                    <View style={styles.skillProgressHeader}>
+                      <Text style={styles.skillProgressName} numberOfLines={1}>{s}</Text>
+                      <View style={[styles.skillBadge, badge === 'Expert' ? styles.skillBadgeExpert : badge === 'Advanced' ? styles.skillBadgeAdvanced : badge === 'Proficient' || badge === 'Beginner' ? styles.skillBadgeProficient : styles.skillBadgeNew]}>
+                        <Text style={[styles.skillBadgeText, badge === 'Expert' ? styles.skillBadgeTextExpert : badge === 'Advanced' ? styles.skillBadgeTextAdvanced : badge === 'Proficient' || badge === 'Beginner' ? styles.skillBadgeTextProficient : styles.skillBadgeTextNew]}>{badge}</Text>
+                      </View>
                     </View>
+                    <View style={styles.skillProgressTrack}>
+                      <View style={[styles.skillProgressFill, { width: `${level}%` }]} />
+                    </View>
+                    <Text style={styles.skillProgressCount}>{count} completed job{count === 1 ? '' : 's'}</Text>
                   </View>
-                  <View style={styles.skillProgressTrack}>
-                    <View style={[styles.skillProgressFill, { width: `${s.level}%` }]} />
-                  </View>
-                </View>
-              ));
-            })()}
+                );
+              })
+            ) : (
+              <View style={styles.emptyTabBox}>
+                <Text style={styles.emptyTabText}>No skills listed yet.</Text>
+              </View>
+            )}
           </View>
         )}
 
@@ -786,20 +810,9 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
                 ))}
               </View>
             ) : (
-              <View style={{ gap: 12 }}>
-                {[
-                  { title: 'MacBook Pro Screen Fix', desc: 'Full display assembly replacement', img: '1518770660' },
-                  { title: 'iPhone Battery Swap', desc: 'OEM battery + adhesive replaced', img: '1565849936' },
-                  { title: 'Gaming PC Rebuild', desc: 'Thermal paste, cable management', img: '1518770660' },
-                ].map((p) => (
-                  <View key={p.title} style={styles.portfolioCardWhite}>
-                    <Image source={{ uri: `https://images.unsplash.com/photo-${p.img}?w=400&h=120&fit=crop&auto=format` }} style={styles.portfolioImage} />
-                    <View style={styles.portfolioCardBody}>
-                      <Text style={styles.portfolioCardTitle}>{p.title}</Text>
-                      <Text style={styles.portfolioCardDesc}>{p.desc}</Text>
-                    </View>
-                  </View>
-                ))}
+              <View style={styles.emptyTabBox}>
+                <Text style={styles.emptyTabText}>Not yet uploaded.</Text>
+                <Text style={styles.emptyTabSub}>Completed repair photos appear here.</Text>
               </View>
             )}
           </View>
@@ -848,7 +861,7 @@ const styles = StyleSheet.create({
 
   // 1. COVER: Primary Profile Card
   coverCard: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 22, padding: 18, marginBottom: 14,
-...shadows.card },
+elevation: 0 },
   // Prototype dark identity header
   coverCardDark: { backgroundColor: colors.dark, borderRadius: 22, padding: 18, marginBottom: 14 },
   avatarTech: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.tech, alignItems: 'center', justifyContent: 'center' },
@@ -917,7 +930,7 @@ const styles = StyleSheet.create({
   infoCardValue: { color: '#111827', fontSize: 13, fontFamily: fonts.semiBold, marginTop: 1 },
 
   // 2. REPUTATION METRICS: 3-Up Telemetry Card
-  statsCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 18, paddingVertical: 14, paddingHorizontal: 8, marginBottom: 18, ...shadows.card },
+  statsCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 18, paddingVertical: 14, paddingHorizontal: 8, marginBottom: 18, elevation: 0 },
   statCol: { flex: 1, alignItems: 'center', gap: 3 },
   statIconBadge: { width: 26, height: 26, borderRadius: 8, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.lineSoft, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
   statNum: { color: colors.ink, fontSize: 17, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'], letterSpacing: -0.3 },
@@ -925,7 +938,7 @@ const styles = StyleSheet.create({
   statDivider: { width: 1, height: 36, backgroundColor: colors.lineSoft },
 
   // 3. EDIT PROFILE CARD
-  editCard: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.hudBorder, borderRadius: 22, padding: 18, marginBottom: 24, ...shadows.cardStrong },
+  editCard: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.hudBorder, borderRadius: 22, padding: 18, marginBottom: 24, elevation: 0 },
   editHeader: { marginBottom: 16, gap: 3 },
   editKicker: { color: colors.tech, fontSize: 10, letterSpacing: 1.4, fontFamily: fonts.bold },
   editTitle: { color: colors.ink, fontSize: 17, fontFamily: fonts.bold },
@@ -936,6 +949,8 @@ const styles = StyleSheet.create({
   inputContainerMulti: { minHeight: 80, alignItems: 'flex-start', paddingVertical: 10 },
   inputIcon: { marginRight: 10, flexShrink: 0 },
   inputIconMulti: { marginTop: 4 },
+  editInputIconBox: { width: 32, height: 32, borderRadius: 9, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', marginRight: 10, flexShrink: 0 },
+  editInputIconBoxMulti: { width: 32, height: 32, borderRadius: 9, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', marginRight: 10, flexShrink: 0, marginTop: 2 },
   textInput: { flex: 1, color: colors.ink, fontSize: 14, fontFamily: fonts.medium, paddingVertical: 10 },
   textInputMulti: { minHeight: 60, textAlignVertical: 'top' },
   geoRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6, paddingHorizontal: 4 },
@@ -946,7 +961,7 @@ const styles = StyleSheet.create({
   editActions: { flexDirection: 'row', gap: 10, marginTop: 16 },
   cancelButton: { flex: 1, minHeight: 48, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' },
   cancelButtonText: { color: colors.muted, fontSize: 14, fontFamily: fonts.bold },
-  saveButton: { flex: 2, minHeight: 48, borderRadius: 14, backgroundColor: colors.tech, alignItems: 'center', justifyContent: 'center', ...shadows.card },
+  saveButton: { flex: 2, minHeight: 48, borderRadius: 14, backgroundColor: colors.tech, alignItems: 'center', justifyContent: 'center', elevation: 0 },
   saveButtonText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
 
   // Shared Card Surface (About, Skills, Service Area, Schedule)
@@ -976,10 +991,13 @@ const styles = StyleSheet.create({
   skillBadgeExpert: { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
   skillBadgeAdvanced: { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' },
   skillBadgeProficient: { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' },
+  skillBadgeNew: { backgroundColor: '#F3F4F6', borderColor: '#E5E7EB' },
   skillBadgeText: { fontSize: 10, fontFamily: fonts.bold },
   skillBadgeTextExpert: { color: '#2563EB' },
   skillBadgeTextAdvanced: { color: '#059669' },
   skillBadgeTextProficient: { color: '#D97706' },
+  skillBadgeTextNew: { color: '#6B7280' },
+  skillProgressCount: { color: '#9CA3AF', fontSize: 11, fontFamily: fonts.regular, marginTop: 6 },
   skillProgressTrack: { height: 6, backgroundColor: '#F3F4F6', borderRadius: 999, overflow: 'hidden' },
   skillProgressFill: { height: 6, backgroundColor: '#2563EB', borderRadius: 999 },
   reviewCardWhite: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#F3F4F6', borderRadius: 16, padding: 14 },
@@ -989,6 +1007,9 @@ const styles = StyleSheet.create({
   reviewName: { color: '#111827', fontSize: 13, fontFamily: fonts.semiBold },
   reviewDate: { color: '#9CA3AF', fontSize: 11, fontFamily: fonts.regular, marginLeft: 'auto' },
   reviewText: { color: '#4B5563', fontSize: 13, fontFamily: fonts.regular, lineHeight: 19 },
+  emptyTabBox: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#F3F4F6', borderRadius: 16, padding: 18, alignItems: 'center', gap: 4 },
+  emptyTabText: { color: '#111827', fontSize: 13, fontFamily: fonts.semiBold, textAlign: 'center' },
+  emptyTabSub: { color: '#6B7280', fontSize: 12, fontFamily: fonts.regular, textAlign: 'center' },
   portfolioCardWhite: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#F3F4F6', borderRadius: 16, overflow: 'hidden' },
   portfolioImage: { width: '100%', height: 112, backgroundColor: '#F3F4F6' },
   portfolioCardBody: { padding: 12, gap: 2 },
@@ -1015,7 +1036,7 @@ const styles = StyleSheet.create({
   schedTime: { color: colors.muted, fontSize: 12, fontFamily: fonts.medium, flexShrink: 1 },
 
   // Bounded cards (Reviews + Portfolio)
-  boundedCard: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 20, padding: 18, marginBottom: 18, ...shadows.card },
+  boundedCard: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 20, padding: 18, marginBottom: 18, elevation: 0 },
   boundedHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14, gap: 12 },
   boundedEyebrow: { color: colors.tech, fontSize: 10, letterSpacing: 1.4, fontFamily: fonts.bold, marginBottom: 2 },
   boundedTitle: { color: colors.ink, fontSize: 17, fontFamily: fonts.bold, letterSpacing: -0.2 },
@@ -1042,7 +1063,7 @@ const styles = StyleSheet.create({
   // Portfolio (Preserved as requested)
   portfolioHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 },
   portfolioHeaderCopy: { flex: 1, minWidth: 0 },
-  addPhotosButton: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, paddingHorizontal: 14, borderRadius: 12, backgroundColor: colors.tech, ...shadows.card, flexShrink: 0 },
+  addPhotosButton: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, paddingHorizontal: 14, borderRadius: 12, backgroundColor: colors.tech, elevation: 0, flexShrink: 0 },
   addPhotosText: { color: colors.white, fontSize: 13, fontFamily: fonts.bold, letterSpacing: 0.1 },
   selectedPreview: { marginBottom: 14, gap: 10 },
   photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
@@ -1052,13 +1073,13 @@ const styles = StyleSheet.create({
   uploadAction: { marginTop: 2 },
 
   // Shared buttons
-  primaryButtonSolid: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.tech, borderRadius: 14, paddingHorizontal: 18, minHeight: 48, ...shadows.card },
+  primaryButtonSolid: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.tech, borderRadius: 14, paddingHorizontal: 18, minHeight: 48, elevation: 0 },
   primaryButtonText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
 
   // Footer: Help + Logout
   footerBreak: { marginTop: 8, gap: 12, paddingBottom: 12 },
   footerDivider: { height: 1, backgroundColor: colors.lineSoft, marginBottom: 8 },
-  helpRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 16, paddingHorizontal: 16, minHeight: 56, ...shadows.subtle },
+  helpRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 16, paddingHorizontal: 16, minHeight: 56, elevation: 0 },
   helpIconWrap: { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.techSoft, borderWidth: 1, borderColor: colors.hudBorder, alignItems: 'center', justifyContent: 'center', flexShrink: 0, minHeight: 44, minWidth: 44 },
   helpCopy: { flex: 1, minWidth: 0 },
   helpTitle: { color: colors.ink, fontSize: 13, fontFamily: fonts.bold },

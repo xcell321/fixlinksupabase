@@ -1,20 +1,104 @@
 import axios from 'axios';
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
-const devHost: string = String((Constants.expoConfig as { hostUri?: string } | undefined)?.hostUri ?? '').split(':')[0] || 'localhost';
-
-// EXPO_PUBLIC_API_URL lets the app reach a tunneled backend (e.g. cloudflared) or LAN IP.
-// Example: EXPO_PUBLIC_API_URL=https://my-backend.trycloudflare.com/api
-// When unset, fall back to the Metro dev host on the default port 5050.
+// ---------------------------------------------------------------------------
+// API URL auto-detection. No manual .env editing is needed.
+// The Metro dev server (metro.config.js) proxies /api plus /uploads to the
+// backend (port 5050), so the app calls its OWN origin:
+//
+//   Web (browser):     same origin the page loads from
+//                      (localhost:8081 or tunnel URL)
+//   Native (Expo Go):  the host that serves the JS bundle
+//                      (LAN IP or tunnel host)
+//
+// Manual override (highest priority): set EXPO_PUBLIC_API_URL in mobile/.env
+// for example EXPO_PUBLIC_API_URL=https://my-backend.example.com/api
+// ---------------------------------------------------------------------------
 const envApiUrl = process.env.EXPO_PUBLIC_API_URL;
-export const API_BASE_URL: string = envApiUrl && envApiUrl.trim() !== '' ? envApiUrl.trim() : `http://${devHost}:5050/api`;
+
+const readHostUri = (): string => {
+  const config = (Constants.expoConfig ?? {}) as {
+    hostUri?: string;
+    extra?: { hostUri?: string };
+  };
+  const manifest = (Constants as unknown as {
+    manifest?: { hostUri?: string; debuggerHost?: string };
+    manifest2?: { extra?: { expoGo?: { developer?: { host?: string } } } };
+  }).manifest;
+  const manifest2 = (Constants as unknown as {
+    manifest2?: { extra?: { expoGo?: { developer?: { projectRoot?: string; host?: string } } } };
+  }).manifest2;
+  return String(
+    config.hostUri ??
+      config.extra?.hostUri ??
+      manifest?.hostUri ??
+      manifest?.debuggerHost ??
+      manifest2?.extra?.expoGo?.developer?.host ??
+      '',
+  );
+};
+
+const stripScheme = (value: string): string => {
+  const noScheme = String(value ?? '')
+    .trim()
+    .replace(/^[a-z][a-z0-9+.-]*:\/\//i, '');
+  const noPath = String(noScheme.split('/')[0] ?? noScheme);
+  const noQuery = String(noPath.split('?')[0] ?? noPath);
+  return noQuery.trim();
+};
+
+const isTunnelHost = (host: string): boolean =>
+  /(trycloudflare\.com|cfargotunnel\.com|ngrok\.io|ngrok-free\.app|ngrok\.app|loca\.lt|serveo\.net)$/i.test(
+    String(host ?? '').trim(),
+  );
+
+const isLoopbackHost = (host: string): boolean => {
+  const normalized = String(host ?? '').trim().toLowerCase();
+  return normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '::1';
+};
+
+const resolveNativeApiUrl = (): string => {
+  const rawHostUri = stripScheme(readHostUri());
+  const [rawHost, rawPort] = rawHostUri.split(':');
+  const bundleHost = String(rawHost ?? '').trim() || 'localhost';
+  const bundlePort = String(rawPort ?? '').trim();
+
+  if (isTunnelHost(bundleHost)) {
+    return `https://${bundleHost}/api`;
+  }
+
+  if (isLoopbackHost(bundleHost)) {
+    const port = /^\d+$/.test(bundlePort) ? bundlePort : '8081';
+    if (Platform.OS === 'android') {
+      return `http://10.0.2.2:${port}/api`;
+    }
+    return `http://${bundleHost}:${port}/api`;
+  }
+
+  const port = /^\d+$/.test(bundlePort) ? bundlePort : '8081';
+  return `http://${bundleHost}:${port}/api`;
+};
+
+const resolveWebApiUrl = (): string => {
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return `${window.location.origin}/api`;
+  }
+  return resolveNativeApiUrl();
+};
+
+export const API_BASE_URL: string =
+  envApiUrl && envApiUrl.trim() !== '' ? envApiUrl.trim().replace(/\/$/, '') : Platform.OS === 'web' ? resolveWebApiUrl() : resolveNativeApiUrl();
 
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 20000,
 });
+
+export const getApiBaseUrl = (): string => API_BASE_URL;
 
 export const setAuthToken = (token: string | null): void => {
   if (token) {
@@ -26,25 +110,55 @@ export const setAuthToken = (token: string | null): void => {
 
 type Coords = { latitude?: number; longitude?: number };
 
+type PickedFile = {
+  uri?: string;
+  file?: unknown;
+  name?: string;
+  fileName?: string;
+  mimeType?: string;
+  type?: string;
+};
+
+// Builds the file value appended to FormData on every platform.
+// Native uses the { uri, name, type } shape handled by the networking layer.
+// Web needs a real File or Blob, so a blob or data URI is fetched first and
+// wrapped as a File. Without this the browser sends the text "[object Object]",
+// the backend receives no file, and register wrongly reports missing files
+// even though the user attached them.
+const buildUploadFile = async (
+  info: PickedFile,
+  fallbackName: string,
+  fallbackType: string,
+): Promise<Blob | { uri: string; name: string; type: string }> => {
+  const name = info.fileName ?? info.name ?? fallbackName;
+  const type = info.mimeType ?? info.type ?? fallbackType;
+  if (info.file instanceof Blob) {
+    return new File([info.file], name, { type });
+  }
+  if (Platform.OS === 'web' && info.uri && /^(blob:|data:)/i.test(info.uri)) {
+    const blob = await (await fetch(info.uri)).blob();
+    return new File([blob], name, { type: blob.type || type });
+  }
+  return { uri: String(info.uri ?? ''), name, type };
+};
+
 export const submitRepairRequest = async (requestData: Record<string, unknown>): Promise<unknown> => {
   try {
     const formData = new FormData();
-    Object.entries(requestData).forEach(([key, value]) => {
+    for (const [key, value] of Object.entries(requestData)) {
       if (value !== undefined && value !== null && value !== '') {
-        const v = value as { uri?: string; fileName?: string; mimeType?: string };
+        const v = value as PickedFile;
         if (key === 'photo' && v.uri) {
-          formData.append('photo', {
-            uri: v.uri,
-            name: v.fileName ?? 'repair-photo.jpg',
-            type: v.mimeType ?? 'image/jpeg',
-          } as unknown as Blob);
+          formData.append('photo', (await buildUploadFile(v, 'repair-photo.jpg', 'image/jpeg')) as unknown as Blob);
         } else {
           formData.append(key, String(value));
         }
       }
-    });
+    }
     const response = await api.post('/requests', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      // Photo uploads through a tunnel or slow mobile data need extra time.
+      timeout: 120000,
     });
     return response.data;
   } catch (error: unknown) {
@@ -60,22 +174,26 @@ export const registerUser = async (userData: Record<string, unknown>): Promise<u
     const extension = file.name?.split('.').pop()?.toLowerCase();
     return extension === 'pdf' ? 'application/pdf' : extension === 'png' ? 'image/png' : 'image/jpeg';
   };
-  Object.entries(userData).forEach(([key, value]) => {
+  for (const [key, value] of Object.entries(userData)) {
     if (value !== undefined && value !== null && value !== '') {
-      const v = value as { uri?: string; name?: string; mimeType?: string };
+      const v = value as PickedFile;
       if ((key === 'governmentIdFile' || key === 'certificateFile') && v.uri) {
-        formData.append(key, {
-          uri: v.uri,
-          name: v.name ?? 'verification-document',
-          type: getMimeType(v as { mimeType?: string; name?: string }),
-        } as unknown as Blob);
+        formData.append(
+          key,
+          (await buildUploadFile(v, 'verification-document', getMimeType(v))) as unknown as Blob,
+        );
       } else {
         formData.append(key, String(value));
       }
     }
-  });
+  }
   const response = await api.post('/auth/register', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    // Technician registration uploads two documents plus server-side storage
+    // writes, so it needs far more time than a plain JSON call, mostly when
+    // running through a tunnel. Without this the request aborts at 20s while
+    // the backend keeps working, which leaves the app spinning with no result.
+    timeout: 120000,
   });
   return response.data;
 };
@@ -190,13 +308,12 @@ export const updateCustomerProfile = async (uid: string, profile: { name?: strin
   formData.append('phone', profile.phone ?? '');
   formData.append('address', profile.address ?? '');
   if (profile.profileImage?.uri) {
-    formData.append('profileImage', {
-      uri: profile.profileImage.uri,
-      name: profile.profileImage.fileName ?? 'profile-image.jpg',
-      type: profile.profileImage.mimeType ?? 'image/jpeg',
-    } as unknown as Blob);
+    formData.append(
+      'profileImage',
+      (await buildUploadFile(profile.profileImage, 'profile-image.jpg', 'image/jpeg')) as unknown as Blob,
+    );
   }
-  return (await api.put(`/profile/${encodeURIComponent(uid)}/profile`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })).data;
+  return (await api.put(`/profile/${encodeURIComponent(uid)}/profile`, formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120000 })).data;
 };
 export const forgotPassword = async (data: unknown): Promise<unknown> => (await api.post('/auth/forgot-password', data)).data;
 export const resetPassword = async (data: unknown): Promise<unknown> => (await api.post('/auth/reset-password', data)).data;
@@ -209,14 +326,13 @@ export const askAssistant = async (message: string, context?: unknown): Promise<
 
 export const uploadPortfolioPhotos = async (uid: string, photos: Array<{ uri: string; fileName?: string; name?: string; mimeType?: string; type?: string }>): Promise<unknown> => {
   const formData = new FormData();
-  photos.forEach((photo) =>
-    formData.append('photos', {
-      uri: photo.uri,
-      name: photo.fileName ?? photo.name ?? 'portfolio-photo.jpg',
-      type: photo.mimeType ?? photo.type ?? 'image/jpeg',
-    } as unknown as Blob),
-  );
-  return (await api.post(`/users/${uid}/portfolio`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })).data;
+  for (const photo of photos) {
+    formData.append(
+      'photos',
+      (await buildUploadFile(photo, 'portfolio-photo.jpg', 'image/jpeg')) as unknown as Blob,
+    );
+  }
+  return (await api.post(`/users/${uid}/portfolio`, formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120000 })).data;
 };
 
 export default api;

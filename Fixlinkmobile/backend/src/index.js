@@ -2,6 +2,7 @@
 require('dotenv').config();
 
 const express = require('express');
+const compression = require('compression');
 const cors = require('cors');
 const path = require('path');
 
@@ -19,15 +20,31 @@ const { createRateLimiter } = require('./middleware/rateLimit');
 const app = express();
 const PORT = process.env.PORT || 5050;
 
+// Trust Cloudflare Tunnel and other proxies so req.protocol and req.ip reflect
+// the real client instead of 127.0.0.1. This keeps rate limiting fair and lets
+// email links use the correct https scheme when behind a tunnel.
+app.set('trust proxy', 1);
+
 // Middleware
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Gzip shrinks JSON feeds several-fold. Matters most on tunnel links and
+// mobile data when many users poll at once.
+app.use(compression());
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 
-// Rate limiters — blocks excess requests instantly, before touching the database
+// Health check. Open /api/health in a browser to verify the backend is
+// reachable through localhost, LAN, or a tunnel. No authentication needed.
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'ok', time: new Date().toISOString() });
+});
+
+// Rate limiters — blocks excess requests instantly, before touching the database.
+// Budget sized for shared-IP crowds: 10 phones on one WiFi poll about
+// 300-400 req/min combined, so the cap sits safely above that.
 const globalLimiter = createRateLimiter({
   windowMs: 60000,
-  max: 300,
+  max: 1000,
   message: 'Too many requests from this IP, please try again later.',
 });
 
@@ -53,7 +70,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/maps', mapsRoutes);
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
     try {
         const { getLocalIp } = require('./utils/network');

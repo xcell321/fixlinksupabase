@@ -39,7 +39,7 @@ async function createTransporter() {
   });
 }
 
-const sendPasswordResetEmail = async (to, link, requestHost) => {
+const sendPasswordResetEmail = async (to, link, requestHost, forwardedProto, forwardedHost) => {
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
     throw new Error('Email credentials not configured.');
   }
@@ -50,7 +50,10 @@ const sendPasswordResetEmail = async (to, link, requestHost) => {
   // forwards the token into the app. The deep link is still shown as plain
   // text for users who cannot open it directly.
   const resolvedLink = link || '';
-  const baseUrl = getPublicBaseUrl(requestHost);
+  const baseUrl = getPublicBaseUrl(requestHost, forwardedProto, forwardedHost);
+  try {
+    console.log(`[reset-email] landing host=${new URL(baseUrl).host} (auto-detected from request, no .env edit needed)`);
+  } catch (_) {}
   const landingUrl = new URL('/reset-password', baseUrl);
   if (resolvedLink.startsWith('fixlink://')) {
     const query = resolvedLink.replace('fixlink://recovery?', '');

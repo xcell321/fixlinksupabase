@@ -390,7 +390,10 @@ router.get('/', async (req, res) => {
       .from('jobs')
       .select('*')
       .eq('status', 'Pending')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      // Cap the scan. The feed only shows jobs inside 20 km, so the newest
+      // 200 pending rows bound per-request work under many-user load.
+      .limit(200);
 
     const requests = [];
     const pendingSnapshot = rows || [];
@@ -646,7 +649,13 @@ router.get('/messages/inbox', async (req, res) => {
       };
     });
 
-    res.json(inbox.filter(item => item !== null));
+    // Most recent conversation first. Empty threads sink to the bottom so
+    // active chats like James Robert stay on top while older ones follow.
+    const inboxSorted = inbox
+      .filter(item => item !== null)
+      .sort((a, b) => String(b.lastMessage?.timestamp || '').localeCompare(String(a.lastMessage?.timestamp || '')));
+
+    res.json(inboxSorted);
   } catch (error) {
     console.error('Error loading inbox:', error);
     res.status(500).json({ error: 'Unable to load inbox.' });
@@ -1374,7 +1383,7 @@ router.get('/completed/:customerName', async (req, res) => {
       .eq('customer_uid', requestedUid)
       .eq('customer_name', req.params.customerName)
       .eq('status', 'Completed')
-      .is('review_id', null);
+      .order('completed_at', { ascending: false });
     res.json((rows || []).map(serializeJob));
   } catch (error) {
     console.error('Error loading completed jobs:', error);

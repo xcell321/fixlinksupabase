@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { confirmRepairRequest, fetchTechnicianProfile, markCustomerReady } from '../services/api';
 import { PhotoLightbox } from '../../components/RequestPhoto';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import { colors, fonts } from '../../theme';
 import { getStatusColor } from '../../utils/applianceIcons';
 
@@ -35,6 +36,8 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
   const [techProfile, setTechProfile] = useState(null);
   const [workflowLoading, setWorkflowLoading] = useState(null);
   const [photoViewerVisible, setPhotoViewerVisible] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
+  const [workflowError, setWorkflowError] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -85,38 +88,48 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
   const techInitial = String(request.technicianName || 'T').charAt(0).toUpperCase();
   const techPhone = techProfile?.phone ? String(techProfile.phone) : null;
 
+  const runPendingAction = async () => {
+    if (!pendingAction || workflowLoading) return;
+    setWorkflowLoading(pendingAction.key);
+    try {
+      await pendingAction.run();
+      setWorkflowError(null);
+      setPendingAction(null);
+    } catch (error) {
+      setWorkflowError(error?.error || 'Please try again.');
+    } finally {
+      setWorkflowLoading(null);
+    }
+  };
+
   const handleConfirmRepair = () => {
-    Alert.alert('Confirm repair?', 'This confirms you need the repair and will be at the service location.', [
-      { text: 'Not yet', style: 'cancel' },
-      { text: 'Confirm', onPress: async () => {
-        setWorkflowLoading('confirm');
-        try {
-          await confirmRepairRequest(request.id);
-          onBack?.();
-        } catch (error) {
-          Alert.alert('Unable to confirm', error?.error || 'Please try again.');
-        } finally {
-          setWorkflowLoading(null);
-        }
-      } },
-    ]);
+    setWorkflowError(null);
+    setPendingAction({
+      key: 'confirm',
+      title: 'Confirm repair?',
+      message: 'This confirms you need the repair and will be at the service location.',
+      confirmLabel: 'Confirm',
+      cancelLabel: 'Not yet',
+      run: async () => {
+        await confirmRepairRequest(request.id);
+        onBack?.();
+      },
+    });
   };
 
   const handleMarkReady = () => {
-    Alert.alert('Mark ready?', 'Confirm that someone will be at the service location to meet the technician.', [
-      { text: 'Not yet', style: 'cancel' },
-      { text: 'Ready', onPress: async () => {
-        setWorkflowLoading('ready');
-        try {
-          await markCustomerReady(request.id);
-          onBack?.();
-        } catch (error) {
-          Alert.alert('Unable to mark ready', error?.error || 'Please try again.');
-        } finally {
-          setWorkflowLoading(null);
-        }
-      } },
-    ]);
+    setWorkflowError(null);
+    setPendingAction({
+      key: 'ready',
+      title: 'Mark ready?',
+      message: 'Confirm that someone will be at the service location to meet the technician.',
+      confirmLabel: 'Ready',
+      cancelLabel: 'Not yet',
+      run: async () => {
+        await markCustomerReady(request.id);
+        onBack?.();
+      },
+    });
   };
 
   const handleCall = async () => {
@@ -270,6 +283,11 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
         )}
 
         {/* Workflow actions */}
+        {workflowError ? (
+          <View style={styles.workflowErrorBox} accessibilityRole="alert">
+            <Text style={styles.workflowErrorText}>{workflowError}</Text>
+          </View>
+        ) : null}
         {isAccepted && (
           <TouchableOpacity style={styles.primaryBtn} onPress={handleConfirmRepair} disabled={workflowLoading === 'confirm'} activeOpacity={0.88}>
             {workflowLoading === 'confirm' ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryBtnText}>Confirm Repair</Text>}
@@ -316,6 +334,16 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
         subtitle="Attached to this request"
         onClose={() => setPhotoViewerVisible(false)}
       />
+      <ConfirmDialog
+        visible={pendingAction !== null}
+        title={pendingAction?.title ?? ''}
+        message={pendingAction?.message ?? ''}
+        confirmLabel={pendingAction?.confirmLabel ?? 'Confirm'}
+        cancelLabel={pendingAction?.cancelLabel ?? 'Cancel'}
+        busy={workflowLoading !== null}
+        onCancel={() => { if (!workflowLoading) setPendingAction(null); }}
+        onConfirm={runPendingAction}
+      />
     </SafeAreaView>
   );
 }
@@ -327,6 +355,8 @@ const styles = StyleSheet.create({
   backTitle: { color: '#111827', fontSize: 15, fontFamily: fonts.semiBold },
   scrollContent: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 28, gap: 16 },
   card: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#F3F4F6' },
+  workflowErrorBox: { backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', borderRadius: 12, padding: 12, marginBottom: 12 },
+  workflowErrorText: { color: '#B91C1C', fontSize: 12, fontFamily: fonts.semiBold, lineHeight: 17 },
   cardTitle: { color: '#111827', fontSize: 14, fontFamily: fonts.bold, marginBottom: 16 },
   deviceRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12, gap: 10 },
   deviceCopy: { flex: 1, minWidth: 0 },
