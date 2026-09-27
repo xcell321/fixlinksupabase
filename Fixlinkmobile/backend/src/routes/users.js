@@ -12,10 +12,26 @@ const portfolioUpload = multer({
   fileFilter: (req, file, callback) => callback(null, ['image/jpeg', 'image/png'].includes(file.mimetype))
 });
 
+// Short-lived memory cache for admin-managed platform data.
+const platformCache = {
+  categories: { at: 0, data: null },
+  announcements: { at: 0, data: null },
+};
+
 router.get('/platform/categories', async (req, res) => {
   try {
+    // Admin-managed catalog barely changes. 60s memory cache shields the
+    // database when many users open register or submit at once.
+    const now = Date.now();
+    if (platformCache.categories.data && now - platformCache.categories.at < 60000) {
+      return res.json(platformCache.categories.data);
+    }
     const { data } = await supabase.from('categories').select('*').order('name', { ascending: true });
-    res.json((data || []).map((doc) => ({ id: doc.id, name: doc.name, devices: doc.devices || [] })));
+    platformCache.categories = {
+      at: now,
+      data: (data || []).map((doc) => ({ id: doc.id, name: doc.name, devices: doc.devices || [] })),
+    };
+    res.json(platformCache.categories.data);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -23,12 +39,20 @@ router.get('/platform/categories', async (req, res) => {
 
 router.get('/platform/announcements', async (req, res) => {
   try {
+    const now = Date.now();
+    if (platformCache.announcements.data && now - platformCache.announcements.at < 60000) {
+      return res.json(platformCache.announcements.data);
+    }
     const { data } = await supabase
       .from('announcements')
       .select('*')
       .order('created_at', { ascending: false })
       .limit(5);
-    res.json((data || []).map((doc) => ({ id: doc.id, ...doc, createdAt: doc.created_at ? new Date(doc.created_at).toISOString() : null })));
+    platformCache.announcements = {
+      at: now,
+      data: (data || []).map((doc) => ({ id: doc.id, ...doc, createdAt: doc.created_at ? new Date(doc.created_at).toISOString() : null })),
+    };
+    res.json(platformCache.announcements.data);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -40,9 +64,28 @@ router.get('/:id/profile', async (req, res) => {
     if (!profile || profile.role !== 'technician') return res.status(404).json({ error: 'Technician profile not found' });
 
     const [jobsResult, reviewsResult] = await Promise.all([
-      supabase.from('jobs').select('id, status').eq('technician_uid', req.params.id),
+      supabase.from('jobs').select('id, status, category, appliance_type').eq('technician_uid', req.params.id),
       supabase.from('reviews').select('*').eq('technician_uid', req.params.id)
     ]);
+
+    const completedJobs = (jobsResult.data || []).filter((job) => String(job.status).toLowerCase() === 'completed');
+
+    // Per-skill experience derived from real completed jobs. A skill name
+    // matches a job when the normalized category equals the skill or either
+    // side contains the other, mirroring the matching algorithm. No levels
+    // stored. Counts computed live so bars grow as technicians finish work.
+    const normalize = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const techSkills = Array.isArray(profile.skills) ? profile.skills.map((s) => String(s).trim()).filter(Boolean) : [];
+    const skillStats = techSkills.map((skill) => {
+      const skillKey = normalize(skill);
+      const count = completedJobs.filter((job) => {
+        const categoryKey = normalize(job.category);
+        const applianceKey = normalize(job.appliance_type);
+        return (categoryKey && (categoryKey === skillKey || categoryKey.includes(skillKey) || skillKey.includes(categoryKey)))
+          || (applianceKey && skillKey && (applianceKey.includes(skillKey) || skillKey.includes(applianceKey)));
+      }).length;
+      return { name: skill, completedJobs: count };
+    });
 
     let reviews = reviewsResult.data || [];
     if (reviews.length === 0 && profile.name) {
@@ -59,10 +102,11 @@ router.get('/:id/profile', async (req, res) => {
       ...serializeUser(profile),
       uid: req.params.id,
       verified: profile.status === 'active' || profile.verification_status === 'verified',
-      completedJobs: (jobsResult.data || []).filter((job) => String(job.status).toLowerCase() === 'completed').length,
+      completedJobs: completedJobs.length,
       averageRating,
       totalReviews,
-      reviews: reviews.map((review) => ({ rating: review.rating || 0, comment: review.comment || review.text || '', createdAt: review.created_at ? new Date(review.created_at).toISOString() : null })),
+      skillStats,
+      reviews: reviews.map((review) => ({ rating: review.rating || 0, comment: review.comment || review.text || '', createdAt: review.created_at ? new Date(review.created_at).toISOString() : null, customerName: review.customer_name || null })),
     });
   } catch (error) {
     res.status(500).json({ error: error.message });

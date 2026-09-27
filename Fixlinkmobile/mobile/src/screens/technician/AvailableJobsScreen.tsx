@@ -28,6 +28,7 @@ import {
   updateTechnicianLocation,
   verifyCompletionCode
 } from '../services/api';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import { colors, fonts, shadows } from '../../theme';
 import { getApplianceIcon, getStatusColor, getStatusIcon } from '../../utils/applianceIcons';
 import {
@@ -96,8 +97,13 @@ export default function AvailableJobsScreen({
   const [fetchError, setFetchError] = useState<boolean>(cached?.fetchError ?? false);
   const [lastSyncAt, setLastSyncAt] = useState<Date | null>(cached?.lastSyncAt ?? null);
   const [acceptingJobId, setAcceptingJobId] = useState<string | null>(null);
+  const [confirmJob, setConfirmJob] = useState<JobItem | null>(null);
+  const [dismissJob, setDismissJob] = useState<JobItem | null>(null);
+  const [dismissing, setDismissing] = useState<boolean>(false);
+  const [acceptError, setAcceptError] = useState<string | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const loadJobsRef = useRef<boolean>(false);
 
   // Operational states
   const [isOnline, setIsOnline] = useState<boolean>(true);
@@ -184,6 +190,10 @@ export default function AvailableJobsScreen({
   };
 
   const loadJobs = async (opts: { background?: boolean } = {}): Promise<void> => {
+    // Skip overlapping ticks. Slow tunnel responses must never stack sockets,
+    // which also quiets MaxListeners warnings under many-user load.
+    if (loadJobsRef.current) return;
+    loadJobsRef.current = true;
     const isBackground = opts.background ?? false;
     if (!isBackground && !(technician?.uid ? jobsCache.has(technician.uid) : false)) {
       setLoading(true);
@@ -220,11 +230,16 @@ export default function AvailableJobsScreen({
     } finally {
       setLoading(false);
       setRefreshing(false);
+      loadJobsRef.current = false;
     }
   };
 
   useEffect(() => {
     loadJobs({ background: technician?.uid ? jobsCache.has(technician.uid) : false });
+    // Silent 8s refresh. New customer requests appear without manual reload
+    // on tunnel links, LAN, and data. Background mode skips spinners.
+    const interval = setInterval(() => loadJobs({ background: true }), 8000);
+    return () => clearInterval(interval);
   }, [technician?.uid]);
 
   const handleRefresh = (): void => {
@@ -234,99 +249,89 @@ export default function AvailableJobsScreen({
 
   const handleAcceptJob = (job: JobItem): void => {
     if (!technician?.uid) {
-      Alert.alert('Authentication required', 'Please sign in with a verified technician account.');
+      setAcceptError('Please sign in with a verified technician account.');
       return;
     }
     if (acceptingJobId) return;
 
     if (workloadStatus === 'at_capacity') {
-      Alert.alert(
-        'At Capacity',
-        'You currently have 6 active jobs. Please complete an ongoing repair before accepting more requests.'
-      );
+      setAcceptError('You currently have 6 active jobs. Please complete an ongoing repair before accepting more requests.');
       return;
     }
 
-    Alert.alert(
-      'Accept this repair request?',
-      `${job.applianceType || 'Repair request'}\nLocation: ${job.location || 'Local Catchment'}\n\nThe customer will be notified immediately and live GPS navigation will be unlocked.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
+    // In-app confirm modal. Alert buttons do not fire reliably on web,
+    // which left taps doing nothing with no message shown.
+    setAcceptError(null);
+    setConfirmJob(job);
+  };
+
+  const doAcceptJob = async (): Promise<void> => {
+    const job = confirmJob;
+    if (!job || !technician?.uid || acceptingJobId) return;
+    setConfirmJob(null);
+    setAcceptingJobId(job.id);
+    try {
+      const response = (await acceptRepairRequest(
+        job.id,
+        technician.uid,
+        technician.name || 'Technician'
+      )) as { jobId?: string; message?: string };
+
+      const acceptedJobId = response?.jobId || job.id;
+
+      setJobs((currentJobs) => currentJobs.filter((currentJob) => currentJob.id !== job.id));
+      setAcceptedJobs((currentJobs) => [
         {
-          text: 'Accept Job',
-          onPress: async () => {
-            setAcceptingJobId(job.id);
-            try {
-              const response = (await acceptRepairRequest(
-                job.id,
-                technician.uid,
-                technician.name || 'Technician'
-              )) as { jobId?: string; message?: string };
-
-              const acceptedJobId = response?.jobId || job.id;
-
-              setJobs((currentJobs) => currentJobs.filter((currentJob) => currentJob.id !== job.id));
-              setAcceptedJobs((currentJobs) => [
-                {
-                  ...job,
-                  id: acceptedJobId,
-                  status: 'Accepted',
-                  technicianUid: technician.uid,
-                  technicianName: technician.name
-                },
-                ...currentJobs
-              ]);
-              setSelectedJobForDetails(null);
-              setFeedTab('active');
-              Alert.alert(
-                'Job Accepted',
-                'Customer details and live route are now available in your active jobs.'
-              );
-              loadJobs({ background: true });
-            } catch (error) {
-              const err = error as { code?: string; message?: string; error?: string };
-              if (err?.code === 'TECHNICIAN_AT_CAPACITY') {
-                Alert.alert('You are At Capacity', err?.message || 'Complete an active job to accept new work.');
-              } else {
-                Alert.alert(
-                  'Unable to accept job',
-                  err?.error || err?.message || 'This job may already have been claimed by another technician.'
-                );
-              }
-            } finally {
-              setAcceptingJobId(null);
-            }
-          }
-        }
-      ]
-    );
+          ...job,
+          id: acceptedJobId,
+          status: 'Accepted',
+          technicianUid: technician.uid,
+          technicianName: technician.name
+        },
+        ...currentJobs
+      ]);
+      setSelectedJobForDetails(null);
+      setFeedTab('active');
+      setAcceptError(null);
+      loadJobs({ background: true });
+    } catch (error) {
+      const err = error as { code?: string; message?: string; error?: string };
+      if (err?.code === 'TECHNICIAN_AT_CAPACITY') {
+        setAcceptError(err?.message || 'Complete an active job to accept new work.');
+      } else {
+        setAcceptError(
+          err?.error || err?.message || 'This job may already have been claimed by another technician.'
+        );
+      }
+    } finally {
+      setAcceptingJobId(null);
+    }
   };
 
   const handleDeclineJob = (job: JobItem): void => {
     if (!technician?.uid) return;
-    Alert.alert(
-      'Dismiss this request?',
-      `${job.applianceType || 'Repair request'}\n${job.location ? `Location: ${job.location}` : ''}\n\nThis will remove the lead from your visible queue.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Dismiss',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await declineRepairRequest(job.id, technician.uid);
-              setJobs((currentJobs) => currentJobs.filter((currentJob) => currentJob.id !== job.id));
-              if (selectedJobForDetails?.id === job.id) {
-                setSelectedJobForDetails(null);
-              }
-            } catch (error) {
-              const err = error as { error?: string; message?: string };
-              Alert.alert('Error', err?.error || err?.message || 'Failed to dismiss job.');
-            }
-          }
-        }
-      ]
-    );
+    setAcceptError(null);
+    setDismissJob(job);
+  };
+
+  const doDismissJob = async (): Promise<void> => {
+    const job = dismissJob;
+    if (!job || !technician?.uid || dismissing) return;
+    setDismissJob(null);
+    setDismissing(true);
+    try {
+      await declineRepairRequest(job.id, technician.uid);
+      setJobs((currentJobs) => currentJobs.filter((currentJob) => currentJob.id !== job.id));
+      if (selectedJobForDetails?.id === job.id) {
+        setSelectedJobForDetails(null);
+      }
+      setAcceptError(null);
+    } catch (error) {
+      const err = error as { error?: string; message?: string };
+      setAcceptError(err?.error || err?.message || 'Failed to dismiss job.');
+    } finally {
+      setDismissing(false);
+    }
   };
 
   const handleArrival = async (job: JobItem): Promise<void> => {
@@ -389,43 +394,40 @@ export default function AvailableJobsScreen({
     }
   };
 
+  const [noShowJob, setNoShowJob] = useState<JobItem | null>(null);
+
   const handleNoShow = (job: JobItem): void => {
     if (!technician?.uid) return;
-    Alert.alert(
-      'Report customer no-show?',
-      'This records that the customer or appliance was not accessible at the specified service address.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Confirm Report',
-          style: 'destructive',
-          onPress: async () => {
-            setActionLoadingId(job.id);
-            try {
-              await reportNoShow(job.id, technician.uid, 'No one available at service location');
-              setAcceptedJobs((currentJobs) => currentJobs.filter((j) => j.id !== job.id));
-              Alert.alert('No-show reported', 'Customer status updated.');
-              loadJobs();
-            } catch (error) {
-              const err = error as {
-                response?: { data?: { error?: string; message?: string } };
-                error?: string;
-                message?: string;
-              };
-              const errorMessage =
-                err?.response?.data?.error ||
-                err?.response?.data?.message ||
-                err?.error ||
-                err?.message ||
-                'Please try again.';
-              Alert.alert('Error', errorMessage);
-            } finally {
-              setActionLoadingId(null);
-            }
-          }
-        }
-      ]
-    );
+    setAcceptError(null);
+    setNoShowJob(job);
+  };
+
+  const doNoShow = async (): Promise<void> => {
+    const job = noShowJob;
+    if (!job || !technician?.uid || actionLoadingId) return;
+    setNoShowJob(null);
+    setActionLoadingId(job.id);
+    try {
+      await reportNoShow(job.id, technician.uid, 'No one available at service location');
+      setAcceptedJobs((currentJobs) => currentJobs.filter((j) => j.id !== job.id));
+      setAcceptError(null);
+      loadJobs();
+    } catch (error) {
+      const err = error as {
+        response?: { data?: { error?: string; message?: string } };
+        error?: string;
+        message?: string;
+      };
+      setAcceptError(
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        err?.error ||
+        err?.message ||
+        'Please try again.'
+      );
+    } finally {
+      setActionLoadingId(null);
+    }
   };
 
   const openOtpModal = (job: JobItem): void => {
@@ -644,6 +646,13 @@ export default function AvailableJobsScreen({
           </View>
         ) : null}
 
+        {acceptError ? (
+          <View style={styles.acceptErrorBox} accessibilityRole="alert">
+            <Ionicons name="alert-circle-outline" size={16} color={colors.danger} />
+            <Text style={styles.acceptErrorText}>{acceptError}</Text>
+          </View>
+        ) : null}
+
         {/* Active Jobs Feed Content */}
         {feedTab === 'active' && (
           <View style={styles.feedListContainer}>
@@ -798,7 +807,6 @@ export default function AvailableJobsScreen({
                     {/* Action Bar */}
                     <View style={styles.cardActionRow}>
                       {isArrivalEligible && (
-                        <View style={styles.actionGroup}>
                           <Pressable
                             style={styles.primaryBtn}
                             onPress={() => handleArrival(job)}
@@ -820,15 +828,6 @@ export default function AvailableJobsScreen({
                               </>
                             )}
                           </Pressable>
-                          <Pressable
-                            style={styles.dangerOutlineBtn}
-                            onPress={() => handleNoShow(job)}
-                            accessibilityRole="button"
-                            accessibilityLabel="Report customer no-show"
-                          >
-                            <Text style={styles.dangerOutlineText}>No-Show</Text>
-                          </Pressable>
-                        </View>
                       )}
 
                       {isStartRepairEligible && (
@@ -872,6 +871,26 @@ export default function AvailableJobsScreen({
                         </Pressable>
                       )}
 
+                    </View>
+
+                    {/* Utility row: no-show plus view/map/chat, even icon spacing */}
+                    <View style={styles.utilityRow}>
+                      <View style={styles.utilityIcons}>
+                      {isArrivalEligible && (
+                        <Pressable
+                          style={styles.dangerOutlineBtn}
+                          onPress={() => handleNoShow(job)}
+                          disabled={actionLoadingId === job.id}
+                          accessibilityRole="button"
+                          accessibilityLabel="Report customer no-show"
+                        >
+                          {actionLoadingId === job.id ? (
+                            <ActivityIndicator color={colors.danger} size="small" />
+                          ) : (
+                            <Ionicons name="person-remove-outline" size={20} color={colors.danger} />
+                          )}
+                        </Pressable>
+                      )}
                       {/* Detail Launcher */}
                       <Pressable
                         style={styles.iconCompanion}
@@ -905,6 +924,7 @@ export default function AvailableJobsScreen({
                           <Ionicons name="chatbubble-ellipses-outline" size={20} color={colors.techDark} />
                         </Pressable>
                       )}
+                      </View>
                     </View>
                   </View>
                 );
@@ -1148,6 +1168,32 @@ export default function AvailableJobsScreen({
         </View>
       </Modal>
 
+      {/* No-show confirm modal. Works on web plus native. */}
+      <ConfirmDialog
+        visible={noShowJob !== null}
+        title="Report customer no-show?"
+        message="This records that the customer or appliance was not accessible at the specified service address."
+        confirmLabel="Confirm Report"
+        danger
+        busy={actionLoadingId !== null}
+        accentColor={colors.tech}
+        onCancel={() => { if (!actionLoadingId) setNoShowJob(null); }}
+        onConfirm={doNoShow}
+      />
+
+      {/* Dismiss confirm modal. Works on web plus native. */}
+      <ConfirmDialog
+        visible={dismissJob !== null}
+        title="Dismiss this request?"
+        message={`${dismissJob?.applianceType || 'Repair request'}${dismissJob?.location ? `\nLocation: ${dismissJob.location}` : ''}\n\nThis will remove the lead from your visible queue.`}
+        confirmLabel="Dismiss"
+        danger
+        busy={dismissing}
+        accentColor={colors.tech}
+        onCancel={() => { if (!dismissing) setDismissJob(null); }}
+        onConfirm={doDismissJob}
+      />
+
       {/* Customer Repair Photo Lightbox */}
       <PhotoLightbox
         visible={previewUrl !== null}
@@ -1156,6 +1202,48 @@ export default function AvailableJobsScreen({
         subtitle="Captured by customer upon request submission"
         onClose={() => setPreviewUrl(null)}
       />
+
+      {/* Accept confirm modal. Works on web plus native. */}
+      <Modal visible={confirmJob !== null} transparent animationType="fade" onRequestClose={() => setConfirmJob(null)}>
+        <View style={styles.confirmBackdrop}>
+          <View style={styles.confirmCard}>
+            <Text style={styles.confirmTitle}>Accept this repair request?</Text>
+            <Text style={styles.confirmCopy} numberOfLines={2}>
+              {confirmJob?.applianceType || 'Repair request'}
+            </Text>
+            <Text style={styles.confirmSub} numberOfLines={1}>
+              Location: {confirmJob?.location || 'Local Catchment'}
+            </Text>
+            <Text style={styles.confirmNote}>
+              The customer is notified immediately and live GPS navigation unlocks.
+            </Text>
+            <View style={styles.confirmActions}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Cancel accept"
+                onPress={() => setConfirmJob(null)}
+                disabled={acceptingJobId !== null}
+                style={({ pressed }) => [styles.confirmCancel, pressed && styles.pressedSoft]}
+              >
+                <Text style={styles.confirmCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Confirm accept job"
+                onPress={doAcceptJob}
+                disabled={acceptingJobId !== null}
+                style={({ pressed }) => [styles.primaryBtn, styles.confirmAccept, pressed && styles.pressedSoft]}
+              >
+                {acceptingJobId !== null ? (
+                  <ActivityIndicator color={colors.white} size="small" />
+                ) : (
+                  <Text style={styles.primaryBtnText}>Accept Job</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -1668,7 +1756,17 @@ alignSelf: 'center' },
     gap: 8,
     flexWrap: 'wrap'
   },
-  actionGroup: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
+  utilityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: colors.lineSoft
+  },
+  utilityIcons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 
   primaryBtn: {
     flex: 1,
@@ -1823,6 +1921,18 @@ alignSelf: 'center' },
   },
   offlineBannerText: { flex: 1, fontSize: 11, fontFamily: fonts.medium, color: colors.muted },
   offlineRetryText: { fontSize: 12, fontFamily: fonts.bold, color: colors.tech },
+  acceptErrorBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12, marginBottom: 12 },
+  acceptErrorText: { flex: 1, fontSize: 12, fontFamily: fonts.semiBold, color: '#B91C1C', lineHeight: 17 },
+  confirmBackdrop: { flex: 1, backgroundColor: 'rgba(13,27,42,0.5)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  confirmCard: { width: '100%', maxWidth: 360, backgroundColor: colors.white, borderRadius: 18, padding: 20 },
+  confirmTitle: { fontSize: 16, fontFamily: fonts.bold, color: colors.ink },
+  confirmCopy: { fontSize: 14, fontFamily: fonts.semiBold, color: colors.ink, marginTop: 8 },
+  confirmSub: { fontSize: 13, fontFamily: fonts.regular, color: colors.muted, marginTop: 4 },
+  confirmNote: { fontSize: 12, fontFamily: fonts.regular, color: colors.muted, marginTop: 10, lineHeight: 17 },
+  confirmActions: { flexDirection: 'row', gap: 10, marginTop: 16 },
+  confirmCancel: { flex: 1, minHeight: 48, borderRadius: 12, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' },
+  confirmCancelText: { fontSize: 14, fontFamily: fonts.bold, color: colors.muted },
+  confirmAccept: { flex: 2, marginTop: 0 },
 
   modalOverlay: {
     flex: 1,

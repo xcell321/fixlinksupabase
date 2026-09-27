@@ -1,6 +1,6 @@
 // @ts-nocheck - migrated from .js, preserve working state; types to be refined incrementally
 import React, { useState, useEffect, useRef } from "react";
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, ScrollView, Modal, FlatList, ActivityIndicator, Image } from "react-native";
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, ScrollView, Modal, FlatList, ActivityIndicator, Image, Platform } from "react-native";
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
@@ -35,6 +35,52 @@ const TIME_SLOTS = [
   'Afternoon (1PM-5PM)',
   'Evening (5PM-8PM)'
 ];
+
+// Web fallback for the native date/time picker, which renders nothing on
+// browsers. Uses the browser date/time inputs through the same pick handler.
+const WebDateTimeInput = ({ mode, date, onPick }: { mode: string; date: Date; onPick: (picked: Date | undefined) => void }) => {
+  if (Platform.OS !== 'web') return null;
+  const pad = (n: number): string => String(n).padStart(2, '0');
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+  const value = mode === 'date'
+    ? `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+    : `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return React.createElement('input', {
+    type: mode === 'date' ? 'date' : 'time',
+    value,
+    min: mode === 'date' ? todayStr : undefined,
+    onChange: (event: any) => {
+      const raw = String(event?.target?.value || '');
+      if (!raw) return;
+      if (mode === 'date') {
+        const parts = raw.split('-').map(Number);
+        if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return;
+        onPick(new Date(parts[0], parts[1] - 1, parts[2], date.getHours(), date.getMinutes()));
+      } else {
+        const parts = raw.split(':').map(Number);
+        if (parts.length < 2 || parts.some((n) => !Number.isFinite(n))) return;
+        const picked = new Date(date);
+        picked.setHours(parts[0], parts[1], 0, 0);
+        onPick(picked);
+      }
+    },
+    style: {
+      width: '100%',
+      minHeight: 48,
+      fontSize: 14,
+      paddingLeft: 14,
+      paddingRight: 14,
+      borderWidth: 1,
+      borderStyle: 'solid',
+      borderColor: '#E5E7EB',
+      borderRadius: 14,
+      backgroundColor: '#F9FAFB',
+      color: '#102A43',
+      marginTop: 8,
+    },
+  }) as unknown as React.JSX.Element;
+};
 
 const STEPS = [
   { key: 'appliance', label: 'Appliance', title: 'Select Device Type', subtitle: 'What needs fixing?' },
@@ -77,6 +123,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
   const [photo, setPhoto] = useState(null);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoViewerVisible, setPhotoViewerVisible] = useState(false);
+  const [photoMenuVisible, setPhotoMenuVisible] = useState(false);
   const scrollRef = useRef(null);
 
   const composedLocation = [street.trim(), city.trim(), zipCode.trim()].filter(Boolean).join(', ');
@@ -109,61 +156,60 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
   };
 
   const handleLocate = async () => {
+    if (locating) return;
     setLocating(true);
     setLocateAccuracy(null);
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') {
-      setLocating(false);
-      Alert.alert('Permission Denied', 'Permission to access location was denied');
-      return;
-    }
-    let watcher = null;
+    // Every external call raced with a timeout. An unanswered permission
+    // prompt or a hanging geocode service must never stick the spinner on.
+    const withTimeout = (promise, ms, label) => {
+      let timer;
+      return Promise.race([
+        promise,
+        new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(label)), ms); }),
+      ]).finally(() => clearTimeout(timer));
+    };
     try {
-      // Multi-fix collection for ~99% accuracy: a single GPS shot is often a
-      // stale/cached fix (hundreds of meters off). Collect fixes for up to 12s
-      // with Highest accuracy and keep the most accurate one (lowest meters).
-      let best = null;
-      let finished = false;
-      watcher = await Location.watchPositionAsync(
-        { accuracy: Location.Accuracy.Highest, timeInterval: 1000, distanceInterval: 0 },
-        (pos) => {
-          const acc = pos.coords.accuracy ?? 9999;
-          if (!best || acc < (best.coords.accuracy ?? 9999)) {
-            best = pos;
-            setCoords({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
-            setLocateAccuracy(acc);
-          }
-          if (acc <= 20) finished = true;
-        }
-      );
-      const start = Date.now();
-      while (!finished && Date.now() - start < 12000) {
-        await new Promise((r) => setTimeout(r, 500));
+      let permission;
+      try {
+        permission = await withTimeout(Location.requestForegroundPermissionsAsync(), 10000, 'Location permission timed out.');
+      } catch {
+        permission = { status: 'denied' };
       }
-      if (!best) {
-        Alert.alert('No GPS fix', 'Could not get your location. Go outside and try again.');
+      if (permission.status !== 'granted') {
+        Alert.alert('Permission Denied', 'Permission to access location was denied');
         return;
       }
-      const bestAcc = best.coords.accuracy ?? 9999;
-      const lat = best.coords.latitude;
-      const lon = best.coords.longitude;
+      // Single balanced fix with a hard timeout. The old 12s watcher loop
+      // plus unguarded reverse-geocode could hang forever on slow links.
+      const pos = await withTimeout(
+        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+        15000,
+        'Location request timed out. Try again outside or type the address manually.'
+      );
+      const acc = pos.coords.accuracy ?? 9999;
+      const lat = pos.coords.latitude;
+      const lon = pos.coords.longitude;
       setCoords({ latitude: lat, longitude: lon });
-      setLocateAccuracy(bestAcc);
+      setLocateAccuracy(acc);
       if (stepErrors.location) setStepErrors((p) => { const n = { ...p }; delete n.location; return n; });
-      const geocode = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lon });
       let resolvedStreet = '';
       let resolvedCity = '';
       let resolvedZip = '';
-      if (geocode && geocode.length > 0) {
-        const a = geocode[0];
-        // Use fresh reverseGeocode only - do not geocode the string "Gairan" again
-        resolvedStreet = a.street || a.name || '';
-        resolvedCity = a.city || a.subregion || '';
-        resolvedZip = a.postalCode || '';
-        if (resolvedStreet) setStreet(resolvedStreet);
-        if (resolvedCity) setCity(resolvedCity);
-        if (resolvedZip) setZipCode(resolvedZip);
-        else if (a.postalCode === null && a.region) setZipCode('');
+      try {
+        const geocode = await withTimeout(Location.reverseGeocodeAsync({ latitude: lat, longitude: lon }), 8000, 'Reverse geocode timed out.');
+        if (geocode && geocode.length > 0) {
+          const a = geocode[0];
+          // Use fresh reverseGeocode only - do not geocode the string "Gairan" again
+          resolvedStreet = a.street || a.name || '';
+          resolvedCity = a.city || a.subregion || '';
+          resolvedZip = a.postalCode || '';
+          if (resolvedStreet) setStreet(resolvedStreet);
+          if (resolvedCity) setCity(resolvedCity);
+          if (resolvedZip) setZipCode(resolvedZip);
+          else if (a.postalCode === null && a.region) setZipCode('');
+        }
+      } catch {
+        // Coords kept. User types street/city manually.
       }
       // Indoor snap: weak GPS (>30m, typical inside a house) gets snapped to the
       // rooftop of the resolved street address via API-only forward geocode.
@@ -172,7 +218,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
       let finalLat = lat;
       let finalLon = lon;
       const fullAddr = [resolvedStreet, resolvedCity, resolvedZip].filter(Boolean).join(', ');
-      if (bestAcc > 30 && fullAddr.length > 5) {
+      if (acc > 30 && fullAddr.length > 5) {
         try {
           const snap = await geocodeAddressPrecise(fullAddr);
           if (snap && Number.isFinite(snap.latitude) && Number.isFinite(snap.longitude)) {
@@ -187,7 +233,6 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
     } catch (e: any) {
       Alert.alert('Error', e?.message || 'Failed to fetch location details.');
     } finally {
-      try { watcher && watcher.remove(); } catch {}
       setLocating(false);
     }
   };
@@ -271,11 +316,17 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
 
   const handlePhotoAction = () => {
     if (photoBusy) return;
-    Alert.alert('Add a photo', 'Show the technician what needs fixing.', [
-      { text: 'Take photo', onPress: takePhoto },
-      { text: 'Choose from gallery', onPress: pickFromLibrary },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    setPhotoMenuVisible(true);
+  };
+
+  const handleTakePhoto = async () => {
+    setPhotoMenuVisible(false);
+    await takePhoto();
+  };
+
+  const handlePickFromLibrary = async () => {
+    setPhotoMenuVisible(false);
+    await pickFromLibrary();
   };
 
   const handleDateValue = (selectedDate) => {
@@ -757,15 +808,19 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
           <Text style={styles.helperText}>The technician confirms the exact arrival window after accepting.</Text>
 
           {showDatePicker && (
-            <DateTimePicker
-              value={date}
-              mode={mode}
-              minimumDate={mode === 'date' ? new Date() : undefined}
-              display="default"
-              onValueChange={(_event, selectedDate) => handleDateValue(selectedDate)}
-              onDismiss={handleDateDismiss}
-              onNeutralButtonPress={handleDateDismiss}
-            />
+            Platform.OS === 'web' ? (
+              <WebDateTimeInput mode={mode} date={date} onPick={handleDateValue} />
+            ) : (
+              <DateTimePicker
+                value={date}
+                mode={mode}
+                minimumDate={mode === 'date' ? new Date() : undefined}
+                display="default"
+                onValueChange={(_event, selectedDate) => handleDateValue(selectedDate)}
+                onDismiss={handleDateDismiss}
+                onNeutralButtonPress={handleDateDismiss}
+              />
+            )
           )}
         </View>
       );
@@ -1068,6 +1123,26 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
         subtitle="Preview before submitting"
         onClose={() => setPhotoViewerVisible(false)}
       />
+
+      <Modal visible={photoMenuVisible} transparent animationType="fade" onRequestClose={() => setPhotoMenuVisible(false)}>
+        <View style={styles.photoMenuBackdrop}>
+          <View style={styles.photoMenuCard}>
+            <Text style={styles.photoMenuTitle}>Add a photo</Text>
+            <Text style={styles.photoMenuSub}>Show the technician what needs fixing.</Text>
+            <TouchableOpacity style={styles.photoMenuButton} onPress={handleTakePhoto} accessibilityRole="button" accessibilityLabel="Take photo">
+              <Ionicons name="camera-outline" size={18} color={colors.customer} />
+              <Text style={styles.photoMenuButtonText}>Take photo</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.photoMenuButton} onPress={handlePickFromLibrary} accessibilityRole="button" accessibilityLabel="Choose from gallery">
+              <Ionicons name="image-outline" size={18} color={colors.customer} />
+              <Text style={styles.photoMenuButtonText}>Choose from gallery</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.photoMenuCancel} onPress={() => setPhotoMenuVisible(false)} accessibilityRole="button" accessibilityLabel="Cancel photo picker">
+              <Text style={styles.photoMenuCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
       </View>
     </ScrollView>
   );
@@ -1175,6 +1250,14 @@ const styles = StyleSheet.create({
   photoSecondaryText: { fontSize: 12, fontFamily: fonts.semiBold, color: colors.customer },
   photoBadge: { marginLeft: 8, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, backgroundColor: colors.customerSoft, borderWidth: 1, borderColor: colors.hudBorder },
   photoBadgeText: { fontSize: 11, fontFamily: fonts.semiBold, color: colors.customer, letterSpacing: 0.2 },
+  photoMenuBackdrop: { flex: 1, backgroundColor: 'rgba(13,27,42,0.5)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  photoMenuCard: { width: '100%', maxWidth: 340, backgroundColor: colors.white, borderRadius: 18, padding: 20 },
+  photoMenuTitle: { fontSize: 16, fontFamily: fonts.bold, color: colors.ink },
+  photoMenuSub: { fontSize: 13, fontFamily: fonts.regular, color: colors.muted, marginTop: 4, marginBottom: 14 },
+  photoMenuButton: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.line, marginBottom: 10, minHeight: 52 },
+  photoMenuButtonText: { fontSize: 14, fontFamily: fonts.semiBold, color: colors.ink },
+  photoMenuCancel: { alignItems: 'center', paddingVertical: 12, minHeight: 44 },
+  photoMenuCancelText: { fontSize: 14, fontFamily: fonts.semiBold, color: colors.muted },
   
   selectInput: { height: 52, backgroundColor: colors.surfaceSunken, borderWidth: 1, borderColor: colors.line, borderRadius: 14, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   selectInputText: { fontSize: 13, fontFamily: fonts.medium, color: colors.ink, flex: 1 },

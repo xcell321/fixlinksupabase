@@ -12,6 +12,7 @@
     "@expo/vector-icons": "^14.0.0",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/datetimepicker": "9.1.0",
+    "@supabase/supabase-js": "^2.117.2",
     "axios": "^1.20.0",
     "expo": "~57.0.19",
     "expo-clipboard": "~57.0.2",
@@ -33,6 +34,7 @@
   "devDependencies": {
     "@babel/core": "^7.25.0",
     "@types/react": "~19.2.4",
+    "http-proxy-middleware": "^4.2.0",
     "typescript": "~6.0.3"
   },
   "private": true

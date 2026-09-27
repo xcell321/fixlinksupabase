@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View, Alert, ScrollView, Pressable, TextInput, ActivityIndicator, RefreshControl, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Skeleton from '../../components/Skeleton';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import { cancelRepairRequest, confirmRepairRequest, fetchCompletedJobs, fetchCustomerRequests, fetchTechnicianRecommendations, markCustomerReady, submitTechnicianReview } from '../services/api';
 import { colors, fonts, shadows } from '../../theme';
 import { getApplianceIcon, getStatusColor, getStatusGuidance, getStatusIcon } from '../../utils/applianceIcons';
@@ -33,6 +34,7 @@ interface CompletedJob {
   technicianName?: string;
   completedAt?: string;
   createdAt?: string;
+  reviewId?: string | null;
 }
 
 interface TechRecommendation {
@@ -115,8 +117,40 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
   const [recommendationsRefresh, setRecommendationsRefresh] = useState<{ run?: number }>({});
   const [recStates, setRecStates] = useState<Record<string, RecState>>({});
   const recommendationsFetched = useRef<Record<string, boolean>>({});
+  const fetchBusyRef = useRef<boolean>(false);
+
+  interface PendingAction {
+    title: string;
+    message: string;
+    confirmLabel: string;
+    cancelLabel?: string;
+    danger?: boolean;
+    run: () => Promise<void>;
+  }
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+  const [actionBusy, setActionBusy] = useState<boolean>(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const runPendingAction = async (): Promise<void> => {
+    if (!pendingAction || actionBusy) return;
+    setActionBusy(true);
+    try {
+      await pendingAction.run();
+      setActionError(null);
+      setPendingAction(null);
+    } catch (error) {
+      setActionError((error as { error?: string; message?: string })?.error
+        || (error as Error)?.message
+        || 'The request could not be completed. Please try again.');
+    } finally {
+      setActionBusy(false);
+    }
+  };
 
   const fetchAll = (): Promise<void> => {
+    // Skip overlapping ticks so slow responses never stack sockets.
+    if (fetchBusyRef.current) return Promise.resolve();
+    fetchBusyRef.current = true;
     let failed = false;
     return Promise.all([
       fetchCompletedJobs(customerName, customerUid)
@@ -125,7 +159,7 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
       fetchCustomerRequests(customerName, customerUid)
         .then((data) => setTrackedRequests(Array.isArray(data) ? (data as ServiceRequest[]) : []))
         .catch(() => { failed = true; setTrackedRequests([]); }),
-    ]).then(() => { setFetchError(failed); });
+    ]).then(() => { setFetchError(failed); }).finally(() => { fetchBusyRef.current = false; });
   };
 
   useEffect(() => {
@@ -159,7 +193,8 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
     let active = true;
     const refreshStatuses = () => fetchAll().finally(() => { if (active) setLoadingRequests(false); });
     refreshStatuses();
-    const interval = setInterval(refreshStatuses, 45000);
+    // 12s silent refresh. Status changes land without manual reload.
+    const interval = setInterval(refreshStatuses, 12000);
     return () => { active = false; clearInterval(interval); };
   }, [customerName, customerUid]);
 
@@ -188,19 +223,20 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
   const pendingIds = pendingRequests.map((r) => r.id).join(',');
 
   const handleCancelRequest = (requestId: string): void => {
-    Alert.alert('Cancel request?', 'This can only be done before a technician accepts the request.', [
-      { text: 'Keep request', style: 'cancel' },
-      { text: 'Cancel request', style: 'destructive', onPress: async () => {
-        try {
-          // Reason intentionally empty: backend stores null, identical to the previous call.
-          await cancelRepairRequest(requestId, '');
-          fetchAll();
-          setTrackedRequests((current) => current.map((request) => request.id === requestId ? { ...request, status: 'Cancelled' } : request));
-        } catch (error) {
-          Alert.alert('Unable to cancel', (error as { error?: string })?.error || 'The request could not be cancelled.');
-        }
-      } },
-    ]);
+    setActionError(null);
+    setPendingAction({
+      title: 'Cancel request?',
+      message: 'This can only be done before a technician accepts the request.',
+      confirmLabel: 'Cancel request',
+      cancelLabel: 'Keep request',
+      danger: true,
+      run: async () => {
+        // Reason intentionally empty: backend stores null, identical to the previous call.
+        await cancelRepairRequest(requestId, '');
+        fetchAll();
+        setTrackedRequests((current) => current.map((request) => request.id === requestId ? { ...request, status: 'Cancelled' } : request));
+      },
+    });
   };
 
   const handleReviewSubmit = async (jobId: string): Promise<void> => {
@@ -279,49 +315,50 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
   };
 
   const confirmRepair = (req: ServiceRequest): void => {
-    Alert.alert('Confirm repair?', 'This confirms you need the repair and will be at the service location.', [
-      { text: 'Not yet', style: 'cancel' },
-      { text: 'Confirm', onPress: async () => {
-        try {
-          await confirmRepairRequest(req.id);
-          fetchAll();
-          setTrackedRequests((prev) => prev.map((r) => r.id === req.id ? { ...r, status: 'Confirmed' } : r));
-        } catch (error) {
-          Alert.alert('Unable to confirm', (error as { error?: string })?.error || 'Please try again.');
-        }
-      } },
-    ]);
+    setActionError(null);
+    setPendingAction({
+      title: 'Confirm repair?',
+      message: 'This confirms you need the repair and will be at the service location.',
+      confirmLabel: 'Confirm',
+      cancelLabel: 'Not yet',
+      run: async () => {
+        await confirmRepairRequest(req.id);
+        fetchAll();
+        setTrackedRequests((prev) => prev.map((r) => r.id === req.id ? { ...r, status: 'Confirmed' } : r));
+      },
+    });
   };
 
   const markReady = (req: ServiceRequest): void => {
-    Alert.alert('Mark ready?', 'Confirm that someone will be at the service location to meet the technician.', [
-      { text: 'Not yet', style: 'cancel' },
-      { text: 'Ready', onPress: async () => {
-        try {
-          await markCustomerReady(req.id);
-          fetchAll();
-          setTrackedRequests((prev) => prev.map((r) => r.id === req.id ? { ...r, status: 'Customer Ready' } : r));
-        } catch (error) {
-          Alert.alert('Unable to mark ready', (error as { error?: string })?.error || 'Please try again.');
-        }
-      } },
-    ]);
+    setActionError(null);
+    setPendingAction({
+      title: 'Mark ready?',
+      message: 'Confirm that someone will be at the service location to meet the technician.',
+      confirmLabel: 'Ready',
+      cancelLabel: 'Not yet',
+      run: async () => {
+        await markCustomerReady(req.id);
+        fetchAll();
+        setTrackedRequests((prev) => prev.map((r) => r.id === req.id ? { ...r, status: 'Customer Ready' } : r));
+      },
+    });
   };
 
   const cancelWithMessage = (req: ServiceRequest, message: string): void => {
-    Alert.alert('Cancel request?', message, [
-      { text: 'Keep request', style: 'cancel' },
-      { text: 'Cancel request', style: 'destructive', onPress: async () => {
-        try {
-          // Reason intentionally empty: backend stores null, identical to the previous call.
-          await cancelRepairRequest(req.id, '');
-          fetchAll();
-          setTrackedRequests((current) => current.map((request) => request.id === req.id ? { ...request, status: 'Cancelled' } : request));
-        } catch (error) {
-          Alert.alert('Unable to cancel', (error as { error?: string })?.error || 'The request could not be cancelled.');
-        }
-      } },
-    ]);
+    setActionError(null);
+    setPendingAction({
+      title: 'Cancel request?',
+      message,
+      confirmLabel: 'Cancel request',
+      cancelLabel: 'Keep request',
+      danger: true,
+      run: async () => {
+        // Reason intentionally empty: backend stores null, identical to the previous call.
+        await cancelRepairRequest(req.id, '');
+        fetchAll();
+        setTrackedRequests((current) => current.map((request) => request.id === req.id ? { ...request, status: 'Cancelled' } : request));
+      },
+    });
   };
 
   const STATUS_PROGRESS: Record<string, number> = { pending: 10, accepted: 25, confirmed: 40, 'customer ready': 60, 'in progress': 80 };
@@ -577,6 +614,7 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
 
   const renderCompletedCard = (job: CompletedJob): React.JSX.Element => {
     const isFocused = focusedJobId && String(focusedJobId) === String(job.id);
+    const reviewed = Boolean(job.reviewId);
     return (
       <View key={job.id} style={[styles.refCard, isFocused && styles.cardFocused]}>
         <View style={styles.refHeaderRow}>
@@ -593,14 +631,18 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
             <Ionicons name="calendar-outline" size={12} color="#9CA3AF" accessible={false} />
             <Text style={styles.refFooterText} numberOfLines={1}>{formatCardDate(job.completedAt || job.createdAt)}</Text>
           </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Rate ${job.applianceType ?? 'this job'}`}
-            onPress={() => { if (onRate) onRate(job); }}
-            style={({ pressed }) => [pressed && { opacity: 0.8 }]}
-          >
-            <Text style={styles.refRateLink}>Rate</Text>
-          </Pressable>
+          {reviewed ? (
+            <Text style={styles.refReviewedText}>Reviewed</Text>
+          ) : (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Rate ${job.applianceType ?? 'this job'}`}
+              onPress={() => { if (onRate) onRate(job); }}
+              style={({ pressed }) => [pressed && { opacity: 0.8 }]}
+            >
+              <Text style={styles.refRateLink}>Rate</Text>
+            </Pressable>
+          )}
         </View>
       </View>
     );
@@ -675,6 +717,11 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
       </View>
 
       <View style={styles.protoBody}>
+      {actionError ? (
+        <View style={styles.actionErrorBox} accessibilityRole="alert">
+          <Text style={styles.actionErrorText}>{actionError}</Text>
+        </View>
+      ) : null}
       {loadingRequests ? (
         renderSkeleton()
       ) : fetchError && trackedRequests.length === 0 && completedJobs.length === 0 ? (
@@ -721,6 +768,17 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
       )}
       </View>
       </View>
+      <ConfirmDialog
+        visible={pendingAction !== null}
+        title={pendingAction?.title ?? ''}
+        message={pendingAction?.message ?? ''}
+        confirmLabel={pendingAction?.confirmLabel ?? 'Confirm'}
+        cancelLabel={pendingAction?.cancelLabel ?? 'Cancel'}
+        danger={pendingAction?.danger ?? false}
+        busy={actionBusy}
+        onCancel={() => { if (!actionBusy) setPendingAction(null); }}
+        onConfirm={runPendingAction}
+      />
     </ScrollView>
   );
 }
@@ -786,6 +844,7 @@ const styles = StyleSheet.create({
   refDonePill: { backgroundColor: '#D1FAE5', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
   refDonePillText: { color: '#047857', fontSize: 10, fontFamily: fonts.bold },
   refRateLink: { color: colors.customer, fontSize: 12, fontFamily: fonts.semiBold },
+  refReviewedText: { color: colors.muted, fontSize: 12, fontFamily: fonts.semiBold },
   cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 12 },
   iconChip: { width: 44, height: 44, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   iconChipAmber: { backgroundColor: '#FFF8E7' },
@@ -892,6 +951,8 @@ const styles = StyleSheet.create({
   terminalSection: { marginTop: 8 },
   terminalHeader: { marginTop: 12, backgroundColor: colors.white, borderRadius: 16, padding: 12, borderWidth: 1, borderColor: colors.line },
   errorCard: { backgroundColor: colors.white, borderRadius: 20, padding: 32, alignItems: 'center', borderWidth: 1, borderColor: colors.line, gap: 10, ...shadows.card },
+  actionErrorBox: { backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', borderRadius: 12, padding: 12, marginBottom: 12 },
+  actionErrorText: { color: '#B91C1C', fontSize: 12, fontFamily: fonts.semiBold, lineHeight: 17 },
   retryButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.customer, borderRadius: 14, paddingHorizontal: 22, minHeight: 48, marginTop: 6, ...shadows.card },
   retryButtonText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
 

@@ -105,6 +105,30 @@ export function formatSkillList(skills?: string[] | string | null): string[] {
     .filter(Boolean);
 }
 
+export function formatMonthYear(dateStr?: string | null): string | null {
+  if (!dateStr) return null;
+  const time = new Date(dateStr).getTime();
+  if (Number.isNaN(time)) return null;
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
+export type SkillBadge = 'New' | 'Beginner' | 'Proficient' | 'Advanced' | 'Expert';
+
+// Skill level derives ONLY from real completed jobs in that category.
+// Thresholds documented here so bars grow honestly as technicians finish work:
+// 0 jobs New (5%), 1-2 Beginner (25%), 3-5 Proficient (50%),
+// 6-10 Advanced (75%), 11+ Expert (100%).
+export function getSkillLevel(completedJobs: number | null | undefined): { badge: SkillBadge; level: number } {
+  const count = typeof completedJobs === 'number' && Number.isFinite(completedJobs) && completedJobs > 0
+    ? Math.floor(completedJobs)
+    : 0;
+  if (count >= 11) return { badge: 'Expert', level: 100 };
+  if (count >= 6) return { badge: 'Advanced', level: 75 };
+  if (count >= 3) return { badge: 'Proficient', level: 50 };
+  if (count >= 1) return { badge: 'Beginner', level: 25 };
+  return { badge: 'New', level: 5 };
+}
+
 export function draftFromProfile(profile: TechnicianProfileData): TechnicianDraft {
   const rawSkills = profile.skills;
   const skillsText = Array.isArray(rawSkills)

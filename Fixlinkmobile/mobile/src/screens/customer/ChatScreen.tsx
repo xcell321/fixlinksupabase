@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import {
+  Animated,
   StyleSheet,
   Text,
   View,
@@ -18,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import Skeleton from '../../components/Skeleton';
 import { fetchJobMessages, fetchMessageInbox, markJobMessagesRead, sendJobMessage } from '../services/api';
+import { subscribeTyping, setTyping, type TypingPeer } from '../../utils/typingPresence';
 import { colors, fonts } from '../../theme';
 import { getStatusColor, getStatusIcon } from '../../utils/applianceIcons';
 import type { ChatMessage, Conversation } from '../../types/message';
@@ -155,8 +157,14 @@ ChatScreenProps): React.JSX.Element {
   const [sendError, setSendError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<FilterKey>('all');
+  const [typingPeers, setTypingPeers] = useState<TypingPeer[]>([]);
   const chatScrollRef = useRef<ScrollView | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTrackAt = useRef<number>(0);
+  const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inboxBusyRef = useRef<boolean>(false);
+  const threadBusyRef = useRef<boolean>(false);
+  const dotAnim = useRef(new Animated.Value(0)).current;
 
   const showToast = useCallback((message: string): void => {
     setToast(message);
@@ -164,9 +172,14 @@ ChatScreenProps): React.JSX.Element {
     toastTimer.current = setTimeout(() => setToast(null), 2200);
   }, []);
 
-  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
+  useEffect(() => () => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    if (idleTimer.current) clearTimeout(idleTimer.current);
+  }, []);
 
   const loadInbox = useCallback(async (isFirst = false): Promise<void> => {
+    if (inboxBusyRef.current) return;
+    inboxBusyRef.current = true;
     try {
       if (isFirst) setLoading(true);
       setInboxError(null);
@@ -177,6 +190,7 @@ ChatScreenProps): React.JSX.Element {
       setInboxError('Could not load conversations. Check your connection and retry.');
     } finally {
       setLoading(false);
+      inboxBusyRef.current = false;
     }
   }, [currentUser?.uid, currentUser?.role]);
 
@@ -217,6 +231,8 @@ ChatScreenProps): React.JSX.Element {
     const cached = messagesByConv[jobId];
     const hasCache = Array.isArray(cached) && cached.length > 0;
     const loadMessages = async (silent = false): Promise<void> => {
+      if (threadBusyRef.current) return;
+      threadBusyRef.current = true;
       try {
         if (!silent && !hasCache) setThreadLoading(true);
         const fetched = await fetchJobMessages(jobId);
@@ -230,11 +246,14 @@ ChatScreenProps): React.JSX.Element {
         console.warn('Error loading job messages:', error);
       } finally {
         if (isMounted) setThreadLoading(false);
+        threadBusyRef.current = false;
       }
     };
 
     loadMessages(false);
-    const intervalId = setInterval(() => loadMessages(true), 15000);
+    // 5s poll keeps new messages arriving fast on tunnel links without a
+    // realtime messages subscription. Cheap at capstone scale.
+    const intervalId = setInterval(() => loadMessages(true), 5000);
     return () => {
       isMounted = false;
       clearInterval(intervalId);
@@ -245,6 +264,52 @@ ChatScreenProps): React.JSX.Element {
     onActiveConversationChange?.(selectedConversation?.jobId ?? null);
     return () => onActiveConversationChange?.(null);
   }, [selectedConversation?.jobId, onActiveConversationChange]);
+
+  useEffect(() => {
+    const jobId = selectedConversation?.jobId;
+    if (!jobId || !currentUser?.uid) return undefined;
+    setTypingPeers([]);
+    const me = { uid: String(currentUser.uid), name: currentUser.name || 'Peer' };
+    const unsubscribe = subscribeTyping(jobId, me, setTypingPeers);
+    return () => {
+      unsubscribe();
+      setTypingPeers([]);
+      void setTyping(jobId, me, false);
+    };
+  }, [selectedConversation?.jobId, currentUser?.uid, currentUser?.name]);
+
+  // Typing dots pulse while a peer types.
+  useEffect(() => {
+    if (typingPeers.length === 0) return undefined;
+    dotAnim.setValue(0);
+    const loop = Animated.loop(
+      Animated.timing(dotAnim, { toValue: 1, duration: 900, useNativeDriver: true }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [typingPeers.length, dotAnim]);
+
+  const handleInputChange = useCallback((text: string): void => {
+    setInputText(text);
+    const jobId = selectedConversation?.jobId;
+    if (!jobId || !currentUser?.uid) return;
+    const me = { uid: String(currentUser.uid), name: currentUser.name || 'Peer' };
+    if (idleTimer.current) clearTimeout(idleTimer.current);
+    if (!text.trim()) {
+      void setTyping(jobId, me, false);
+      return;
+    }
+    const now = Date.now();
+    if (now - lastTrackAt.current > 2500) {
+      lastTrackAt.current = now;
+      void setTyping(jobId, me, true);
+    }
+    // Idle 3.5s clears my flag so the peer never sees a stuck indicator.
+    idleTimer.current = setTimeout(() => {
+      const currentJob = selectedConversation?.jobId;
+      if (currentJob) void setTyping(currentJob, me, false);
+    }, 3500);
+  }, [selectedConversation?.jobId, currentUser?.uid, currentUser?.name]);
 
   const currentMessages: ChatMessage[] = selectedConversation
     ? (messagesByConv[selectedConversation.jobId] ?? [])
@@ -273,6 +338,7 @@ ChatScreenProps): React.JSX.Element {
     if (!text || !jobId || sending) return;
     setSending(true);
     setSendError(null);
+    void setTyping(jobId, { uid: String(currentUser.uid), name: currentUser.name || 'Peer' }, false);
     const optimistic: ChatMessage = {
       id: `local-${Date.now()}`,
       jobId,
@@ -357,6 +423,11 @@ ChatScreenProps): React.JSX.Element {
     : statusFilter === 'completed' ? completedConversations
     : statusFilter === 'unread' ? unreadConversations
     : conversations;
+  // Most recent first, matching backend order. Guards cached lists so the
+  // newest chat stays on top even before a fresh inbox fetch lands.
+  const sortedConversations = [...visibleConversations].sort((a, b) =>
+    String(b.lastMessage?.timestamp || '').localeCompare(String(a.lastMessage?.timestamp || '')),
+  );
 
   const emptyCopy: Record<FilterKey, { title: string; body: string }> = {
     all: { title: 'No conversations yet', body: isTechnician ? 'When you accept a service request, you can coordinate directly with the customer here.' : 'Once a technician accepts your repair request, you can message them here to coordinate scheduling.' },
@@ -531,6 +602,33 @@ ChatScreenProps): React.JSX.Element {
             </View>
           ) : null}
 
+          {/* Typing indicator: peer names plus pulsing dots */}
+          {typingPeers.length > 0 ? (
+            <View style={styles.typingRow}>
+              <View style={styles.typingBubble}>
+                <Text style={styles.typingText} numberOfLines={1}>
+                  {typingPeers.map((p) => p.name).join(', ')} {typingPeers.length === 1 ? 'is' : 'are'} typing
+                </Text>
+                <View style={styles.typingDots}>
+                  {[0, 1, 2].map((i) => (
+                    <Animated.View
+                      key={i}
+                      style={[
+                        styles.typingDot,
+                        {
+                          opacity: dotAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [0.25 + (i % 3) * 0.15, 1 - (i % 3) * 0.15],
+                          }),
+                        },
+                      ]}
+                    />
+                  ))}
+                </View>
+              </View>
+            </View>
+          ) : null}
+
           {/* Prototype composer: input + send only */}
           <View style={[styles.composerBar, { paddingBottom: Math.max(8, insets.bottom > 0 ? insets.bottom : 10) }]}>
             <View style={styles.composerInputWrap}>
@@ -539,7 +637,7 @@ ChatScreenProps): React.JSX.Element {
                 placeholder={isTechnician ? 'Message the customer...' : 'Message the technician...'}
                 placeholderTextColor="#8AA0B5"
                 value={inputText}
-                onChangeText={setInputText}
+                onChangeText={handleInputChange}
                 multiline
                 maxLength={1000}
                 returnKeyType="send"
@@ -628,7 +726,7 @@ ChatScreenProps): React.JSX.Element {
         </View>
       ) : (
         <FlatList
-          data={conversations}
+          data={sortedConversations}
           keyExtractor={(item) => String(item.jobId)}
           renderItem={({ item }) => (
             <ConversationRow item={item} currentUid={currentUser?.uid} accent={accent} onOpen={() => handleOpenConversation(item)} />
@@ -949,6 +1047,21 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.line,
   },
+  typingRow: { paddingHorizontal: 14, paddingTop: 6, backgroundColor: colors.white },
+  typingBubble: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    maxWidth: '80%',
+  },
+  typingText: { fontSize: 12, fontFamily: fonts.medium, color: colors.muted, flexShrink: 1 },
+  typingDots: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  typingDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.muted },
   composerPlus: {
     width: 44,
     height: 44,

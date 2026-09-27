@@ -28,14 +28,33 @@ function getLocalIp() {
 
 /**
  * Resolve the publicly reachable base URL for email links.
- * Priority: requestHost (from phone's Host header) > PUBLIC_BASE_URL env (for prod https) > auto-detected LAN IP > localhost.
+ * Priority: original tunnel or LAN host > PUBLIC_BASE_URL env (for prod https) > auto-detected LAN IP.
+ * The Metro proxy forwards the original public host in X-Forwarded-Host, while
+ * Host becomes 127.0.0.1 after proxying. The forwarded host always wins so the
+ * email link never points at a proxy-internal address.
+ * Loopback hosts always use http because the backend serves plain http locally.
+ * No host is hardcoded. Tunnel and LAN hosts are detected from the request at runtime.
  */
-function getPublicBaseUrl(requestHost) {
-  if (requestHost) {
-    const host = String(requestHost).trim();
-    if (host) return `http://${host}`;
-  }
+function getPublicBaseUrl(requestHost, forwardedProto, forwardedHost) {
   const envUrl = String(process.env.PUBLIC_BASE_URL || '').trim();
+  const rawForwarded = String(forwardedHost || '').trim().split(',')[0].trim().replace(/\/$/, '');
+  const rawHost = String(requestHost || '').trim().replace(/\/$/, '');
+  const host = (rawForwarded || rawHost).replace(/^https?:\/\//i, '');
+  if (host) {
+    const bare = host.split(':')[0].trim().toLowerCase();
+    const isLoopback = bare === 'localhost' || bare === '127.0.0.1' || bare === '[::1]' || bare === '::1';
+    if (isLoopback) {
+      if (envUrl) return envUrl.replace(/\/$/, '');
+      const port = process.env.PORT || 5050;
+      return `http://${getLocalIp()}:${port}`;
+    }
+    const proto = String(forwardedProto || '').trim().toLowerCase().split(',')[0].trim();
+    const isHttpsProto = proto === 'https';
+    const isTunnelHost = /(trycloudflare\.com|cfargotunnel\.com|ngrok\.io|ngrok-free\.app|ngrok\.app|loca\.lt|serveo\.net)$/i.test(bare);
+    const scheme = isHttpsProto || isTunnelHost ? 'https' : 'http';
+    if (envUrl) return envUrl.replace(/\/$/, '');
+    return `${scheme}://${host}`;
+  }
   if (envUrl) return envUrl.replace(/\/$/, '');
   const port = process.env.PORT || 5050;
   return `http://${getLocalIp()}:${port}`;

@@ -1,5 +1,5 @@
 // Prototype TechMap: dark Nearby Jobs header, live map with pay pins, job list.
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
@@ -22,8 +22,11 @@ export default function TechMapScreen({ technician, onOpenJob }: TechMapScreenPr
   const [techCoords, setTechCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const loadBusyRef = useRef(false);
 
   const load = useCallback(async () => {
+    if (loadBusyRef.current) return;
+    loadBusyRef.current = true;
     try {
       let coords: { latitude: number; longitude: number } | undefined;
       try {
@@ -41,10 +44,16 @@ export default function TechMapScreen({ technician, onOpenJob }: TechMapScreenPr
     } finally {
       setLoading(false);
       setRefreshing(false);
+      loadBusyRef.current = false;
     }
   }, [technician?.uid]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    // Silent 10s refresh so new nearby jobs pin without manual reload.
+    const interval = setInterval(() => load(), 10000);
+    return () => clearInterval(interval);
+  }, [load]);
 
   const pins = jobs
     .filter((j) => Number.isFinite(Number(j.latitude)) && Number.isFinite(Number(j.longitude)))

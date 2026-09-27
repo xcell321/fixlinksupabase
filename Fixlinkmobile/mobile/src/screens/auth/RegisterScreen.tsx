@@ -3,20 +3,22 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, ActivityIndicator, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
-import { fetchPlatformCategories, registerUser, setAuthToken } from '../services/api';
+import { fetchPlatformCategories, registerUser } from '../services/api';
 import { colors, fonts } from '../../theme';
 
 // Reference Register layout for both roles: dark rounded header, uppercase
 // labels, gray-50 inputs, full-width accent button.
 // Backend-mandated extras kept for technicians only: credentials uploads
 // (government ID + certificate files are required by the API).
-export default function RegisterScreen({ switchToLogin, initialRole = 'customer', onTechnicianPending }) {
+export default function RegisterScreen({ switchToLogin, initialRole = 'customer', onTechnicianPending, onRegistered }) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
+  const [serviceArea, setServiceArea] = useState('');
   const [skills, setSkills] = useState('');
   const [yearsExperience, setYearsExperience] = useState('');
   const [governmentIdNumber, setGovernmentIdNumber] = useState('');
@@ -26,6 +28,8 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
   const [loading, setLoading] = useState(false);
   const [categoryOptions, setCategoryOptions] = useState([]);
   const [fieldErrors, setFieldErrors] = useState({}); // Record<string,string>
+  const [successMessage, setSuccessMessage] = useState(null);
+  const [submitError, setSubmitError] = useState(null);
 
   useEffect(() => {
     fetchPlatformCategories().then(setCategoryOptions).catch(() => setCategoryOptions([]));
@@ -36,6 +40,23 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
   const accentSoft = isTechRole ? colors.techSoft : colors.customerSoft;
 
   const clearFieldError = (key) => setFieldErrors((prev) => { if (!prev[key]) return prev; const next = { ...prev }; delete next[key]; return next; });
+
+  // Philippine mobile numbers are exactly 11 digits starting with 09.
+  // Accepts +63/63 prefix and spaces/dashes, normalizes before checking.
+  const validatePhone = (raw) => {
+    const input = String(raw ?? '').trim();
+    if (!input) return 'Phone number is required';
+    let digits = input.replace(/\D/g, '');
+    if (input.startsWith('+')) {
+      if (digits.startsWith('63')) digits = `0${digits.slice(2)}`;
+    } else if (digits.startsWith('63') && digits.length === 12) {
+      digits = `0${digits.slice(2)}`;
+    }
+    if (digits.length < 11) return 'Phone number is incomplete. Enter 11 digits.';
+    if (digits.length > 11) return 'Phone number must be 11 digits only.';
+    if (!/^09\d{9}$/.test(digits)) return 'Enter a valid 11-digit mobile number (09XX XXX XXXX).';
+    return null;
+  };
 
   const toggleSkill = (categoryName) => {
     const skillList = skills.split(',').map((s) => s.trim()).filter((s) => s !== '');
@@ -52,11 +73,15 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
     const nextErrors = {};
     if (!fullName) nextErrors.name = 'Please enter your name';
     if (!email.trim()) nextErrors.email = 'Email is required';
-    if (!phone.trim()) nextErrors.phone = 'Phone number is required';
+    const phoneError = validatePhone(phone);
+    if (phoneError) nextErrors.phone = phoneError;
+    if (role === 'customer' && !address.trim()) nextErrors.address = 'Address is required';
     if (!password) nextErrors.password = 'Password is required';
+    else if (password.length < 6) nextErrors.password = 'Password must be at least 6 characters';
     if (!confirmPassword) nextErrors.confirmPassword = 'Please confirm your password';
     else if (password !== confirmPassword) nextErrors.confirmPassword = 'Passwords do not match';
     if (role === 'technician') {
+      if (!serviceArea.trim()) nextErrors.serviceArea = 'Service area is required';
       if (!skills.trim()) nextErrors.skills = 'Select at least one expertise';
       if (!yearsExperience.trim()) nextErrors.yearsExperience = 'Years of experience is required';
       if (!governmentIdNumber.trim()) nextErrors.governmentIdNumber = 'Government ID is required';
@@ -68,15 +93,18 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
       return;
     }
     setFieldErrors({});
+    setSuccessMessage(null);
+    setSubmitError(null);
 
     setLoading(true);
     try {
-      const regData = await registerUser({
+      await registerUser({
         name: fullName,
         email: email.trim().toLowerCase(),
         password,
         role,
         phone: phone.trim(),
+        address: role === 'technician' ? serviceArea.trim() : address.trim(),
         skills: role === 'technician' ? skills.trim() : undefined,
         yearsExperience: role === 'technician' ? yearsExperience.trim() : undefined,
         governmentIdNumber: role === 'technician' ? governmentIdNumber.trim() : undefined,
@@ -84,28 +112,51 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
         certificateFile: role === 'technician' ? certificateFile : undefined,
       });
 
-      if (regData?.idToken) {
-        setAuthToken(regData.idToken);
-        Alert.alert('Welcome to FixLink!', 'Your account is ready.');
-        return;
-      }
-
-      Alert.alert('Application submitted', role === 'technician'
+      const message = role === 'technician'
         ? 'Your technician application is pending admin review. You can log in after it is approved.'
-        : 'Account created successfully! Please log in.');
-      if (role === 'technician' && onTechnicianPending) onTechnicianPending();
-      else switchToLogin();
+        : 'Account created successfully! You can now log in.';
+      setSuccessMessage(message);
+      Alert.alert('Account created', message, [
+        {
+          text: 'OK',
+          onPress: () => {
+            if (role === 'technician' && onTechnicianPending) onTechnicianPending();
+            else switchToLogin();
+          },
+        },
+      ]);
     } catch (error) {
-      const errorMessage = error.response?.data?.error || error.message || 'Registration failed';
-      Alert.alert('Registration Error', errorMessage);
+      const rawMessage = error?.response?.data?.error || error?.message || 'Registration failed';
+      const friendlyMessage = /timeout/i.test(String(rawMessage))
+        ? 'The request took too long. Check your connection and try again. If the account was created, just log in.'
+        : String(rawMessage);
+      setSubmitError(friendlyMessage);
+      console.warn('Registration failed:', friendlyMessage);
+      Alert.alert('Registration Error', friendlyMessage);
     } finally {
       setLoading(false);
     }
   };
 
-  const chooseCredential = async (setter) => {
-    const result = await DocumentPicker.getDocumentAsync({ type: ['image/*', 'application/pdf'], copyToCacheDirectory: true });
-    if (!result.canceled) setter(result.assets[0]);
+  const isAcceptedCredentialFile = (asset) => {
+    const mime = String(asset?.mimeType || '').toLowerCase();
+    if (mime === 'image/jpeg' || mime === 'image/png' || mime === 'application/pdf') return true;
+    const fileName = String(asset?.name || '');
+    const dotIndex = fileName.lastIndexOf('.');
+    const extension = dotIndex >= 0 ? fileName.slice(dotIndex).toLowerCase() : '';
+    return extension === '.jpg' || extension === '.jpeg' || extension === '.png' || extension === '.pdf';
+  };
+
+  const chooseCredential = async (setter, fieldKey, label) => {
+    const result = await DocumentPicker.getDocumentAsync({ type: ['image/jpeg', 'image/png', 'application/pdf'], copyToCacheDirectory: true });
+    if (result.canceled) return;
+    const asset = result.assets[0];
+    if (!isAcceptedCredentialFile(asset)) {
+      setFieldErrors((prev) => ({ ...prev, [fieldKey]: `${label} must be JPG, PNG, or PDF.` }));
+      return;
+    }
+    clearFieldError(fieldKey);
+    setter(asset);
   };
 
   const renderField = (label, value, onChange, fieldKey, placeholder, extraProps = {}) => (
@@ -168,6 +219,8 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
 
         {renderField('Email', email, setEmail, 'email', isTechRole ? 'tech@email.com' : 'you@email.com', { autoCapitalize: 'none', keyboardType: 'email-address' })}
         {renderField('Phone', phone, setPhone, 'phone', '+1 555 000 0000', { keyboardType: 'phone-pad' })}
+        {!isTechRole && renderField('Address', address, setAddress, 'address', 'Street, Barangay, City')}
+        {isTechRole && renderField('Service Area', serviceArea, setServiceArea, 'serviceArea', 'Bogo City, Cebu')}
 
         {isTechRole && (
           <View style={styles.field}>
@@ -200,6 +253,9 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
         {isTechRole && renderField('Years of Experience', yearsExperience, setYearsExperience, 'yearsExperience', '5', { keyboardType: 'number-pad' })}
 
         {renderField('Password', password, setPassword, 'password', '••••••••', { secureTextEntry: true })}
+        {!fieldErrors.password && (
+          <Text style={styles.hintText}>Use at least 6 characters.</Text>
+        )}
         {renderField('Confirm Password', confirmPassword, setConfirmPassword, 'confirmPassword', '••••••••', { secureTextEntry: true })}
 
         {isTechRole && (
@@ -207,7 +263,7 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
             {renderField('Government ID Number', governmentIdNumber, setGovernmentIdNumber, 'governmentIdNumber', 'Enter valid government ID number')}
             <View style={styles.field}>
               <Text style={styles.label}>Government ID File</Text>
-              <TouchableOpacity style={[styles.input, styles.docButton, fieldErrors.governmentIdFile && styles.inputError]} onPress={() => { chooseCredential(setGovernmentIdFile); clearFieldError('governmentIdFile'); }} accessibilityRole="button" accessibilityLabel="Choose Government ID file">
+              <TouchableOpacity style={[styles.input, styles.docButton, fieldErrors.governmentIdFile && styles.inputError]} onPress={() => chooseCredential(setGovernmentIdFile, 'governmentIdFile', 'Government ID file')} accessibilityRole="button" accessibilityLabel="Choose Government ID file">
                 <Ionicons name="cloud-upload-outline" size={18} color={accent} />
                 <Text style={styles.docButtonText} numberOfLines={1}>{governmentIdFile ? governmentIdFile.name : 'Choose Government ID file'}</Text>
               </TouchableOpacity>
@@ -215,7 +271,7 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
             </View>
             <View style={styles.field}>
               <Text style={styles.label}>Certificate or Proof of Experience</Text>
-              <TouchableOpacity style={[styles.input, styles.docButton, fieldErrors.certificateFile && styles.inputError]} onPress={() => { chooseCredential(setCertificateFile); clearFieldError('certificateFile'); }} accessibilityRole="button" accessibilityLabel="Choose certificate file">
+              <TouchableOpacity style={[styles.input, styles.docButton, fieldErrors.certificateFile && styles.inputError]} onPress={() => chooseCredential(setCertificateFile, 'certificateFile', 'Certificate file')} accessibilityRole="button" accessibilityLabel="Choose certificate file">
                 <Ionicons name="cloud-upload-outline" size={18} color={accent} />
                 <Text style={styles.docButtonText} numberOfLines={1}>{certificateFile ? certificateFile.name : 'Choose certificate file'}</Text>
               </TouchableOpacity>
@@ -223,6 +279,18 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
             </View>
           </>
         )}
+
+        {submitError ? (
+          <View style={styles.submitErrorBox} accessibilityRole="alert">
+            <Text style={styles.submitErrorText}>{submitError}</Text>
+          </View>
+        ) : null}
+
+        {successMessage ? (
+          <View style={styles.successBox} accessibilityRole="alert">
+            <Text style={styles.successText}>{successMessage}</Text>
+          </View>
+        ) : null}
 
         <TouchableOpacity style={[styles.primary, { backgroundColor: accent }]} onPress={handleRegister} disabled={loading} activeOpacity={0.88} accessibilityRole="button" accessibilityLabel={isTechRole ? 'Submit application' : 'Create account'}>
           {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>{isTechRole ? 'Submit Application' : 'Create Account'}</Text>}
@@ -261,6 +329,11 @@ const styles = StyleSheet.create({
   input: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 16, minHeight: 52, fontSize: 14, fontFamily: fonts.medium, color: colors.ink, backgroundColor: '#F9FAFB' },
   inputError: { borderColor: '#FCA5A5' },
   errorText: { color: '#DC2626', fontSize: 12, fontFamily: fonts.medium, marginTop: 6 },
+  hintText: { color: '#9CA3AF', fontSize: 12, fontFamily: fonts.medium, marginTop: -10, marginBottom: 16 },
+  successBox: { backgroundColor: '#E6F6F3', borderWidth: 1, borderColor: '#B5E7DE', borderRadius: 12, padding: 14, marginBottom: 16 },
+  successText: { color: '#0F766E', fontSize: 13, fontFamily: fonts.semiBold, lineHeight: 18 },
+  submitErrorBox: { backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', borderRadius: 12, padding: 14, marginBottom: 16 },
+  submitErrorText: { color: '#B91C1C', fontSize: 13, fontFamily: fonts.semiBold, lineHeight: 18 },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#FFFFFF' },
   chipText: { color: '#4B5563', fontSize: 12, fontFamily: fonts.semiBold },
