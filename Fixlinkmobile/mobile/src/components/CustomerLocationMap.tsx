@@ -10,6 +10,8 @@ export interface CustomerLocationMapProps {
   routeCoordinates?: number[][];
   isAccepted?: boolean;
   style?: any;
+  /** Supply this to let the customer drag their pin to the exact spot. */
+  onCustomerPinDrag?: (coords: { latitude: number; longitude: number }) => void;
 }
 
 export default function CustomerLocationMap(props: CustomerLocationMapProps): React.JSX.Element {
@@ -20,6 +22,7 @@ export default function CustomerLocationMap(props: CustomerLocationMapProps): Re
       isAccepted={props.isAccepted}
       currentUserRole="customer"
       style={props.style}
+      onCustomerPinDrag={props.onCustomerPinDrag}
     />
   );
 }

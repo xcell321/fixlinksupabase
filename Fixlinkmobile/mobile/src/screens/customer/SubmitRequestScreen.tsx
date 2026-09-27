@@ -1,6 +1,6 @@
 // @ts-nocheck - migrated from .js, preserve working state; types to be refined incrementally
 import React, { useState, useEffect, useRef } from "react";
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, ScrollView, Modal, FlatList, ActivityIndicator, Image, Platform } from "react-native";
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, ScrollView, Modal, FlatList, ActivityIndicator, Image, Platform, Animated } from "react-native";
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
@@ -128,6 +128,82 @@ const STEPS = [
 
 const TOTAL_STEPS = 4;
 
+// Per-stage copy for the live location lookup. The short label sits in the
+// locate row, the long one in the map overlay, so the user always knows what
+// the app is doing while the fix is still resolving.
+const LOCATE_STAGES = {
+  permission: { short: 'Checking permission...', long: 'Checking location permission' },
+  gps: { short: 'Getting GPS fix...', long: 'Acquiring your GPS position' },
+  address: { short: 'Finding address...', long: 'Matching your coordinates to a street address' },
+  pin: { short: 'Confirming pin...', long: 'Confirming the pin on the map' },
+};
+
+// Pulsing placeholder block. Shown while the live location is still resolving
+// so the step never looks frozen or empty mid-request.
+// Straight-line metres between two coordinates (haversine).
+const distanceInMeters = (fromLat, fromLon, toLat, toLon) => {
+  if (![fromLat, fromLon, toLat, toLon].every(Number.isFinite)) return Infinity;
+  const toRad = (v) => (v * Math.PI) / 180;
+  const dLat = toRad(toLat - fromLat);
+  const dLon = toRad(toLon - fromLon);
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRad(fromLat)) * Math.cos(toRad(toLat)) * Math.sin(dLon / 2) ** 2;
+  return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+// Best-of-N GPS fix. A single reading can be tens of metres off (worst indoors),
+// so keep sampling in high-accuracy mode and resolve with the tightest radius.
+// Returns early once a rooftop-grade fix (<= 12 m) is in hand, so the common
+// case still finishes in a couple of seconds.
+const collectBestFix = (budgetMs = 12000) => new Promise((resolve, reject) => {
+  let best = null;
+  let samples = 0;
+  let finished = false;
+  let subscription = null;
+  let timer = null;
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    if (timer) clearTimeout(timer);
+    try { subscription?.remove?.(); } catch {}
+    if (best) resolve(best);
+    else reject(new Error('Location request timed out. Try again outside or type the address manually.'));
+  };
+  timer = setTimeout(finish, budgetMs);
+  try {
+    Location.watchPositionAsync(
+      { accuracy: Location.Accuracy.Highest, distanceInterval: 0, timeInterval: 1000 },
+      (pos) => {
+        if (finished) return;
+        const accuracy = Number(pos?.coords?.accuracy);
+        if (!best || (Number.isFinite(accuracy) && accuracy < Number(best.coords.accuracy))) best = pos;
+        samples += 1;
+        if ((Number.isFinite(accuracy) && accuracy <= 12) || samples >= 6) finish();
+      },
+    )
+      .then((sub) => { subscription = sub; if (finished) { try { sub.remove(); } catch {} } })
+      .catch(() => finish());
+  } catch {
+    finish();
+  }
+});
+
+function Skeleton({ width = '100%', height = 14, radius = 8, color = '#E1E6EB', style }): React.JSX.Element {
+  const pulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 650, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.timing(pulse, { toValue: 0, duration: 650, useNativeDriver: Platform.OS !== 'web' }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse]);
+  const opacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.4, 0.9] });
+  return <Animated.View style={[{ width, height, borderRadius: radius, backgroundColor: color, opacity }, style]} />;
+}
+
 export default function SubmitRequestScreen({ currentUser, customerName, onNavigateToProgress, onClose }) {
   const [currentStep, setCurrentStep] = useState(1);
   const [stepErrors, setStepErrors] = useState({});
@@ -142,9 +218,14 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
   const [zipCode, setZipCode] = useState("");
   const [notes, setNotes] = useState("");
   const [coords, setCoords] = useState(null);
-  // Smart opacity: manual text = 50%, GPS autofill = 100% (medium weight, never bold)
-  const [locationFromGps, setLocationFromGps] = useState(false);
-  const locTextStyle = [styles.textInputSingle, { opacity: locationFromGps ? 1 : 0.5 }];
+  // Smart opacity: manual text = 50%, address derived from the pin = 100%
+  // (medium weight, never bold).
+  // `addressFromPin` means the fields were filled FROM the pin (a GPS fix or a
+  // pin the customer dragged), not typed. While true the auto-geocode effect
+  // must not overwrite the pin from a typed-address lookup. Editing any field
+  // clears it, so manual edits still re-sync the map.
+  const [addressFromPin, setAddressFromPin] = useState(false);
+  const locTextStyle = [styles.textInputSingle, { opacity: addressFromPin ? 1 : 0.5 }];
   // Consistent focus ring for all step 4 boxes (orange when focused)
   const [focusedField, setFocusedField] = useState(null);
   const [categoryOptions, setCategoryOptions] = useState([]);
@@ -159,7 +240,11 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
   const [modalVisible, setModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [locating, setLocating] = useState(false);
+  // While locating and still empty, the address fields render as skeletons so
+  // the form looks like it is filling itself in rather than sitting blank.
+  const addressFieldsEmpty = !street.trim() && !city.trim() && !zipCode.trim();
   const [locateAccuracy, setLocateAccuracy] = useState(null);
+  const [locateStage, setLocateStage] = useState(null);
   const [locateNote, setLocateNote] = useState(null);
   const [photo, setPhoto] = useState(null);
   const [photoBusy, setPhotoBusy] = useState(false);
@@ -199,6 +284,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
   const handleLocate = async () => {
     if (locating) return;
     setLocating(true);
+    setLocateStage('permission');
     setLocateAccuracy(null);
     // Inline status, never Alert alone. Web popups can stay invisible, which
     // looked like loading-then-nothing with zero explanation.
@@ -242,19 +328,21 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
         Alert.alert('Permission Denied', 'Permission to access location was denied');
         return;
       }
-      // Single balanced fix with a hard timeout. The old 12s watcher loop
-      // plus unguarded reverse-geocode could hang forever on slow links.
+      // Highest-accuracy mode with best-of-N sampling, still bounded by a hard
+      // timeout so a slow fix can never hang the spinner.
+      setLocateStage('gps');
       const pos = await withTimeout(
-        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
-        15000,
+        collectBestFix(12000),
+        14000,
         'Location request timed out. Try again outside or type the address manually.'
       );
-      const acc = pos.coords.accuracy ?? 9999;
-      const lat = pos.coords.latitude;
-      const lon = pos.coords.longitude;
+      const acc = Number(pos?.coords?.accuracy) || 9999;
+      const lat = Number(pos?.coords?.latitude);
+      const lon = Number(pos?.coords?.longitude);
       setCoords({ latitude: lat, longitude: lon });
       setLocateAccuracy(acc);
       if (stepErrors.location) setStepErrors((p) => { const n = { ...p }; delete n.location; return n; });
+      setLocateStage('address');
       let resolvedStreet = '';
       let resolvedCity = '';
       let resolvedZip = '';
@@ -291,13 +379,21 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
       // rooftop of the resolved street address via API-only forward geocode.
       // Good GPS (<=30m) is kept as-is since it is already best. The coarse
       // dict is never used here so it cannot drag the pin offshore again.
+      setLocateStage('pin');
       let finalLat = lat;
       let finalLon = lon;
       const fullAddr = [resolvedStreet, resolvedCity, resolvedState, resolvedZip].filter(Boolean).join(', ');
       if (acc > 30 && fullAddr.length > 5) {
         try {
           const snap = await geocodeAddressPrecise(fullAddr);
-          if (snap && Number.isFinite(snap.latitude) && Number.isFinite(snap.longitude)) {
+          // Only accept the snap when it lands near the raw fix. A geocode that
+          // jumps further means the address matched the wrong place, and the raw
+          // GPS reading is the safer answer.
+          const snapOk = snap
+            && Number.isFinite(snap.latitude)
+            && Number.isFinite(snap.longitude)
+            && distanceInMeters(lat, lon, snap.latitude, snap.longitude) <= 400;
+          if (snapOk) {
             finalLat = snap.latitude;
             finalLon = snap.longitude;
           }
@@ -305,7 +401,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
       }
       setCoords({ latitude: finalLat, longitude: finalLon });
       // GPS autofill done - full 100% opacity text (medium, not bold)
-      setLocationFromGps(true);
+      setAddressFromPin(true);
       setLocateNote({ kind: 'ok', text: 'Location found. Check the pin, then adjust the address if needed.' });
     } catch (e: any) {
       const message = e?.message || 'Failed to fetch location details.';
@@ -313,7 +409,46 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
       Alert.alert('Error', message);
     } finally {
       setLocating(false);
+      setLocateStage(null);
     }
+  };
+
+  // The customer dragged the pin onto their exact house/unit. The pin becomes
+  // the source of truth, so re-derive the address fields from it and keep the
+  // auto-geocode effect from geocoding back over it. No `locating` toggle here:
+  // that would swap the map out for the skeleton the customer just interacted
+  // with.
+  const handlePinDrag = async ({ latitude, longitude }) => {
+    setCoords({ latitude, longitude });
+    setAddressFromPin(true);
+    setLocateNote({ kind: 'ok', text: 'Pin moved - updating the address...' });
+    let parts = null;
+    try {
+      parts = await reverseGeocodePrecise(latitude, longitude);
+    } catch {}
+    if (!parts) {
+      try {
+        const geo = await Location.reverseGeocodeAsync({ latitude, longitude });
+        if (geo && geo.length > 0) {
+          const a = geo[0];
+          parts = {
+            street: a.street || a.name || '',
+            city: a.city || a.subregion || '',
+            state: a.region || '',
+            postalCode: a.postalCode || '',
+          };
+        }
+      } catch {}
+    }
+    if (parts?.street) setStreet(parts.street);
+    if (parts?.city) setCity(parts.city);
+    if (parts?.postalCode) setZipCode(parts.postalCode);
+    setLocateNote({
+      kind: 'ok',
+      text: parts?.street
+        ? 'Pin set. Address updated to match - adjust it below if needed.'
+        : 'Pin set. Check the address below and adjust it if needed.',
+    });
   };
 
   // Auto-detect all location inputs when entering Step 4
@@ -327,6 +462,13 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
   // structured endpoint when parts exist (rooftop accuracy); free-text otherwise.
   useEffect(() => {
     if (currentStep !== 4) return;
+    // Do NOT geocode over a pin the device or the customer placed. The
+    // structured lookup with no house number returns a street/area centroid,
+    // and this effect used to fire right after the GPS autofill and silently
+    // drag the accurate pin to the middle of the road. Editing any address
+    // field clears addressFromPin (and for street/city also coords), so manual
+    // edits still re-sync the map.
+    if (addressFromPin) return;
     const hasParts = street.trim().length >= 3 || city.trim().length >= 3 || zipCode.trim().length >= 3;
     const q = composedLocation;
     if (!hasParts && (!q || q.length < 5)) return;
@@ -350,7 +492,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
       } catch {}
     }, 700);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [composedLocation, currentStep, street, city, zipCode]);
+  }, [composedLocation, currentStep, street, city, zipCode, addressFromPin]);
 
   // Optional problem photo: helps the technician see the issue before
   // accepting. Kept local until submit; uploaded as multipart `photo`.
@@ -936,31 +1078,73 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
     return (
       <View style={styles.stepBody}>
         <View style={styles.mapBox}>
-          {coords ? (
+          {locating ? (
+            <View style={styles.mapSkeleton} accessibilityRole="progressbar" accessibilityLabel="Getting your location">
+              <Skeleton width="100%" height={144} radius={16} />
+              <View style={styles.mapSkeletonBody}>
+                <View style={styles.mapPin}>
+                  <Ionicons name="locate" size={20} color="#FFFFFF" />
+                </View>
+                <View style={styles.mapSkeletonStatus}>
+                  <ActivityIndicator size="small" color={colors.customer} />
+                  <Text style={styles.mapSkeletonText} accessibilityLiveRegion="polite" numberOfLines={2}>
+                    {LOCATE_STAGES[locateStage]?.long || 'Getting your location...'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          ) : coords ? (
             <CustomerLocationMap
               customerCoords={{ latitude: coords.latitude, longitude: coords.longitude, name: 'Service location' }}
               isAccepted={false}
               style={{ height: 144 }}
+              onCustomerPinDrag={handlePinDrag}
             />
           ) : (
             <View style={styles.mapPlaceholder}>
               <View style={styles.mapPin}>
                 <Ionicons name="location" size={20} color="#FFFFFF" />
               </View>
+              <Text style={styles.mapPlaceholderText}>Tap "Use my current location" to drop your pin</Text>
             </View>
           )}
         </View>
+        {coords && !locating ? (
+          <View style={styles.mapHintRow}>
+            <Ionicons name="hand-left-outline" size={13} color={colors.customer} />
+            <Text style={styles.mapHintText}>Drag the pin to your exact house - the address updates automatically.</Text>
+          </View>
+        ) : null}
         <TouchableOpacity style={styles.locateRow} onPress={handleLocate} disabled={locating} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Use my current location">
           {locating ? (
             <ActivityIndicator size="small" color={colors.customer} />
           ) : (
             <Ionicons name="locate-outline" size={15} color={colors.customer} />
           )}
-          <Text style={styles.locateRowText}>{locating ? 'Locating...' : 'Use my current location'}</Text>
+          <Text style={styles.locateRowText} numberOfLines={1}>{locating ? (LOCATE_STAGES[locateStage]?.short || 'Locating...') : 'Use my current location'}</Text>
         </TouchableOpacity>
         {locateNote ? (
           <Text style={locateNote.kind === 'ok' ? styles.locateOkText : styles.locateErrorText}>{locateNote.text}</Text>
         ) : null}
+        {locating && addressFieldsEmpty ? (
+          <View style={styles.addressSkeletonGroup} accessibilityLabel="Loading your address" accessibilityRole="progressbar">
+            <View>
+              <Text style={styles.refLabel}>Street Address</Text>
+              <Skeleton width="100%" height={52} radius={14} />
+            </View>
+            <View style={styles.twoColGrid}>
+              <View style={styles.twoColCell}>
+                <Text style={styles.refLabel}>City</Text>
+                <Skeleton width="100%" height={52} radius={14} />
+              </View>
+              <View style={styles.twoColCell}>
+                <Text style={styles.refLabel}>ZIP Code</Text>
+                <Skeleton width="100%" height={52} radius={14} />
+              </View>
+            </View>
+          </View>
+        ) : (
+        <>
         <View style={styles.inputGroup}>
           <Text style={styles.refLabel}>Street Address</Text>
           <View style={[styles.textInputContainer, focusedField === 'street' && styles.inputFocused, !!stepErrors.location && styles.inputError]}>
@@ -969,7 +1153,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
               placeholder="142 Oak Street, Apt 3B"
               placeholderTextColor={colors.muted}
               value={street}
-              onChangeText={(t) => { setStreet(t); setCoords(null); setLocationFromGps(false); clearLocationError(); }}
+              onChangeText={(t) => { setStreet(t); setCoords(null); setAddressFromPin(false); clearLocationError(); }}
               onFocus={() => setFocusedField('street')}
               onBlur={() => setFocusedField(null)}
               accessibilityLabel="Street address"
@@ -987,7 +1171,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
                 placeholder="Bogo City"
                 placeholderTextColor={colors.muted}
                 value={city}
-                onChangeText={(t) => { setCity(t); setCoords(null); setLocationFromGps(false); }}
+                onChangeText={(t) => { setCity(t); setCoords(null); setAddressFromPin(false); }}
                 onFocus={() => setFocusedField('city')}
                 onBlur={() => setFocusedField(null)}
                 accessibilityLabel="City"
@@ -1000,18 +1184,21 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
             <View style={[styles.textInputContainer, focusedField === 'zip' && styles.inputFocused]}>
               <TextInput
                 style={locTextStyle}
-                placeholder="6005"
+                placeholder="6010"
                 placeholderTextColor={colors.muted}
                 value={zipCode}
-                onChangeText={(t) => { setZipCode(t); setLocationFromGps(false); }}
+                onChangeText={(t) => { setZipCode(t); setAddressFromPin(false); }}
                 onFocus={() => setFocusedField('zip')}
                 onBlur={() => setFocusedField(null)}
                 accessibilityLabel="ZIP code"
                 keyboardType="number-pad"
+                maxLength={4}
               />
             </View>
           </View>
         </View>
+        </>
+        )}
         <View style={styles.inputGroup}>
           <Text style={styles.refLabel}>Additional Notes</Text>
           <View style={[styles.textInputContainer, focusedField === 'notes' && styles.inputFocused]}>
@@ -1321,7 +1508,10 @@ const styles = StyleSheet.create({
   // quick picks - grouped tight (8) within, generous (16) from next input
   // Prototype 2x2 device grid
   quickPickWrap: { gap: 14, marginTop: 12 },
-  deviceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, width: '100%' },
+  // A fixed percentage plus a px gap overflowed on narrow phones and dropped the
+  // cards to one per row. Percent widths + space-between keep a strict 2-up grid
+  // with a small, consistent gutter at any screen width.
+  deviceGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12, width: '100%' },
   deviceCard: { width: '48%', borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.canvas, padding: 16, alignItems: 'center', gap: 12, minHeight: 130, justifyContent: 'center', elevation: 0 },
   deviceCardActive: { borderColor: colors.customer, borderWidth: 1.5, backgroundColor: colors.customerSoft, elevation: 0 },
   deviceIconTile: { width: 56, height: 56, borderRadius: 14, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.lineSoft },
@@ -1401,6 +1591,22 @@ const styles = StyleSheet.create({
   locateRowText: { color: colors.customer, fontSize: 13, fontFamily: fonts.semiBold },
   locateErrorText: { color: '#B91C1C', fontSize: 12, fontFamily: fonts.semiBold, marginTop: 8, lineHeight: 17 },
   locateOkText: { color: colors.customer, fontSize: 12, fontFamily: fonts.semiBold, marginTop: 8 },
+
+  // Live-location panel. Previously these were referenced in the step-4 JSX but
+  // never defined, so the empty map area collapsed and the pin lost its tile.
+  mapBox: { borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: colors.line, backgroundColor: colors.canvas, minHeight: 144 },
+  mapPlaceholder: { height: 144, alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 24, backgroundColor: colors.surfaceSunken },
+  mapPlaceholderText: { fontSize: 12, fontFamily: fonts.medium, color: colors.muted, textAlign: 'center', lineHeight: 16 },
+  mapHintRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
+  mapHintText: { flex: 1, fontSize: 11, fontFamily: fonts.medium, color: colors.muted, lineHeight: 15 },
+  mapPin: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.customer, alignItems: 'center', justifyContent: 'center', ...shadows.subtle },
+  mapSkeleton: { height: 144, position: 'relative' as const, alignItems: 'center', justifyContent: 'center' },
+  mapSkeletonBody: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 16 },
+  mapSkeletonStatus: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.94)', borderWidth: 1, borderColor: colors.line, maxWidth: '100%' },
+  mapSkeletonText: { fontSize: 12, fontFamily: fonts.semiBold, color: colors.ink, flexShrink: 1 },
+  addressSkeletonGroup: { gap: 20 },
+  twoColGrid: { flexDirection: 'row', gap: 12 },
+  twoColCell: { flex: 1, minWidth: 0 },
   accuracyText: { fontSize: 11, fontFamily: fonts.medium, textAlign: 'center', marginTop: 6 },
   accuracyGood: { color: colors.green },
   accuracyOk: { color: colors.gold },

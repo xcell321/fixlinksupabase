@@ -107,7 +107,7 @@ export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile,
         <Text style={styles.label}>FIRST NAME</Text>
         <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Alex" placeholderTextColor="#9CA3AF" />
         <Text style={styles.label}>PHONE</Text>
-        <TextInput style={styles.input} value={phone} onChangeText={setPhone} placeholder="+1 555 000 0000" placeholderTextColor="#9CA3AF" keyboardType="phone-pad" />
+        <TextInput style={styles.input} value={phone} onChangeText={setPhone} placeholder="09XX XXX XXXX" placeholderTextColor="#9CA3AF" keyboardType="phone-pad" />
         <Text style={styles.label}>ADDRESS</Text>
         <TextInput style={styles.input} value={address} onChangeText={setAddress} placeholder="142 Oak St, Apt 3B" placeholderTextColor="#9CA3AF" />
         <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={loading} activeOpacity={0.88}>

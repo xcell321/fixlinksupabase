@@ -179,6 +179,8 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
 
   // Password inputs with a visibility toggle (eye icon) so users can verify
   // what they typed. Applied to both roles since they share this screen.
+  // Icon shows the CURRENT state: slashed eye while rendered as dots,
+  // plain eye while the password is readable.
   const renderPasswordField = (label, value, onChange, fieldKey, visible, onToggleVisible) => (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
@@ -199,7 +201,7 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
           accessibilityRole="button"
           accessibilityLabel={visible ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
         >
-          <Ionicons name={visible ? 'eye-off-outline' : 'eye-outline'} size={20} color="#9CA3AF" />
+          <Ionicons name={visible ? 'eye-outline' : 'eye-off-outline'} size={20} color="#9CA3AF" />
         </TouchableOpacity>
       </View>
       {fieldErrors[fieldKey] ? <Text style={styles.errorText}>{fieldErrors[fieldKey]}</Text> : null}
@@ -249,7 +251,7 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
         {fieldErrors.name && !firstName.trim() && !lastName.trim() ? <Text style={styles.errorText}>{fieldErrors.name}</Text> : null}
 
         {renderField('Email', email, setEmail, 'email', isTechRole ? 'tech@email.com' : 'you@email.com', { autoCapitalize: 'none', keyboardType: 'email-address' })}
-        {renderField('Phone', phone, setPhone, 'phone', '+1 555 000 0000', { keyboardType: 'phone-pad' })}
+        {renderField('Phone Number', phone, setPhone, 'phone', '09XX XXX XXXX', { keyboardType: 'phone-pad' })}
         {!isTechRole && renderField('Address', address, setAddress, 'address', 'Street, Barangay, City')}
         {isTechRole && renderField('Service Area', serviceArea, setServiceArea, 'serviceArea', 'Bogo City, Cebu')}
 

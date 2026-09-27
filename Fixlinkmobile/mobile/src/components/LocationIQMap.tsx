@@ -12,6 +12,8 @@ export interface LocationIQMapProps {
   isAccepted?: boolean;
   jobPins?: Array<{ latitude: number; longitude: number; label?: string }>;
   style?: StyleProp<ViewStyle>;
+  /** Fired when the customer drags their pin. Passing it enables dragging. */
+  onCustomerPinDrag?: (coords: { latitude: number; longitude: number }) => void;
 }
 
 let WebView: unknown = null;
@@ -32,10 +34,14 @@ export default function LocationIQMap({
   isAccepted = false,
   jobPins = [],
   style,
+  onCustomerPinDrag,
 }: LocationIQMapProps): React.JSX.Element {
   const webViewRef = useRef<{ injectJavaScript: (js: string) => void } | null>(null);
   const iframeRef = useRef<{ contentWindow?: { postMessage: (msg: unknown, target: string) => void } } | null>(null);
   const isWebFallback: boolean = Platform.OS === 'web' || !WebView;
+  // Only the customer's own pin is adjustable, and only when the host screen
+  // asked for it. Technician and tracking maps stay read-only.
+  const pinDraggable: boolean = Boolean(onCustomerPinDrag) && currentUserRole === 'customer';
 
   const runMapCommand = (command: Record<string, unknown>): void => {
     if (isWebFallback) {
@@ -160,14 +166,17 @@ export default function LocationIQMap({
           const techIcon = L.divIcon({ className: 'custom-div-icon', html: '<div class="pulse-wrapper"><div class="pulse-ring"></div><div class="pulse-dot"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/><path d="M5 21l1.5-4.5"/><path d="M9 14l1 1"/></svg></div></div>', iconSize: [44, 44], iconAnchor: [22, 22] });
           const custIcon = L.divIcon({ className: 'custom-div-icon', html: '<div class="customer-pin-wrapper"><div class="customer-pin"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg></div></div>', iconSize: [42, 42], iconAnchor: [21, 21] });
           const isAccepted = ${canLocateOther ? 'true' : 'false'}; const isCurrentUserTech = ${isTech ? 'true' : 'false'};
+          const CUST_DRAGGABLE = ${pinDraggable ? 'true' : 'false'};
+          function postToHost(payload) { try { if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) { window.ReactNativeWebView.postMessage(JSON.stringify(payload)); } else if (window.parent && window.parent !== window) { window.parent.postMessage(payload, '*'); } } catch (err) {} }
+          function attachCustDrag(marker) { if (!CUST_DRAGGABLE || !marker) return; try { if (marker.dragging) marker.dragging.enable(); marker.off('dragend'); marker.on('dragend', function () { var ll = marker.getLatLng(); postToHost({ source: 'fixlink-map', type: 'pinMoved', lat: ll.lat, lng: ll.lng }); }); } catch (err) {} }
           const techCoords = ${techLat && techLng ? `[${techLat}, ${techLng}]` : 'null'}; const custCoords = ${custLat && custLng ? `[${custLat}, ${custLng}]` : 'null'}; const rawRoute = ${routeJson};
           if (techCoords && (isCurrentUserTech || isAccepted)) { techMarker = L.marker(techCoords, { icon: techIcon }).addTo(map); const label = isCurrentUserTech ? "You (Technician)" : ("Technician: " + ${techName}); techMarker.bindPopup('<div class="custom-popup"><strong>' + label + '</strong><span class="subtext">Live Location</span></div>'); }
-          if (custCoords && (!isCurrentUserTech || isAccepted)) { custMarker = L.marker(custCoords, { icon: custIcon }).addTo(map); }
+          if (custCoords && (!isCurrentUserTech || isAccepted)) { custMarker = L.marker(custCoords, { icon: custIcon, draggable: CUST_DRAGGABLE }).addTo(map); attachCustDrag(custMarker); }
           if (isAccepted && rawRoute && rawRoute.length > 0) { routePolyline = L.polyline(rawRoute, { color: '${routeColor}', weight: 5, opacity: 0.85, smoothFactor: 1 }).addTo(map); }
           window.updateJobPins(${pinsJson});
           window.fitMarkers = function() { try { const bounds = []; if (techMarker && (isCurrentUserTech || isAccepted)) bounds.push(techMarker.getLatLng()); if (custMarker && (!isCurrentUserTech || isAccepted)) bounds.push(custMarker.getLatLng()); if (routePolyline && routePolyline.getLatLngs().length > 0) { map.fitBounds(routePolyline.getBounds(), { padding: [45, 45], maxZoom: 16 }); } else if (bounds.length > 1) { map.fitBounds(L.latLngBounds(bounds), { padding: [55, 55], maxZoom: 16 }); } else if (bounds.length === 1) { map.setView(bounds[0], 15); } } catch (err) {} };
           setTimeout(window.fitMarkers, 350);
-          window.updateCustomerMarker = function(lat, lng, name, address) { try { const latLng = [lat, lng]; if (!custMarker) { custMarker = L.marker(latLng, { icon: custIcon }).addTo(map); window.fitMarkers(); } else { custMarker.setLatLng(latLng); } } catch (err) {} };
+          window.updateCustomerMarker = function(lat, lng, name, address) { try { const latLng = [lat, lng]; if (!custMarker) { custMarker = L.marker(latLng, { icon: custIcon, draggable: CUST_DRAGGABLE }).addTo(map); window.fitMarkers(); } else { custMarker.setLatLng(latLng); } attachCustDrag(custMarker); } catch (err) {} };
           window.updateTechMarker = function(lat, lng, name) { try { const latLng = [lat, lng]; if (!techMarker) { techMarker = L.marker(latLng, { icon: techIcon }).addTo(map); window.fitMarkers(); } else { techMarker.setLatLng(latLng); } const label = isCurrentUserTech ? "You (Technician)" : ("Technician: " + (name || "Technician")); techMarker.bindPopup('<div class="custom-popup"><strong>' + label + '</strong><span class="subtext">Live Location</span></div>'); } catch (err) {} };
           window.updateRoutePolyline = function(coords) { try { if (routePolyline) { map.removeLayer(routePolyline); routePolyline = null; } if (coords && coords.length > 0) { routePolyline = L.polyline(coords, { color: '${routeColor}', weight: 5, opacity: 0.85, smoothFactor: 1 }).addTo(map); } } catch (err) {} };
           window.addEventListener('message', function (event) { const data = event.data || {}; if (!data || data.source !== 'fixlink-map-host') return; try { if (data.type === 'tech') { window.updateTechMarker(Number(data.lat), Number(data.lng), data.name); } else if (data.type === 'customer') { window.updateCustomerMarker(Number(data.lat), Number(data.lng), data.name, data.address); } else if (data.type === 'route') { window.updateRoutePolyline(data.coords); } else if (data.type === 'pins') { window.updateJobPins(data.pins); } } catch (err) {} });
@@ -175,7 +184,7 @@ export default function LocationIQMap({
       </body>
       </html>
     `;
-  }, [initialCenter, customerCoords, technicianCoords, currentUserRole, isAccepted, routeCoordinates, jobPins]);
+  }, [initialCenter, customerCoords, technicianCoords, currentUserRole, isAccepted, routeCoordinates, jobPins, pinDraggable]);
 
   useEffect(() => {
     if (jobPins) {
@@ -194,6 +203,32 @@ export default function LocationIQMap({
       runMapCommand({ type: 'customer', lat: customerCoords.latitude, lng: customerCoords.longitude, name: customerCoords.name ?? 'Customer', address: customerCoords.address ?? '' });
     }
   }, [customerCoords?.latitude, customerCoords?.longitude, customerCoords?.name, customerCoords?.address]);
+
+  // Web: the srcdoc iframe posts the dropped pin back through the parent window.
+  useEffect(() => {
+    if (!onCustomerPinDrag || typeof window === 'undefined' || Platform.OS !== 'web') return undefined;
+    const onMessage = (event: { data?: { source?: string; type?: string; lat?: unknown; lng?: unknown } }): void => {
+      const data = event?.data;
+      if (!data || data.source !== 'fixlink-map' || data.type !== 'pinMoved') return;
+      const latitude = Number(data.lat);
+      const longitude = Number(data.lng);
+      if (Number.isFinite(latitude) && Number.isFinite(longitude)) onCustomerPinDrag({ latitude, longitude });
+    };
+    window.addEventListener('message', onMessage as never);
+    return () => window.removeEventListener('message', onMessage as never);
+  }, [onCustomerPinDrag]);
+
+  // Native: the same payload arrives over the WebView bridge instead.
+  const handleNativeMessage = (event: { nativeEvent?: { data?: string } }): void => {
+    if (!onCustomerPinDrag) return;
+    try {
+      const data = JSON.parse(String(event?.nativeEvent?.data ?? '{}')) as { source?: string; type?: string; lat?: unknown; lng?: unknown };
+      if (data?.source !== 'fixlink-map' || data?.type !== 'pinMoved') return;
+      const latitude = Number(data.lat);
+      const longitude = Number(data.lng);
+      if (Number.isFinite(latitude) && Number.isFinite(longitude)) onCustomerPinDrag({ latitude, longitude });
+    } catch {}
+  };
 
   useEffect(() => {
     if (routeCoordinates) {
@@ -224,6 +259,7 @@ export default function LocationIQMap({
         originWhitelist={['*']}
         source={{ html: mapHtml }}
         style={styles.webView}
+        onMessage={handleNativeMessage as never}
         javaScriptEnabled={true}
         domStorageEnabled={true}
         startInLoadingState={true}
