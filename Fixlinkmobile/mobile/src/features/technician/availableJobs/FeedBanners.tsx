@@ -33,7 +33,7 @@ export const FeedBanners = ({ fetchError, hasJobs, acceptError, onRetry }: FeedB
           onPress={onRetry}
           style={({ pressed }) => [styles.primaryBtn, pressed && styles.pressedSoft, { marginTop: 12 }]}
         >
-          <Ionicons name="refresh" size={16} color={colors.white} style={{ marginRight: 6 }} />
+          <Ionicons name="refresh" size={16} color={colors.onAccent} style={{ marginRight: 6 }} />
           <Text style={styles.primaryBtnText}>Retry Connection</Text>
         </Pressable>
       </View>

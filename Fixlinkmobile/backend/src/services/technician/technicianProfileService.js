@@ -49,6 +49,28 @@ const getTechnicianPublicProfile = async ({ technicianId }) => {
     totalReviews: profile.total_reviews,
   });
 
+  // Reviews written after customer_uid existed link straight to the reviewer;
+  // legacy rows only have the name they used at the time. Resolve both to the
+  // customer's *current* name and picture so the reviews tab never shows a
+  // stale name or a bare-initials avatar for someone who has a profile photo.
+  const reviewCustomerUids = [...new Set(reviews.map((r) => r.customer_uid).filter(Boolean))];
+  const reviewCustomerNames = [...new Set(reviews.map((r) => r.customer_name).filter(Boolean))];
+  const [byUidResult, byNameResult] = await Promise.all([
+    reviewCustomerUids.length
+      ? supabase.from('users').select('id, name, profile_image').in('id', reviewCustomerUids)
+      : Promise.resolve({ data: [] }),
+    reviewCustomerNames.length
+      ? supabase.from('users').select('id, name, profile_image, role').in('name', reviewCustomerNames)
+      : Promise.resolve({ data: [] }),
+  ]);
+  const customerByUid = new Map((byUidResult.data || []).map((u) => [u.id, u]));
+  const customerByName = new Map();
+  (byNameResult.data || []).forEach((u) => {
+    const key = String(u.name || '').toLowerCase();
+    // Prefer a customer over a technician who happens to share the display name.
+    if (key && (!customerByName.has(key) || u.role === 'customer')) customerByName.set(key, u);
+  });
+
   return {
     ...serializeUser(profile),
     uid: technicianId,
@@ -57,12 +79,17 @@ const getTechnicianPublicProfile = async ({ technicianId }) => {
     averageRating,
     totalReviews,
     skillStats,
-    reviews: reviews.map((review) => ({
-      rating: review.rating || 0,
-      comment: review.comment || review.text || '',
-      createdAt: review.created_at ? new Date(review.created_at).toISOString() : null,
-      customerName: review.customer_name || null,
-    })),
+    reviews: reviews.map((review) => {
+      const uidMatch = review.customer_uid ? customerByUid.get(review.customer_uid) : null;
+      const match = uidMatch || customerByName.get(String(review.customer_name || '').toLowerCase());
+      return {
+        rating: review.rating || 0,
+        comment: review.comment || review.text || '',
+        createdAt: review.created_at ? new Date(review.created_at).toISOString() : null,
+        customerName: match?.name || review.customer_name || null,
+        customerImage: match?.profile_image || null,
+      };
+    }),
   };
 };
 

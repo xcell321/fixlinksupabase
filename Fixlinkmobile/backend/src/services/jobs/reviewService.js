@@ -24,13 +24,24 @@ const submitReview = async ({ jobId, authUid, customerName, rating, comment }) =
   const { data: review, error: reviewError } = await reviewRepository.insertReview({
     technician_uid: job.technician_uid,
     technician_name: job.technician_name,
+    // The reviewer's uid lets the profile reviews tab resolve their current
+    // name and picture instead of trusting the name snapshot alone.
+    customer_uid: authUid,
     customer_name: customerName,
     rating: numericRating,
     comment: String(comment || '').trim(),
     request_id: job.id,
     created_at: new Date().toISOString(),
   });
-  if (reviewError) throw reviewError;
+  if (reviewError) {
+    // A stale database (schema.sql migration not run) surfaces here as a
+    // missing-column error for `customer_uid`. Log the fix, keep the client
+    // contract stable.
+    if (/customer_uid|could not find.*column|PGRST204/i.test(String(reviewError.message || ''))) {
+      console.error('Reviews insert failed: run backend/src/db/schema.sql in Supabase SQL Editor to add reviews.customer_uid.');
+    }
+    throw new HttpError(500, { error: 'Unable to submit review.' });
+  }
 
   await jobRepository.updateById(job.id, { review_id: review.id, reviewed_at: new Date().toISOString() });
 

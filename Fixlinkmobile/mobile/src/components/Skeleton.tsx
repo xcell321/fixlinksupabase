@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, type ViewStyle, type StyleProp } from 'react-native';
+import { Animated, type ViewStyle, type StyleProp } from 'react-native';
+import { themedStyles } from '../theme';
 
 export interface SkeletonProps {
   style?: StyleProp<ViewStyle>;
@@ -27,7 +28,7 @@ export default function Skeleton({ style, pulse = false }: SkeletonProps): React
   return <Animated.View style={[styles.skeleton, style, pulse && { opacity }]} />;
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles({
   skeleton: {
     backgroundColor: '#E5E7EB',
     borderRadius: 8,

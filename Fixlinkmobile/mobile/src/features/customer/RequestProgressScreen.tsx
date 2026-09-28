@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Skeleton from '../../components/Skeleton';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { cancelRepairRequest, confirmRepairRequest, fetchCompletedJobs, fetchCustomerRequests, fetchTechnicianRecommendations, markCustomerReady, submitTechnicianReview } from '../../services/api';
-import { colors, fonts, shadows } from '../../theme';
+import { colors, fonts, shadows, themedStyles } from '../../theme';
 import { getApplianceIcon, getStatusColor, getStatusGuidance, getStatusIcon } from '../../utils/applianceIcons';
 import { splitJobDescription } from '../../utils/jobDescription';
 import type { ScheduleAvailability, TechnicianScheduleItem } from '../../types/schedule';
@@ -301,7 +301,7 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
                 <View style={styles.railTrack}>
                   {i > 0 && <View style={[styles.railLine, (done || isCurrent) && styles.railLineDone, isUpcoming && styles.railLineUpcoming]} />}
                   <View style={[styles.railDot, done && styles.railDotDone, isCurrent && styles.railDotCurrent, isUpcoming && styles.railDotUpcoming]}>
-                    {done && <Ionicons name="checkmark" size={7} color={colors.white} accessible={false} />}
+                    {done && <Ionicons name="checkmark" size={7} color={colors.onAccent} accessible={false} />}
                     {isUpcoming && <View style={styles.railDotInner} />}
                   </View>
                   {i < PROGRESS_STEPS.length - 1 && <View style={[styles.railLine, i < current && styles.railLineDone, isUpcoming && styles.railLineUpcoming]} />}
@@ -741,7 +741,7 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
             onPress={handleRefresh}
             style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}
           >
-            <Ionicons name="refresh-outline" size={15} color={colors.white} accessible={false} />
+            <Ionicons name="refresh-outline" size={15} color={colors.onAccent} accessible={false} />
             <Text style={styles.retryButtonText}>Try again</Text>
           </Pressable>
         </View>
@@ -787,17 +787,17 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles({
   scrollContent: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 32, backgroundColor: '#F9FAFB', flexGrow: 1, alignItems: 'center' as const },
   centerWrap: { width: '100%' as const, maxWidth: 480, alignSelf: 'center' as const },
   // Prototype dark header with Active / History toggle
   protoHeader: { backgroundColor: '#0D1B2A', paddingHorizontal: 20, paddingTop: 24, paddingBottom: 20, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, marginHorizontal: -20, marginTop: -20, marginBottom: 20 },
-  protoTitle: { color: '#FFFFFF', fontSize: 21, fontFamily: fonts.extraBold, letterSpacing: -0.3, marginBottom: 16 },
+  protoTitle: { color: colors.onAccent, fontSize: 21, fontFamily: fonts.extraBold, letterSpacing: -0.3, marginBottom: 16 },
   protoTabs: { flexDirection: 'row', gap: 8 },
   protoTab: { flex: 1, paddingVertical: 10, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.10)', alignItems: 'center' },
   protoTabActive: { backgroundColor: colors.customer },
   protoTabText: { color: '#9CA3AF', fontSize: 14, fontFamily: fonts.semiBold },
-  protoTabTextActive: { color: '#FFFFFF' },
+  protoTabTextActive: { color: colors.onAccent },
   protoBody: { gap: 12 },
   sectionHeaderContainer: { marginBottom: 16, gap: 2 },
   kicker: { color: colors.customer, fontSize: 10, letterSpacing: 1.4, fontFamily: fonts.bold, marginBottom: 2, textTransform: 'uppercase' as const },
@@ -813,11 +813,11 @@ const styles = StyleSheet.create({
   segment: { flex: 1, minWidth: 72, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, minHeight: 44, paddingHorizontal: 6, borderRadius: 12, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line },
   segmentActive: { backgroundColor: colors.customer, borderColor: colors.customerDark },
   segmentText: { color: colors.muted, fontSize: 11, fontFamily: fonts.semiBold, flexShrink: 1 },
-  segmentTextActive: { color: colors.white },
+  segmentTextActive: { color: colors.onAccent },
   segmentCount: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center' },
   segmentCountActive: { backgroundColor: 'rgba(255,255,255,0.25)' },
   segmentCountText: { color: colors.muted, fontSize: 11, fontFamily: fonts.bold, fontVariant: ['tabular-nums'] },
-  segmentCountTextActive: { color: colors.white },
+  segmentCountTextActive: { color: colors.onAccent },
 
   // Section headers - more space above than below (rhythm)
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, marginTop: 20, gap: 12 },
@@ -914,8 +914,8 @@ const styles = StyleSheet.create({
   readyBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.customerSoft, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 12, borderWidth: 1, borderColor: colors.hudBorder, marginBottom: 12, gap: 8 },
   readyText: { fontSize: 12, color: colors.customerDark, fontFamily: fonts.bold },
   completionBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.ink, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 12, marginBottom: 12, gap: 8 },
-  completionText: { fontSize: 12, color: colors.white, fontFamily: fonts.semiBold },
-  completionCode: { fontSize: 15, fontFamily: fonts.extraBold, color: colors.white, letterSpacing: 3, fontVariant: ['tabular-nums'] },
+  completionText: { fontSize: 12, color: colors.onAccent, fontFamily: fonts.semiBold },
+  completionCode: { fontSize: 15, fontFamily: fonts.extraBold, color: colors.onAccent, letterSpacing: 3, fontVariant: ['tabular-nums'] },
 
   // Action hierarchy
   cardActions: { gap: 10 },
@@ -923,7 +923,7 @@ const styles = StyleSheet.create({
   secondaryRow: { flexDirection: 'row', gap: 10 },
   secondaryActionsRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
   primaryButton: { flex: 1, minHeight: 48, borderRadius: 14, backgroundColor: colors.customer, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, ...shadows.card },
-  primaryButtonText: { color: colors.white, fontFamily: fonts.bold, fontSize: 14 },
+  primaryButtonText: { color: colors.onAccent, fontFamily: fonts.bold, fontSize: 14 },
   detailsButton: { flex: 1, minHeight: 48, borderRadius: 14, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   detailsButtonText: { color: colors.customer, fontFamily: fonts.bold, fontSize: 14 },
   cancelButton: { minHeight: 48, borderRadius: 14, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center' },
@@ -958,7 +958,7 @@ const styles = StyleSheet.create({
   actionErrorBox: { backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', borderRadius: 12, padding: 12, marginBottom: 12 },
   actionErrorText: { color: '#B91C1C', fontSize: 12, fontFamily: fonts.semiBold, lineHeight: 17 },
   retryButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.customer, borderRadius: 14, paddingHorizontal: 22, minHeight: 48, marginTop: 6, ...shadows.card },
-  retryButtonText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
+  retryButtonText: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bold },
 
   // AI recommendations - SECONDARY disclosure, collapsed by default. Never competes with status.
   aiPanel: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.lineSoft, borderRadius: 12, marginBottom: 11, overflow: 'hidden' as const },
@@ -984,7 +984,7 @@ const styles = StyleSheet.create({
   techRank: { color: colors.customer, fontSize: 13, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'], minWidth: 16, textAlign: 'center', marginTop: 2 },
   techAvatar: { width: 40, height: 40, borderRadius: 14, backgroundColor: colors.customer, alignItems: 'center', justifyContent: 'center' },
   techAvatarImg: { width: 40, height: 40, borderRadius: 14, backgroundColor: colors.customerSoft },
-  techAvatarText: { color: colors.white, fontSize: 17, fontFamily: fonts.extraBold },
+  techAvatarText: { color: colors.onAccent, fontSize: 17, fontFamily: fonts.extraBold },
   techCopy: { flex: 1, gap: 6 },
   techNameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   techName: { color: colors.ink, fontSize: 14, fontFamily: fonts.bold, flex: 1 },
@@ -1010,6 +1010,8 @@ const styles = StyleSheet.create({
   techActionsRow: { flexDirection: 'row', gap: 8 },
   techProfileButton: { flex: 1, minHeight: 44, borderRadius: 12, backgroundColor: colors.customerSoft, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   techProfileButtonText: { color: colors.customer, fontSize: 12, fontFamily: fonts.bold },
-  techMessageButton: { flex: 1, minHeight: 44, borderRadius: 12, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  // Secondary action matches the accent one in shape — both borderless, so the
+  // pair reads as one system instead of one filled pill beside an outlined one.
+  techMessageButton: { flex: 1, minHeight: 44, borderRadius: 12, backgroundColor: colors.appBg, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   techMessageButtonText: { color: colors.ink, fontSize: 12, fontFamily: fonts.bold },
 });

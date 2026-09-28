@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { resetPassword } from '../../services/api';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, themedStyles } from '../../theme';
 
 // Same prototype header family as ForgotPassword (not in prototype, deep-link only).
 const ORANGE = colors.customer;
@@ -98,14 +98,14 @@ export default function PasswordResetScreen({ params, switchToLogin }: PasswordR
           />
         </View>
         <TouchableOpacity style={styles.primary} onPress={handleSubmit} disabled={loading} activeOpacity={0.88} accessibilityRole="button" accessibilityLabel="Save new password">
-          {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>Save New Password</Text>}
+          {loading ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.primaryText}>Save New Password</Text>}
         </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles({
   screen: { flex: 1, backgroundColor: '#FFFFFF' },
   // SafeAreaView in AppNavigator already clears the status bar; keep only a
   // small gap so the back row sits at the top instead of floating mid-screen.
@@ -119,5 +119,5 @@ const styles = StyleSheet.create({
   inputWrap: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 14, backgroundColor: '#F9FAFB', minHeight: 52, justifyContent: 'center', marginBottom: 4 },
   input: { flex: 1, color: colors.ink, fontSize: 15, fontFamily: fonts.medium, paddingVertical: 12 },
   primary: { backgroundColor: ORANGE, borderRadius: 12, minHeight: 52, alignItems: 'center', justifyContent: 'center', marginTop: 20 },
-  primaryText: { color: '#FFFFFF', fontSize: 15, fontFamily: fonts.bold },
+  primaryText: { color: colors.onAccent, fontSize: 15, fontFamily: fonts.bold },
 });

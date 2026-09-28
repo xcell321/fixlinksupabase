@@ -18,15 +18,23 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
+import * as ImagePicker from 'expo-image-picker';
 import Skeleton from '../../components/Skeleton';
+import ConversationInfoSheet from '../../components/ConversationInfoSheet';
+import { PhotoLightbox } from '../../components/RequestPhoto';
 import { fetchJobMessages, fetchMessageInbox, markJobMessagesRead, sendJobMessage } from '../../services/api';
 import { subscribeTyping, setTyping, type TypingPeer } from '../../utils/typingPresence';
 import { subscribeOnlineUids } from '../../utils/onlinePresence';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, themedStyles } from '../../theme';
 import { getStatusColor, getStatusIcon } from '../../utils/applianceIcons';
 import type { ChatMessage, Conversation } from '../../types/message';
 
 type Role = 'customer' | 'technician';
+
+// Only the fields the upload helper needs. Keeps the picker's nullable
+// fileName/mimeType out of the API signature.
+type PickedChatPhoto = { uri: string; fileName?: string; mimeType?: string };
+
 type FilterKey = 'all' | 'active' | 'completed' | 'unread';
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -166,6 +174,10 @@ ChatScreenProps): React.JSX.Element {
   const [threadLoading, setThreadLoading] = useState<boolean>(false);
   const [sending, setSending] = useState<boolean>(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  // Photo staged for the next message, plus the photo open in the viewer.
+  const [pendingPhoto, setPendingPhoto] = useState<PickedChatPhoto | null>(null);
+  const [viewerPhoto, setViewerPhoto] = useState<string | null>(null);
+  const [infoOpen, setInfoOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<FilterKey>('all');
   const [typingPeers, setTypingPeers] = useState<TypingPeer[]>([]);
@@ -347,10 +359,35 @@ ChatScreenProps): React.JSX.Element {
     });
   }, []);
 
+  // Attach a photo to the next message. Only the uri/name/mime triple is kept
+  // so it can be handed straight to the multipart upload helper.
+  const pickPhoto = useCallback(async (): Promise<void> => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      showToast('Photo permission is required to attach an image');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.7,
+    });
+    if (result.canceled) return;
+    const asset = result.assets?.[0];
+    if (!asset) return;
+    setPendingPhoto({
+      uri: asset.uri,
+      fileName: asset.fileName ?? undefined,
+      mimeType: asset.mimeType ?? undefined,
+    });
+  }, [showToast]);
+
   const handleSendMessage = async (): Promise<void> => {
     const text = inputText.trim();
+    const photo = pendingPhoto;
     const jobId = selectedConversation?.jobId;
-    if (!text || !jobId || sending) return;
+    // A message is text, a photo, or both — but never empty.
+    if ((!text && !photo) || !jobId || sending) return;
     setSending(true);
     setSendError(null);
     void setTyping(jobId, { uid: String(currentUser.uid), name: currentUser.name || 'Peer' }, false);
@@ -361,11 +398,14 @@ ChatScreenProps): React.JSX.Element {
       senderName: currentUser.name,
       senderRole: currentUser.role,
       text,
+      // Show the picked file immediately; the uploaded URL replaces it on success.
+      imageUrl: photo?.uri ?? null,
       timestamp: new Date().toISOString(),
       pending: true,
     };
     setMessagesByConv((prev) => ({ ...prev, [jobId]: [...(prev[jobId] ?? []), optimistic] }));
     setInputText('');
+    setPendingPhoto(null);
     setTimeout(() => chatScrollRef.current?.scrollToEnd({ animated: true }), 60);
     try {
       const message = await sendJobMessage(jobId, {
@@ -373,6 +413,7 @@ ChatScreenProps): React.JSX.Element {
         senderName: currentUser.name,
         senderRole: currentUser.role,
         text,
+        photo,
       }) as ChatMessage;
       setMessagesByConv((prev) => ({
         ...prev,
@@ -382,7 +423,9 @@ ChatScreenProps): React.JSX.Element {
       console.warn('Error sending job message:', error);
       setMessagesByConv((prev) => ({ ...prev, [jobId]: (prev[jobId] ?? []).filter((m) => m.id !== optimistic.id) }));
       setInputText(text);
-      setSendError('Message failed to send. Tap Send to retry.');
+      if (photo) setPendingPhoto(photo);
+      const failure = error as { error?: string } | null;
+      setSendError(failure?.error || 'Message failed to send. Tap Send to retry.');
     } finally {
       setSending(false);
     }
@@ -461,11 +504,12 @@ ChatScreenProps): React.JSX.Element {
   if (selectedConversation) {
     const s = selectedConversation;
     const peerPhone = s.peerPhone ?? null;
-    const canSend = inputText.trim().length > 0 && !sending;
+    const canSend = (inputText.trim().length > 0 || pendingPhoto !== null) && !sending;
     const stripColor = getStatusColor(s.status);
     // Read presence from the live uid set rather than a snapshot, so the header
     // follows the 30s inbox poll instead of freezing on the value at open time.
     const peerOnline = onlineUids.has(String(s.peerUid || ''));
+    const lastActivityLabel = formatMessageTime(currentMessages[currentMessages.length - 1]?.timestamp) || undefined;
 
     return (
       <SafeAreaView style={styles.threadContainer} edges={['top', 'bottom']}>
@@ -477,7 +521,7 @@ ChatScreenProps): React.JSX.Element {
             accessibilityRole="button"
             accessibilityLabel="Back to conversations"
             hitSlop={10}
-            onPress={() => setSelectedConversation(null)}
+            onPress={() => { setInfoOpen(false); setSelectedConversation(null); }}
             style={({ pressed }) => [styles.headerBack, pressed && styles.pressedSoft]}
           >
             <Ionicons name="arrow-back" size={22} color={colors.ink} />
@@ -510,7 +554,19 @@ ChatScreenProps): React.JSX.Element {
             onPress={() => handleCall(peerPhone, s.peerName)}
             style={({ pressed }) => [styles.headerCall, { backgroundColor: accent }, pressed && styles.pressedSoft]}
           >
-            <Ionicons name="call" size={18} color={colors.white} />
+            <Ionicons name="call" size={18} color={colors.onAccent} />
+          </Pressable>
+
+          {/* Conversation information: who this is and which job the chat belongs to. */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Conversation details"
+            accessibilityHint="Shows who you are talking to and the job this chat belongs to"
+            hitSlop={8}
+            onPress={() => setInfoOpen(true)}
+            style={({ pressed }) => [styles.headerInfo, pressed && styles.pressedSoft]}
+          >
+            <Ionicons name="information-circle-outline" size={22} color={colors.ink} />
           </Pressable>
         </View>
 
@@ -593,6 +649,7 @@ ChatScreenProps): React.JSX.Element {
                           isMe ? null : styles.bubbleOther,
                           isMe ? { backgroundColor: accent, borderWidth: 0 } : null,
                           msg.pending && styles.bubblePending,
+                          msg.imageUrl ? styles.bubbleWithImage : null,
                           isMe
                             ? {
                                 borderTopRightRadius: isFirstInGroup ? 18 : 8,
@@ -604,9 +661,20 @@ ChatScreenProps): React.JSX.Element {
                               },
                         ]}
                       >
-                        <Text style={[styles.bubbleText, isMe ? styles.bubbleTextMe : styles.bubbleTextOther]} selectable>
-                          {msg.text}
-                        </Text>
+                        {msg.imageUrl ? (
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel="View shared photo"
+                            onPress={() => setViewerPhoto(msg.imageUrl ?? null)}
+                          >
+                            <Image source={{ uri: msg.imageUrl }} style={styles.bubbleImage} resizeMode="cover" />
+                          </Pressable>
+                        ) : null}
+                        {msg.text ? (
+                          <Text style={[styles.bubbleText, isMe ? styles.bubbleTextMe : styles.bubbleTextOther]} selectable>
+                            {msg.text}
+                          </Text>
+                        ) : null}
                       </View>
                       {/* Timestamp shown only for last in group - keeps bubbles lightweight */}
                       {isLastInGroup ? (
@@ -657,8 +725,40 @@ ChatScreenProps): React.JSX.Element {
             </View>
           ) : null}
 
-          {/* Prototype composer: input + send only */}
+          {/* Staged photo, shown above the composer so the input row keeps its
+              alignment (both the plus and send buttons stay 44px). */}
+          {pendingPhoto ? (
+            <View style={styles.photoPreviewRow}>
+              <Image source={{ uri: pendingPhoto.uri }} style={styles.photoPreviewThumb} accessibilityLabel="Attached photo preview" />
+              <View style={styles.photoPreviewCopy}>
+                <Text style={styles.photoPreviewTitle} numberOfLines={1}>Photo attached</Text>
+                <Text style={styles.photoPreviewHint} numberOfLines={1}>Sends with your message</Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Remove attached photo"
+                hitSlop={8}
+                onPress={() => setPendingPhoto(null)}
+                style={({ pressed }) => [styles.photoPreviewRemove, pressed && styles.pressedSoft]}
+              >
+                <Ionicons name="close" size={16} color={colors.muted} />
+              </Pressable>
+            </View>
+          ) : null}
+
           <View style={[styles.composerBar, { paddingBottom: Math.max(8, insets.bottom > 0 ? insets.bottom : 10) }]}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Attach a photo"
+              accessibilityHint="Opens your photo library"
+              hitSlop={6}
+              onPress={pickPhoto}
+              disabled={sending}
+              style={({ pressed }) => [styles.composerPlus, { backgroundColor: accentSoft }, pressed && styles.pressed]}
+            >
+              <Ionicons name="add" size={22} color={accent} />
+            </Pressable>
+
             <View style={styles.composerInputWrap}>
               <TextInput
                 style={styles.composerInput}
@@ -691,13 +791,40 @@ ChatScreenProps): React.JSX.Element {
               ]}
             >
               {sending ? (
-                <ActivityIndicator size="small" color={colors.white} />
+                <ActivityIndicator size="small" color={colors.onAccent} />
               ) : (
-                <Ionicons name="send" size={16} color={colors.white} style={{ marginLeft: 1, marginTop: 1 }} />
+                <Ionicons name="send" size={16} color={colors.onAccent} style={{ marginLeft: 1, marginTop: 1 }} />
               )}
             </Pressable>
           </View>
         </KeyboardAvoidingView>
+
+        <ConversationInfoSheet
+          visible={infoOpen}
+          viewerRole={currentUser.role}
+          peerName={s.peerName}
+          peerInitial={s.peerInitial}
+          peerImage={s.peerImage}
+          peerRoleLabel={s.roleLabel}
+          peerPhone={peerPhone}
+          online={peerOnline}
+          jobCode={s.jobCode}
+          applianceType={s.applianceType}
+          status={s.status}
+          lastActivityLabel={lastActivityLabel}
+          onCall={() => handleCall(peerPhone, s.peerName)}
+          onCopyPhone={() => handleCopyPhone(peerPhone)}
+          onClose={() => setInfoOpen(false)}
+        />
+
+        <PhotoLightbox
+          visible={viewerPhoto !== null}
+          photoUrl={viewerPhoto}
+          title="Shared photo"
+          subtitle="Sent in this conversation"
+          caption="Close this viewer to return to the chat."
+          onClose={() => setViewerPhoto(null)}
+        />
 
         {toast ? (
           <View style={styles.toast}>
@@ -711,7 +838,7 @@ ChatScreenProps): React.JSX.Element {
   // -- Prototype inbox: dark header, conversation cards, no filters --
   return (
     <SafeAreaView style={styles.inboxContainer} edges={['top']}>
-      <StatusBar barStyle="light-content" backgroundColor="#0D1B2A" />
+      <StatusBar barStyle="light-content" backgroundColor={colors.dark} />
 
       <View style={styles.inboxHeaderDark}>
         <Text style={styles.inboxTitleDark}>Messages</Text>
@@ -731,7 +858,7 @@ ChatScreenProps): React.JSX.Element {
             onPress={() => loadInbox(false)}
             style={({ pressed }) => [styles.inlineRetry, pressed && styles.pressed]}
           >
-            <Ionicons name="refresh-outline" size={14} color={colors.white} />
+            <Ionicons name="refresh-outline" size={14} color={colors.onAccent} />
             <Text style={styles.inlineRetryText}>Retry</Text>
           </Pressable>
         </View>
@@ -786,7 +913,7 @@ ChatScreenProps): React.JSX.Element {
 // Helper for bubble radius type
 type ViewStyleWithRadius = { borderTopRightRadius?: number; borderBottomRightRadius?: number; borderTopLeftRadius?: number; borderBottomLeftRadius?: number };
 
-const styles = StyleSheet.create({
+const styles = themedStyles({
   // Shared press
   pressed: { transform: [{ scale: 0.97 }], opacity: 0.96 },
   pressedSoft: { transform: [{ scale: 0.98 }], opacity: 0.92 },
@@ -794,7 +921,7 @@ const styles = StyleSheet.create({
   // -- Prototype inbox: dark header + cards --
   inboxContainer: { flex: 1, backgroundColor: '#F9FAFB' },
   inboxHeaderDark: { backgroundColor: '#0D1B2A', paddingHorizontal: 20, paddingTop: 24, paddingBottom: 20, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
-  inboxTitleDark: { color: '#FFFFFF', fontSize: 21, fontFamily: fonts.extraBold, letterSpacing: -0.3 },
+  inboxTitleDark: { color: colors.onAccent, fontSize: 21, fontFamily: fonts.extraBold, letterSpacing: -0.3 },
   inboxHeader: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -819,7 +946,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  headerUnreadText: { color: colors.white, fontSize: 11, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
+  headerUnreadText: { color: colors.onAccent, fontSize: 11, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
 
   filterBar: {
     backgroundColor: colors.white,
@@ -841,13 +968,13 @@ const styles = StyleSheet.create({
   filterPillActive: { backgroundColor: colors.customer, borderColor: colors.customerDark },
   filterLabel: { fontSize: 13, fontFamily: fonts.semiBold },
   filterLabelIdle: { color: colors.muted },
-  filterLabelActive: { color: colors.white },
+  filterLabelActive: { color: colors.onAccent },
   filterCount: { minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' },
   filterCountIdle: { backgroundColor: '#EDF2F7' },
   filterCountActive: { backgroundColor: 'rgba(255,255,255,0.22)' },
   filterCountText: { fontSize: 11, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
   filterCountTextIdle: { color: colors.muted },
-  filterCountTextActive: { color: colors.white },
+  filterCountTextActive: { color: colors.onAccent },
 
   inlineError: {
     marginHorizontal: 16,
@@ -875,7 +1002,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     justifyContent: 'center',
   },
-  inlineRetryText: { color: colors.white, fontSize: 12, fontFamily: fonts.bold },
+  inlineRetryText: { color: colors.onAccent, fontSize: 12, fontFamily: fonts.bold },
 
   // Prototype conversation cards
   rowCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: '#F3F4F6' },
@@ -891,7 +1018,7 @@ const styles = StyleSheet.create({
   rowOnlineDot: { position: 'absolute', right: -1, bottom: -1, width: 12, height: 12, borderRadius: 6, backgroundColor: '#10B981', borderWidth: 2, borderColor: '#FFFFFF' },
   // Grey = not using the app right now.
   rowDotOffline: { backgroundColor: '#C7CDD6' },
-  rowAvatarText: { color: colors.white, fontFamily: fonts.extraBold, fontSize: 15 },
+  rowAvatarText: { color: colors.onAccent, fontFamily: fonts.extraBold, fontSize: 15 },
   rowAvatarImage: { width: 40, height: 40, borderRadius: 20 },
   rowCenter: { flex: 1, gap: 1, minWidth: 0 },
   rowNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -900,7 +1027,7 @@ const styles = StyleSheet.create({
   rowRole: { fontSize: 11, fontFamily: fonts.regular, color: '#6B7280' },
   rowPreview: { fontSize: 12, fontFamily: fonts.regular, color: '#6B7280', lineHeight: 16, marginTop: 2 },
   rowUnread: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' },
-  rowUnreadText: { color: '#FFFFFF', fontSize: 10, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
+  rowUnreadText: { color: colors.onAccent, fontSize: 10, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
 
   skeletonList: { paddingHorizontal: 16, paddingTop: 12, gap: 16 },
   skeletonRow: { flexDirection: 'row', gap: 12, alignItems: 'center' },
@@ -952,7 +1079,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerAvatarText: { color: colors.white, fontFamily: fonts.extraBold, fontSize: 15 },
+  headerAvatarText: { color: colors.onAccent, fontFamily: fonts.extraBold, fontSize: 15 },
   headerAvatarImage: { width: 40, height: 40, borderRadius: 20 },
   headerCenter: { flex: 1, gap: 2, paddingRight: 4 },
   headerName: { fontSize: 15, fontFamily: fonts.bold, color: colors.ink, lineHeight: 18 },
@@ -965,6 +1092,15 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 22,
     backgroundColor: colors.customer,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Quiet companion to the filled call button: same 44px target, no competing fill.
+  headerInfo: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.canvas,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1053,8 +1189,11 @@ const styles = StyleSheet.create({
   bubbleOther: { backgroundColor: colors.white, borderWidth: StyleSheet.hairlineWidth, borderColor: '#E3ECF2' },
   bubblePending: { opacity: 0.78 },
   bubbleText: { fontSize: 14, fontFamily: fonts.medium, lineHeight: 19 },
-  bubbleTextMe: { color: colors.white },
+  bubbleTextMe: { color: colors.onAccent },
   bubbleTextOther: { color: colors.ink },
+  // A photo bubble hugs its image instead of the 14px text padding.
+  bubbleWithImage: { paddingHorizontal: 5, paddingVertical: 5 },
+  bubbleImage: { width: 220, height: 165, borderRadius: 14, backgroundColor: colors.lineSoft },
   bubbleTime: { fontSize: 10.5, fontFamily: fonts.regular, marginTop: 4, fontVariant: ['tabular-nums'], paddingHorizontal: 2 },
   bubbleTimeMe: { color: '#6B8A9A', alignSelf: 'flex-end' },
   bubbleTimeOther: { color: '#8AA0B5', alignSelf: 'flex-start' },
@@ -1096,6 +1235,21 @@ const styles = StyleSheet.create({
   typingText: { fontSize: 12, fontFamily: fonts.medium, color: colors.muted, flexShrink: 1 },
   typingDots: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   typingDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.muted },
+  photoPreviewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: colors.white,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.line,
+  },
+  photoPreviewThumb: { width: 40, height: 40, borderRadius: 10, backgroundColor: colors.lineSoft },
+  photoPreviewCopy: { flex: 1, minWidth: 0 },
+  photoPreviewTitle: { fontSize: 12, fontFamily: fonts.bold, color: colors.ink },
+  photoPreviewHint: { fontSize: 11, fontFamily: fonts.regular, color: colors.muted, marginTop: 1 },
+  photoPreviewRemove: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center' },
   composerPlus: {
     width: 44,
     height: 44,
@@ -1106,6 +1260,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // No vertical padding here: the field's own padding sets its height, so an
+  // empty composer is exactly as tall as the 44px send button beside it and the
+  // two bottoms line up. Padding here used to make the pill 48px tall, which is
+  // why the send button looked misaligned.
   composerInputWrap: {
     flex: 1,
     minHeight: 44,
@@ -1115,7 +1273,7 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     borderRadius: 22,
     paddingHorizontal: 14,
-    paddingVertical: 6,
+    paddingVertical: 0,
     justifyContent: 'center',
   },
   composerInput: { flex: 1, fontSize: 15, fontFamily: fonts.medium, color: colors.ink, paddingVertical: 8, lineHeight: 20, maxHeight: 96 },
@@ -1140,5 +1298,5 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: 'center',
   },
-  toastText: { color: colors.white, fontSize: 13, fontFamily: fonts.semiBold, textAlign: 'center' },
+  toastText: { color: colors.onAccent, fontSize: 13, fontFamily: fonts.semiBold, textAlign: 'center' },
 });

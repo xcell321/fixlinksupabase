@@ -5,6 +5,7 @@ import React from 'react';
 import { Image, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { styles } from './availableJobsStyles';
+import { colors } from '../../../theme';
 
 interface QueueHeaderProps {
   technicianName: string;
@@ -76,7 +77,7 @@ export const QueueHeader = ({
             hitSlop={8}
             style={({ pressed }) => [styles.protoBell, pressed && styles.pressedSoft]}
           >
-            <Ionicons name="notifications-outline" size={18} color="#FFFFFF" />
+            <Ionicons name="notifications-outline" size={18} color={colors.onAccent} />
             {notificationCount > 0 && (
               <View style={styles.notifBadge}>
                 <Text style={styles.notifBadgeText}>{notificationCount > 9 ? '9+' : notificationCount}</Text>

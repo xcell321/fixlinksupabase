@@ -9,7 +9,7 @@ import { submitRepairRequest, fetchPlatformCategories } from "../../services/api
 import { geocodeAddress, geocodeAddressPrecise, geocodeAddressStructured, reverseGeocodePrecise } from "../../services/locationIq";
 import { collectBestFix, distanceInMeters } from "./locationFix";
 import CustomerLocationMap from "../../components/CustomerLocationMap";
-import { colors, fonts, shadows } from '../../theme';
+import { colors, fonts, shadows, themedStyles } from '../../theme';
 import { getApplianceIcon, type IconName } from '../../utils/applianceIcons';
 
 type CurrentUserRef = {
@@ -1017,7 +1017,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
                     hitSlop={8}
                   >
                     <View style={[styles.slotRadio, isActive && styles.slotRadioActive]}>
-                      {isActive ? <Ionicons name="checkmark" size={14} color="#FFFFFF" /> : <Ionicons name="calendar-outline" size={14} color="#9CA3AF" />}
+                      {isActive ? <Ionicons name="checkmark" size={14} color={colors.onAccent} /> : <Ionicons name="calendar-outline" size={14} color={colors.subtle} />}
                     </View>
                     <Text style={styles.slotRowText}>{slot}</Text>
                   </TouchableOpacity>
@@ -1036,7 +1036,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
                 hitSlop={8}
               >
                 <View style={[styles.slotRadio, isCustomTime && styles.slotRadioActive]}>
-                  {isCustomTime ? <Ionicons name="checkmark" size={14} color="#FFFFFF" /> : <Ionicons name="time-outline" size={14} color="#9CA3AF" />}
+                  {isCustomTime ? <Ionicons name="checkmark" size={14} color={colors.onAccent} /> : <Ionicons name="time-outline" size={14} color={colors.subtle} />}
                 </View>
                 <Text style={styles.slotRowText}>
                   {isCustomTime ? selectedTimeSlot : 'Exact Time...'}
@@ -1088,7 +1088,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
               <Skeleton width="100%" height={144} radius={16} />
               <View style={styles.mapSkeletonBody}>
                 <View style={styles.mapPin}>
-                  <Ionicons name="locate" size={20} color="#FFFFFF" />
+                  <Ionicons name="locate" size={20} color={colors.onAccent} />
                 </View>
                 <View style={styles.mapSkeletonStatus}>
                   <ActivityIndicator size="small" color={colors.customer} />
@@ -1108,7 +1108,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
           ) : (
             <View style={styles.mapPlaceholder}>
               <View style={styles.mapPin}>
-                <Ionicons name="location" size={20} color="#FFFFFF" />
+                <Ionicons name="location" size={20} color={colors.onAccent} />
               </View>
               <Text style={styles.mapPlaceholderText}>Tap "Use my current location" to drop your pin</Text>
             </View>
@@ -1252,7 +1252,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
                 <View key={s.key} style={styles.dotCell}>
                   <View style={[styles.dot, isCompleted && styles.dotCompleted, isActive && styles.dotActive, isUpcoming && styles.dotUpcoming]}>
                     {isCompleted ? (
-                      <Ionicons name="checkmark" size={12} color={colors.white} />
+                      <Ionicons name="checkmark" size={12} color={colors.onAccent} />
                     ) : (
                       <Text style={[styles.dotText, isActive && styles.dotTextActive, isUpcoming && styles.dotTextUpcoming]}>{stepNum}</Text>
                     )}
@@ -1318,7 +1318,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
               hitSlop={8}
             >
               {loading ? (
-                <ActivityIndicator color={colors.white} />
+                <ActivityIndicator color={colors.onAccent} />
               ) : (
                 <Text style={styles.primaryButtonText}>Submit Request</Text>
               )}
@@ -1452,7 +1452,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles({
   scrollContent: { flexGrow: 1, paddingHorizontal: 16, paddingTop: 20, paddingBottom: 36, backgroundColor: colors.white, alignItems: 'center' as const },
   centerWrap: { width: '100%' as const, maxWidth: 480, alignSelf: 'center' as const },
   sectionHeaderContainer: { marginBottom: 20, marginTop: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -1490,7 +1490,7 @@ const styles = StyleSheet.create({
   dotCompleted: { backgroundColor: colors.customer, borderColor: colors.customer },
   dotUpcoming: { backgroundColor: colors.white, borderColor: colors.line },
   dotText: { fontSize: 16, fontFamily: fonts.bold, color: colors.muted, fontVariant: ['tabular-nums'] as const },
-  dotTextActive: { color: colors.white },
+  dotTextActive: { color: colors.onAccent },
   dotTextUpcoming: { color: colors.muted },
   dotLabel: { fontSize: 11, fontFamily: fonts.semiBold, color: colors.muted, letterSpacing: 0.3, textAlign: 'center' as const, lineHeight: 16, marginTop: 2 },
   dotLabelActive: { color: colors.customer, fontFamily: fonts.bold },
@@ -1599,7 +1599,7 @@ const styles = StyleSheet.create({
   locationContainer: { flexDirection: 'row', flexWrap: 'wrap' as const, alignItems: 'center', gap: 10 },
   locationFieldWrap: { position: 'relative', zIndex: 20 },
   locateButton: { backgroundColor: colors.customer, height: 52, paddingHorizontal: 16, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 6, boxShadow: '0 4px 10px rgba(15,118,110,0.18)', elevation: 3, minWidth: 92, flex: 1, justifyContent: 'center' },
-  locateButtonText: { color: colors.white, fontSize: 13, fontFamily: fonts.bold },
+  locateButtonText: { color: colors.onAccent, fontSize: 13, fontFamily: fonts.bold },
   locateRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, borderRadius: 14, borderWidth: 1.5, borderColor: colors.customer, backgroundColor: colors.customerSoft, paddingHorizontal: 16, elevation: 0 },
   locateRowText: { color: colors.customer, fontSize: 13, fontFamily: fonts.semiBold },
   locateErrorText: { color: '#B91C1C', fontSize: 12, fontFamily: fonts.semiBold, marginTop: 8, lineHeight: 17 },
@@ -1651,7 +1651,7 @@ const styles = StyleSheet.create({
   primaryButton: { backgroundColor: colors.customer, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, ...shadows.card, paddingHorizontal: 20 },
   primaryButtonFlex: { flex: 1, minWidth: 0 },
   primaryButtonMuted: { opacity: 0.55 },
-  primaryButtonText: { color: colors.white, fontSize: 15, fontFamily: fonts.bold, letterSpacing: 0.4 },
+  primaryButtonText: { color: colors.onAccent, fontSize: 15, fontFamily: fonts.bold, letterSpacing: 0.4 },
   primaryButtonTextMuted: { opacity: 0.85 },
   navHint: { fontSize: 12, fontFamily: fonts.medium, color: colors.muted, textAlign: 'center', marginTop: 10, lineHeight: 16 },
 

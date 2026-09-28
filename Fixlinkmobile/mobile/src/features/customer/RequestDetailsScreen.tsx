@@ -5,7 +5,8 @@ import * as Clipboard from 'expo-clipboard';
 import { confirmRepairRequest, fetchTechnicianProfile, markCustomerReady } from '../../services/api';
 import { PhotoLightbox } from '../../components/RequestPhoto';
 import ConfirmDialog from '../../components/ConfirmDialog';
-import { colors, fonts } from '../../theme';
+import RecommendedTechSheet from '../../components/RecommendedTechSheet';
+import { colors, fonts, themedStyles } from '../../theme';
 import { getStatusColor } from '../../utils/applianceIcons';
 import { splitJobDescription } from '../../utils/jobDescription';
 
@@ -85,6 +86,8 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
   const [photoViewerVisible, setPhotoViewerVisible] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [workflowError, setWorkflowError] = useState<string | null>(null);
+  // Floating AI match: the ranked shortlist of technicians for THIS job.
+  const [matchSheetVisible, setMatchSheetVisible] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -202,7 +205,7 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
       <View style={styles.backHeader}>
         <TouchableOpacity onPress={onBack} style={styles.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityRole="button" accessibilityLabel="Go back">
@@ -231,7 +234,7 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
 
         {isTerminal && (
           <View style={styles.terminalBanner}>
-            <Ionicons name={isCancelled ? 'close-circle' : 'alert-circle'} size={18} color="#DC2626" />
+            <Ionicons name={isCancelled ? 'close-circle' : 'alert-circle'} size={18} color={colors.danger} />
             <Text style={styles.terminalText}>
               {isCancelled ? 'This request was cancelled.' : 'No-show reported. No one was at the service location.'}
             </Text>
@@ -246,7 +249,7 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
               <View key={s.label} style={styles.timelineRow}>
                 <View style={styles.timelineRail}>
                   <View style={[styles.timelineDot, s.done ? styles.timelineDotDone : styles.timelineDotTodo]}>
-                    {s.done && <Ionicons name="checkmark" size={10} color="#FFFFFF" />}
+                    {s.done && <Ionicons name="checkmark" size={10} color={colors.onAccent} />}
                   </View>
                   {i < timelineSteps.length - 1 && <View style={[styles.timelineLine, s.done && styles.timelineLineDone]} />}
                 </View>
@@ -276,28 +279,30 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
                   </Text>
                 </View>
               </View>
+              {/* One row, one shape: Message keeps the accent, Call and Profile
+                  are the same quiet secondary — no stray outlines. */}
               <View style={styles.techActions}>
-                <TouchableOpacity style={styles.messageBtn} onPress={onMessageTechnician} activeOpacity={0.88} accessibilityRole="button" accessibilityLabel="Message technician">
-                  <Ionicons name="chatbubble-ellipses-outline" size={16} color="#EA580C" />
-                  <Text style={styles.messageText}>Message</Text>
+                <TouchableOpacity style={[styles.techActionBtn, styles.techActionPrimary]} onPress={onMessageTechnician} activeOpacity={0.88} accessibilityRole="button" accessibilityLabel="Message technician">
+                  <Ionicons name="chatbubble-ellipses-outline" size={16} color={colors.customerDark} />
+                  <Text style={[styles.techActionText, styles.techActionTextPrimary]}>Message</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.callBtn} onPress={handleCall} activeOpacity={0.88} accessibilityRole="button" accessibilityLabel="Call technician">
+                <TouchableOpacity style={[styles.techActionBtn, styles.techActionSecondary]} onPress={handleCall} activeOpacity={0.88} accessibilityRole="button" accessibilityLabel="Call technician">
                   <Ionicons name="call-outline" size={16} color="#374151" />
-                  <Text style={styles.callText}>Call</Text>
+                  <Text style={styles.techActionText}>Call</Text>
                 </TouchableOpacity>
+                {request.technicianUid && onViewTechnicianProfile ? (
+                  <TouchableOpacity
+                    style={[styles.techActionBtn, styles.techActionSecondary]}
+                    onPress={() => onViewTechnicianProfile({ uid: request.technicianUid, name: request.technicianName })}
+                    activeOpacity={0.88}
+                    accessibilityRole="button"
+                    accessibilityLabel="View technician profile"
+                  >
+                    <Ionicons name="person-outline" size={16} color={colors.ink} />
+                    <Text style={styles.techActionText}>Profile</Text>
+                  </TouchableOpacity>
+                ) : null}
               </View>
-              {request.technicianUid && onViewTechnicianProfile ? (
-                <TouchableOpacity
-                  style={styles.viewProfileBtn}
-                  onPress={() => onViewTechnicianProfile({ uid: request.technicianUid, name: request.technicianName })}
-                  activeOpacity={0.88}
-                  accessibilityRole="button"
-                  accessibilityLabel="View technician profile"
-                >
-                  <Ionicons name="person-outline" size={16} color={colors.customer} />
-                  <Text style={styles.viewProfileText}>View Profile</Text>
-                </TouchableOpacity>
-              ) : null}
             </>
           ) : (
             <Text style={styles.waitingText}>Waiting for a technician to accept this request.</Text>
@@ -340,17 +345,17 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
         ) : null}
         {isAccepted && (
           <TouchableOpacity style={styles.primaryBtn} onPress={handleConfirmRepair} disabled={workflowLoading === 'confirm'} activeOpacity={0.88}>
-            {workflowLoading === 'confirm' ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryBtnText}>Confirm Repair</Text>}
+            {workflowLoading === 'confirm' ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.primaryBtnText}>Confirm Repair</Text>}
           </TouchableOpacity>
         )}
         {isConfirmed && (
           <TouchableOpacity style={styles.primaryBtn} onPress={handleMarkReady} disabled={workflowLoading === 'ready'} activeOpacity={0.88}>
-            {workflowLoading === 'ready' ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryBtnText}>I&apos;m Ready for the Technician</Text>}
+            {workflowLoading === 'ready' ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.primaryBtnText}>I&apos;m Ready for the Technician</Text>}
           </TouchableOpacity>
         )}
         {isActive && onTrackMap && (
           <TouchableOpacity style={styles.primaryBtn} onPress={() => onTrackMap(request)} activeOpacity={0.88}>
-            <Ionicons name="map" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+            <Ionicons name="map" size={18} color={colors.onAccent} style={{ marginRight: 8 }} />
             <Text style={styles.primaryBtnText}>Track Technician on Live Map</Text>
           </TouchableOpacity>
         )}
@@ -377,6 +382,28 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
         ) : null}
       </ScrollView>
 
+      {/* Floating AI: opens the ranked technician matches for this request. */}
+      {!isTerminal && !isCompleted ? (
+        <TouchableOpacity
+          style={styles.aiFab}
+          onPress={() => setMatchSheetVisible(true)}
+          activeOpacity={0.88}
+          accessibilityRole="button"
+          accessibilityLabel="See AI-recommended technicians for this request"
+          hitSlop={8}
+        >
+          <Image source={require('../../../assets/ai-assistant.png')} style={styles.aiFabImage} accessibilityLabel="FixLink AI" />
+        </TouchableOpacity>
+      ) : null}
+
+      <RecommendedTechSheet
+        visible={matchSheetVisible}
+        jobId={request.id}
+        applianceType={request.applianceType ?? null}
+        onClose={() => setMatchSheetVisible(false)}
+        onViewProfile={(tech) => { setMatchSheetVisible(false); onViewTechnicianProfile?.(tech); }}
+      />
+
       <PhotoLightbox
         visible={photoViewerVisible}
         photoUrl={request.photoUrl}
@@ -398,12 +425,16 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
+  // Same floating robot as the Home tab, so the AI entry point feels like one system.
+  aiFab: { position: 'absolute', right: 20, bottom: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', elevation: 6, boxShadow: '0 6px 14px rgba(16,42,67,0.25)', overflow: 'hidden' },
+  aiFabImage: { width: 56, height: 56, borderRadius: 28 },
   backHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 16, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
   backBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   backTitle: { color: '#111827', fontSize: 15, fontFamily: fonts.semiBold },
-  scrollContent: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 28, gap: 16 },
+  // Extra bottom room so the floating AI button never covers the last card.
+  scrollContent: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 96, gap: 16 },
   card: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#F3F4F6' },
   workflowErrorBox: { backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', borderRadius: 12, padding: 12, marginBottom: 12 },
   workflowErrorText: { color: '#B91C1C', fontSize: 12, fontFamily: fonts.semiBold, lineHeight: 17 },
@@ -433,19 +464,18 @@ const styles = StyleSheet.create({
   timelineTime: { fontSize: 12, fontFamily: fonts.regular, color: '#9CA3AF', marginTop: 1 },
   techRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
   avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#3B82F6', alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: '#FFFFFF', fontSize: 15, fontFamily: fonts.extraBold },
+  avatarText: { color: colors.onAccent, fontSize: 15, fontFamily: fonts.extraBold },
   techCopy: { flex: 1, minWidth: 0 },
   techName: { color: '#111827', fontSize: 14, fontFamily: fonts.semiBold },
   starsRow: { flexDirection: 'row', gap: 2, marginTop: 3 },
   techMeta: { color: '#6B7280', fontSize: 12, fontFamily: fonts.regular, marginTop: 2 },
   waitingText: { color: '#6B7280', fontSize: 13, fontFamily: fonts.regular },
-  techActions: { flexDirection: 'row', gap: 8 },
-  messageBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#FFF7ED', borderRadius: 12, paddingVertical: 10 },
-  messageText: { color: '#EA580C', fontSize: 14, fontFamily: fonts.semiBold },
-  callBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#F9FAFB', borderRadius: 12, paddingVertical: 10 },
-  callText: { color: '#374151', fontSize: 14, fontFamily: fonts.semiBold },
-  viewProfileBtn: { marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: colors.line, borderRadius: 12, paddingVertical: 12, minHeight: 48 },
-  viewProfileText: { color: colors.customer, fontSize: 14, fontFamily: fonts.bold },
+  techActions: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  techActionBtn: { flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 12, paddingHorizontal: 8 },
+  techActionPrimary: { backgroundColor: colors.customerSoft },
+  techActionSecondary: { backgroundColor: colors.appBg },
+  techActionText: { color: colors.ink, fontSize: 13, fontFamily: fonts.semiBold },
+  techActionTextPrimary: { color: colors.customerDark },
   codeHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   codeTitle: { color: '#111827', fontSize: 14, fontFamily: fonts.bold },
   codeDigitsRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
@@ -453,7 +483,7 @@ const styles = StyleSheet.create({
   codeDigitText: { color: '#111827', fontSize: 22, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
   codeSub: { color: '#6B7280', fontSize: 12, fontFamily: fonts.regular, lineHeight: 17 },
   primaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.customer, borderRadius: 12, minHeight: 52, paddingHorizontal: 16 },
-  primaryBtnText: { color: '#FFFFFF', fontSize: 14, fontFamily: fonts.semiBold },
+  primaryBtnText: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.semiBold },
   photoWrap: { marginBottom: 12 },
   photoImage: { width: '100%', height: 160, borderRadius: 12, backgroundColor: '#F3F4F6' },
   photoHintRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },

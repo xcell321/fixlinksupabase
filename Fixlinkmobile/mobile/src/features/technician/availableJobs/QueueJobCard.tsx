@@ -112,13 +112,13 @@ export const QueueJobCard = ({
         accessibilityLabel={`Accept repair job for ${job.applianceType || 'request'}`}
       >
         {acceptingJobId === job.id ? (
-          <ActivityIndicator color={colors.white} size="small" />
+          <ActivityIndicator color={colors.onAccent} size="small" />
         ) : (
           <>
             <Ionicons
               name="checkmark-circle"
               size={16}
-              color={colors.white}
+              color={colors.onAccent}
               style={{ marginRight: 6 }}
             />
             <Text style={styles.primaryBtnText}>Accept Job</Text>

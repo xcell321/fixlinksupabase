@@ -27,13 +27,27 @@ const chatController = require('../controllers/chatController');
 const trackingController = require('../controllers/trackingController');
 const notificationController = require('../controllers/notificationController');
 
+// Multer errors default to an HTML 500 page, which the app cannot display.
+// Convert them to JSON so chat and submit screens show a readable message.
+const handlePhotoUpload = (field) => (req, res, next) => {
+  memoryUpload.single(field)(req, res, (err) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ error: 'The photo must be 5MB or smaller. Please use a smaller image.' });
+      }
+      return res.status(400).json({ error: 'Photo upload failed. Please use an image file.' });
+    }
+    next();
+  });
+};
+
 // Every endpoint requires a valid session, then the shared per-user budget.
 // Both run at router level so no route can accidentally ship unguarded.
 router.use(requireAuth);
 router.use(perUserLimiter);
 
 // --- Repair requests: submit + available feed ------------------------------
-router.post('/', memoryUpload.single('photo'), jobController.submitRequest);
+router.post('/', handlePhotoUpload('photo'), jobController.submitRequest);
 router.get('/', jobController.listAvailableJobs);
 
 // --- Chat: unread badge + inbox --------------------------------------------
@@ -59,7 +73,8 @@ router.get('/technician/:technicianUid', jobController.listTechnicianJobs);
 
 // --- Chat: the message thread itself ---------------------------------------
 router.get('/accepted/:id/messages', chatController.listMessages);
-router.post('/accepted/:id/messages', chatController.sendMessage);
+// Optional photo attachment: JSON when text-only, multipart when a photo rides along.
+router.post('/accepted/:id/messages', handlePhotoUpload('photo'), chatController.sendMessage);
 
 // --- Queue actions ---------------------------------------------------------
 router.put('/:id/decline', jobController.declineJob);

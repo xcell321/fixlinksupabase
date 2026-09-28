@@ -8,6 +8,8 @@ const userRepository = require('../repositories/userRepository');
 const { serializeMessage, serializeUnreadNotification } = require('../domain/chatSerializer');
 const { groupReadsByMessage } = require('../domain/readReceipts');
 const { HttpError } = require('../domain/httpError');
+const { uploadBuffer } = require('../config/supabase');
+const { withTimeout } = require('../utils/async');
 const { NOTIFICATION_TYPES } = require('./notificationService');
 
 const CHAT_ROLES = ['customer', 'technician'];
@@ -161,7 +163,8 @@ const getInbox = async ({ uid, role, authUid }) => {
       status: job.status || 'Active',
       lastMessage: lastMessage
         ? {
-            text: lastMessage.text || '',
+            text: lastMessage.text || (lastMessage.image_url ? 'Sent a photo' : ''),
+            imageUrl: lastMessage.image_url || null,
             senderName: lastMessage.sender_name || 'Contact',
             senderUid: lastMessage.sender_uid ? String(lastMessage.sender_uid) : null,
             timestamp: lastMessage.timestamp ? new Date(lastMessage.timestamp).toISOString() : null,
@@ -187,45 +190,65 @@ const listMessages = async ({ jobId, authUid }) => {
 };
 
 // POST /api/requests/accepted/:id/messages
-const sendMessage = async ({ jobId, authUid, senderUid, senderName, senderRole, text }) => {
-  if (!senderUid || !senderName || !senderRole || !String(text || '').trim()) {
-    throw new HttpError(400, { error: 'Sender identity and message text are required.' });
+// A message carries text, a photo, or both — but never nothing.
+const sendMessage = async ({ jobId, authUid, senderUid, senderName, senderRole, text, file }) => {
+  const messageText = String(text || '').trim();
+  if (!senderUid || !senderName || !senderRole || (!messageText && !file)) {
+    throw new HttpError(400, { error: 'Sender identity and a message or photo are required.' });
+  }
+  if (!CHAT_ROLES.includes(String(senderRole))) {
+    throw new HttpError(400, { error: 'Sender role must be customer or technician.' });
   }
   if (String(senderUid) !== authUid) {
     throw new HttpError(403, { error: 'Sender identity does not match the authenticated account.' });
   }
+  if (file && !String(file.mimetype || '').startsWith('image/')) {
+    throw new HttpError(400, { error: 'Only image attachments can be sent in chat.' });
+  }
 
   const job = await requireParticipant(jobId, authUid);
 
-  const messageText = String(text).trim();
+  // Upload first: a failed upload must never leave a half-saved message behind.
+  let imageUrl = null;
+  if (file) {
+    try {
+      imageUrl = await withTimeout(uploadBuffer({
+        folder: 'chat-images',
+        file,
+        buffer: file.buffer,
+        contentType: file.mimetype,
+      }), 45000, 'Photo upload timed out. Please try again with a smaller image.');
+    } catch (uploadError) {
+      console.error('Chat photo upload failed:', uploadError.message);
+      const timedOut = /timed out|timeout/i.test(String(uploadError.message || ''));
+      throw new HttpError(timedOut ? 504 : 502, { error: `Photo upload failed: ${uploadError.message}. Please try again.` });
+    }
+  }
+
   const { data, error } = await messageRepository.sendChatMessage({
     jobId: job.id,
     senderUid: String(senderUid),
     senderName: String(senderName),
     senderRole: String(senderRole),
     text: messageText,
+    imageUrl,
   });
 
   if (error) {
     console.error('Error saving job message:', error.message);
+    // A stale database (schema.sql migration not run, or the PostgREST
+    // schema cache not reloaded) surfaces here as a missing-function error.
+    // Fail retryable instead of a flat 500 so the app can ask for a retry.
+    if (/could not find the function|PGRST202|schema cache/i.test(String(error.message || '') + String(error.code || ''))) {
+      console.error('Chat RPC missing: run backend/src/db/schema.sql in Supabase SQL Editor, then reload the PostgREST schema cache.');
+      throw new HttpError(503, { error: 'Chat is temporarily unavailable. Please try again in a moment.' });
+    }
     throw new HttpError(500, { error: 'Unable to save job message.' });
   }
 
-  const recipientUid = String(senderRole) === 'technician' ? job.customer_uid : job.technician_uid;
-  if (recipientUid && String(recipientUid) !== String(senderUid)) {
-    const { error: notificationError } = await notificationRepository.insertOne({
-      type: 'chat',
-      recipient_uid: String(recipientUid),
-      sender_uid: String(senderUid),
-      sender_name: String(senderName),
-      job_id: job.id,
-      message_id: data,
-      text: messageText,
-      timestamp: new Date().toISOString(),
-      read: false,
-    });
-    if (notificationError) console.warn('Unable to create chat notification:', notificationError.message);
-  }
+  // The `send_chat_message` RPC already fans out the chat notification
+  // atomically with the message insert. Do not insert a second row here,
+  // or every message would appear twice in the feed and badge.
 
   return {
     status: 201,
@@ -235,6 +258,7 @@ const sendMessage = async ({ jobId, authUid, senderUid, senderName, senderRole, 
       senderName: String(senderName),
       senderRole: String(senderRole),
       text: messageText,
+      imageUrl,
       timestamp: new Date().toISOString(),
       readBy: [String(senderUid)],
     },

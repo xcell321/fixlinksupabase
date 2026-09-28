@@ -96,7 +96,7 @@ export default function AvailableJobsScreen({
     otpModalVisible,
     setOtpModalVisible,
     otpCode,
-    setOtpCode,
+    otpError,
     verifyingOtp,
     handleAcceptJob,
     doAcceptJob,
@@ -108,6 +108,7 @@ export default function AvailableJobsScreen({
     doNoShow,
     openOtpModal,
     handleVerifyOtp,
+    handleOtpCodeChange,
   } = actions;
 
   const technicianName = technician?.name || 'Technician';
@@ -322,12 +323,13 @@ export default function AvailableJobsScreen({
       </View>
       )}
 
-      {/* 4-Digit OTP Completion Handshake Modal */}
+      {/* 4-Digit OTP Completion Handshake Sheet */}
       <OtpModal
         visible={otpModalVisible}
         otpCode={otpCode}
         verifying={verifyingOtp}
-        onChangeCode={setOtpCode}
+        error={otpError}
+        onChangeCode={handleOtpCodeChange}
         onClose={() => setOtpModalVisible(false)}
         onVerify={handleVerifyOtp}
       />

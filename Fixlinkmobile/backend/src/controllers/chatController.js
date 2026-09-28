@@ -41,6 +41,8 @@ const sendMessage = handleRequest(
     senderName: req.body?.senderName,
     senderRole: req.body?.senderRole,
     text: req.body?.text,
+    // Present only when the message was posted as multipart with a photo.
+    file: req.file,
   })
 );
 

@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useMemo } from 'react';
 import { StyleSheet, View, Platform, ActivityIndicator, type StyleProp, type ViewStyle } from 'react-native';
 import { getLocationIqTileUrl } from '../services/locationIq';
+import { colors, themedStyles } from '../theme';
 
 // Latitude/longitude are nullable because a job pin is genuinely unresolved
 // until geocoding or live tracking fills it; every use below guards first.
@@ -267,7 +268,7 @@ export default function LocationIQMap({
         startInLoadingState={true}
         renderLoading={() => (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#0F766E" />
+            <ActivityIndicator size="large" color={colors.teal} />
           </View>
         )}
       />
@@ -275,7 +276,7 @@ export default function LocationIQMap({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles({
   container: { width: '100%', height: '100%', backgroundColor: '#EEF2F5', overflow: 'hidden' },
   webView: { flex: 1, backgroundColor: 'transparent' },
   loadingContainer: { ...StyleSheet.absoluteFill, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F5F8FA' } as const,

@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import TechnicianLocationMap from '../../components/TechnicianLocationMap';
 import { fetchRepairRequests } from '../../services/api';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, themedStyles } from '../../theme';
 import { type JobItem } from './availableJobsHelpers';
 import { getApplianceIcon } from '../../utils/applianceIcons';
 
@@ -117,11 +117,11 @@ export default function TechMapScreen({ technician, onOpenJob }: TechMapScreenPr
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles({
   screen: { flex: 1, backgroundColor: '#F9FAFB' },
   content: { paddingBottom: 28 },
   header: { backgroundColor: DARK, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 20, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
-  title: { color: '#FFFFFF', fontSize: 21, fontFamily: fonts.extraBold, letterSpacing: -0.3 },
+  title: { color: colors.onAccent, fontSize: 21, fontFamily: fonts.extraBold, letterSpacing: -0.3 },
   subtitle: { color: '#9CA3AF', fontSize: 13, fontFamily: fonts.regular, marginTop: 4 },
   body: { paddingHorizontal: 20, paddingTop: 20, gap: 16 },
   mapCard: { backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E5E7EB', overflow: 'hidden', height: 220 },

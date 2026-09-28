@@ -19,7 +19,7 @@ import {
   updateTechnicianLocation
 } from '../../services/api';
 import { geocodeAddressPrecise, getDrivingRoute } from '../../services/locationIq';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, themedStyles } from '../../theme';
 import { getApplianceIcon } from '../../utils/applianceIcons';
 import { customerPinFromJob, distanceInKm } from './trackingGeometry';
 
@@ -423,7 +423,7 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
           Select an accepted repair from your Jobs feed to start turn-by-turn navigation to the customer's home.
         </Text>
         <TouchableOpacity style={styles.emptyButton} onPress={onNavigateToJobs || onBack} activeOpacity={0.88}>
-          <Ionicons name="briefcase-outline" size={18} color={colors.white} />
+          <Ionicons name="briefcase-outline" size={18} color={colors.onAccent} />
           <Text style={styles.emptyButtonText}>Go to My Jobs</Text>
         </TouchableOpacity>
       </View>
@@ -631,7 +631,7 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles({
   container: { flex: 1, backgroundColor: colors.canvas },
 
   // Map hero - dominant
@@ -683,7 +683,7 @@ const styles = StyleSheet.create({
     minWidth: 22,
     alignItems: 'center',
   },
-  activeJobsBadgeText: { color: colors.white, fontSize: 11, fontFamily: fonts.bold, textAlign: 'center' },
+  activeJobsBadgeText: { color: colors.onAccent, fontSize: 11, fontFamily: fonts.bold, textAlign: 'center' },
 
   // Bottom panel - ONE coherent navigation workspace
   bottomPanel: {
@@ -762,7 +762,7 @@ const styles = StyleSheet.create({
   },
   jobCopy: { flex: 1, minWidth: 0 },
   jobName: { color: colors.ink, fontSize: 13, fontFamily: fonts.bold, lineHeight: 16 },
-  jobNameSelected: { color: colors.white },
+  jobNameSelected: { color: colors.onAccent },
   jobCustomer: { color: colors.muted, fontSize: 11, fontFamily: fonts.medium, marginTop: 2, lineHeight: 14 },
   jobCustomerSelected: { color: 'rgba(255,255,255,0.9)' },
   selectedCheck: {
@@ -831,7 +831,7 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 16,
   },
-  primaryCtaText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold, letterSpacing: 0.1 },
+  primaryCtaText: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bold, letterSpacing: 0.1 },
 
   // Secondary group - subordinate
   secondaryGroup: { flexDirection: 'column', gap: 8 },
@@ -870,5 +870,5 @@ const styles = StyleSheet.create({
   emptyTitle: { color: colors.ink, fontSize: 18, fontFamily: fonts.bold, marginBottom: 8, textAlign: 'center' },
   emptySubtitle: { color: colors.muted, fontSize: 13, textAlign: 'center', lineHeight: 19, marginBottom: 20, fontFamily: fonts.regular, paddingHorizontal: 12 },
   emptyButton: { height: 48, borderRadius: 12, backgroundColor: colors.tech, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 160, justifyContent: 'center' },
-  emptyButtonText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
+  emptyButtonText: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bold },
 });

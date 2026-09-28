@@ -92,6 +92,21 @@ export function formatReviewDate(dateStr?: string | null): string {
   });
 }
 
+// Portfolio cards show only when the photo was added — the date AND the time,
+// so "uploaded" is unambiguous rather than a bare month.
+export function formatUploadTimestamp(dateStr?: string | null): string {
+  if (!dateStr) return '';
+  const time = new Date(dateStr).getTime();
+  if (Number.isNaN(time)) return '';
+  return new Date(dateStr).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 export function formatSkillList(skills?: string[] | string | null): string[] {
   if (!skills) {
     return [];

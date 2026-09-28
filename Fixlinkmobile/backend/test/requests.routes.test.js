@@ -63,6 +63,7 @@ test('routes keep their extra middleware (uploads, limiters, OTP gate)', () => {
   const expectedMiddlewareDepth = {
     'POST /': 2, // multer upload.single('photo') + handler
     'GET /messages/unread': 2, // unreadLimiter + handler
+    'POST /accepted/:id/messages': 2, // multer upload.single('photo') + handler
     'POST /:id/verify-completion': 3, // otpVerifyLimiter + otpGate + handler
   };
 

@@ -45,7 +45,7 @@ export const AcceptConfirmModal = ({ job, accepting, onCancel, onConfirm }: Acce
             style={({ pressed }) => [styles.primaryBtn, styles.confirmAccept, pressed && styles.pressedSoft]}
           >
             {accepting ? (
-              <ActivityIndicator color={colors.white} size="small" />
+              <ActivityIndicator color={colors.onAccent} size="small" />
             ) : (
               <Text style={styles.primaryBtnText}>Accept Job</Text>
             )}

@@ -4,7 +4,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { Ionicons } from '@expo/vector-icons';
 import { PhotoThumb } from '../../components/RequestPhoto';
 import TechnicianLocationMap from '../../components/TechnicianLocationMap';
-import { colors, fonts, shadows } from '../../theme';
+import { colors, fonts, shadows, themedStyles } from '../../theme';
 import { getApplianceIcon } from '../../utils/applianceIcons';
 import { splitJobDescription } from '../../utils/jobDescription';
 import { formatJobSchedule, canMarkArrival, canStartRepair, type JobItem } from './availableJobsHelpers';
@@ -131,7 +131,7 @@ export default function TechJobDetailScreen({
               <Text style={styles.declineText}>Decline</Text>
             </Pressable>
             <Pressable onPress={() => onAccept(job)} disabled={busy} style={({ pressed }) => [styles.acceptBtn, pressed && { opacity: 0.88 }]} accessibilityRole="button" accessibilityLabel="Accept job">
-              {busy ? <ActivityIndicator color="#FFFFFF" size="small" /> : (<><Ionicons name="checkmark" size={16} color="#FFFFFF" /><Text style={styles.acceptText}>Accept</Text></>)}
+              {busy ? <ActivityIndicator color={colors.onAccent} size="small" /> : (<><Ionicons name="checkmark" size={16} color={colors.onAccent} /><Text style={styles.acceptText}>Accept</Text></>)}
             </Pressable>
           </View>
         ) : null}
@@ -141,7 +141,7 @@ export default function TechJobDetailScreen({
             {arrivalEligible ? (
               <View style={styles.btnRow}>
                 <Pressable onPress={() => onArrival(job)} disabled={busy} style={({ pressed }) => [styles.primaryBlue, pressed && { opacity: 0.88 }]} accessibilityRole="button" accessibilityLabel="Mark arrival">
-                  {busy ? <ActivityIndicator color="#FFFFFF" size="small" /> : (<><Ionicons name="location" size={15} color="#FFFFFF" /><Text style={styles.primaryBlueText}>Mark Arrival</Text></>)}
+                  {busy ? <ActivityIndicator color={colors.onAccent} size="small" /> : (<><Ionicons name="location" size={15} color={colors.onAccent} /><Text style={styles.primaryBlueText}>Mark Arrival</Text></>)}
                 </Pressable>
                 <Pressable onPress={() => onNoShow(job)} disabled={busy} style={({ pressed }) => [styles.declineBtn, pressed && { opacity: 0.85 }]} accessibilityRole="button" accessibilityLabel="Report no-show">
                   <Text style={styles.declineText}>No-Show</Text>
@@ -155,13 +155,13 @@ export default function TechJobDetailScreen({
               </Pressable>
               {startEligible ? (
                 <Pressable onPress={() => onStart(job)} disabled={busy} style={({ pressed }) => [styles.startBtn, pressed && { opacity: 0.88 }]} accessibilityRole="button" accessibilityLabel="Start repair">
-                  {busy ? <ActivityIndicator color="#FFFFFF" size="small" /> : (<><Ionicons name="flash-outline" size={16} color="#FFFFFF" /><Text style={styles.startText}>Start Repair</Text></>)}
+                  {busy ? <ActivityIndicator color={colors.onAccent} size="small" /> : (<><Ionicons name="flash-outline" size={16} color={colors.onAccent} /><Text style={styles.startText}>Start Repair</Text></>)}
                 </Pressable>
               ) : null}
             </View>
             {isInProgress ? (
               <Pressable onPress={() => onComplete(job)} style={({ pressed }) => [styles.completeBtn, pressed && { opacity: 0.9 }]} accessibilityRole="button" accessibilityLabel="Mark as completed">
-                <Ionicons name="checkmark" size={18} color="#FFFFFF" />
+                <Ionicons name="checkmark" size={18} color={colors.onAccent} />
                 <Text style={styles.completeText}>Mark as Completed</Text>
               </Pressable>
             ) : null}
@@ -172,7 +172,7 @@ export default function TechJobDetailScreen({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles({
   screen: { flex: 1, backgroundColor: colors.canvas },
   backHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16, backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.line },
   backBtn: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', minHeight: 44, minWidth: 44 },
@@ -202,20 +202,20 @@ const styles = StyleSheet.create({
   mapAddressBar: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.techSoft, borderWidth: 1, borderColor: colors.hudBorder, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginTop: 10 },
   mapAddressText: { flex: 1, color: colors.ink, fontSize: 12, fontFamily: fonts.semiBold },
   navigateBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: BLUE, borderRadius: 12, minHeight: 44, marginTop: 8, ...shadows.card },
-  navigateText: { color: '#FFFFFF', fontSize: 13, fontFamily: fonts.bold },
+  navigateText: { color: colors.onAccent, fontSize: 13, fontFamily: fonts.bold },
   navigateBtnSystem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE', borderRadius: 12, minHeight: 44, marginTop: 8 },
   navigateTextSystem: { color: '#2563EB', fontSize: 13, fontFamily: fonts.bold },
   btnRow: { flexDirection: 'row', gap: 8 },
   declineBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: colors.danger + '40', borderRadius: 14, minHeight: 48, backgroundColor: colors.white },
   declineText: { color: colors.danger, fontSize: 14, fontFamily: fonts.bold },
   acceptBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.tech, borderRadius: 14, minHeight: 48, ...shadows.card },
-  acceptText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
+  acceptText: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bold },
   messageBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 14, minHeight: 48 },
   messageText: { color: colors.ink, fontSize: 14, fontFamily: fonts.bold },
   startBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.tech, borderRadius: 14, minHeight: 48, ...shadows.card },
-  startText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
+  startText: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bold },
   primaryBlue: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.tech, borderRadius: 14, minHeight: 48, ...shadows.card },
-  primaryBlueText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
+  primaryBlueText: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bold },
   completeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.tech, borderRadius: 14, minHeight: 48, ...shadows.card },
-  completeText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
+  completeText: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bold },
 });

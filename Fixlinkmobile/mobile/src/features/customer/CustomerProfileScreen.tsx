@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView, TextInput, Alert, ActivityIndicator, Image, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, themedStyles } from '../../theme';
+import Skeleton from '../../components/Skeleton';
 import HelpSheet from '../../components/HelpSheet';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { fetchCompletedJobs, fetchCustomerRequests } from '../../services/api';
@@ -12,6 +13,10 @@ import { fetchCompletedJobs, fetchCustomerRequests } from '../../services/api';
 const ORANGE = colors.customer;
 const DARK = colors.dark;
 const ACTIVE_STATUSES = ['accepted', 'confirmed', 'customer ready', 'in progress'];
+
+// The stat columns, in render order. The loading placeholders iterate the same
+// list so the layout never shifts when the real counts arrive.
+const STAT_COLUMNS = ['Requests', 'Active', 'Completed'] as const;
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -38,9 +43,11 @@ type CustomerProfileScreenProps = {
   }) => Promise<unknown> | unknown;
   onNavigateToProgress?: () => void;
   onOpenNotifications?: () => void;
+  // Opens the shared FixLink Assistant from Help & Support.
+  onOpenAssistant?: () => void;
 };
 
-export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile, onNavigateToProgress, onOpenNotifications }: CustomerProfileScreenProps) {
+export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile, onNavigateToProgress, onOpenNotifications, onOpenAssistant }: CustomerProfileScreenProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(user?.name || '');
   const [phone, setPhone] = useState(user?.phone || '');
@@ -146,7 +153,7 @@ export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile,
             ) : (
               <View style={styles.avatarLgPh}><Text style={styles.avatarLgText}>{initials}</Text></View>
             )}
-            <View style={styles.cameraBadge}><Ionicons name="pencil" size={12} color="#FFFFFF" /></View>
+            <View style={styles.cameraBadge}><Ionicons name="pencil" size={12} color={colors.onAccent} /></View>
           </TouchableOpacity>
           <Text style={styles.changePhoto}>Change Photo</Text>
         </View>
@@ -157,7 +164,7 @@ export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile,
         <Text style={styles.label}>ADDRESS</Text>
         <TextInput style={styles.input} value={address} onChangeText={setAddress} placeholder="142 Oak St, Apt 3B" placeholderTextColor="#9CA3AF" />
         <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={loading} activeOpacity={0.88}>
-          {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.saveBtnText}>Save Changes</Text>}
+          {loading ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.saveBtnText}>Save Changes</Text>}
         </TouchableOpacity>
       </ScrollView>
     );
@@ -182,9 +189,15 @@ export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile,
         </View>
         <Text style={styles.name} numberOfLines={1}>{user?.name || 'Customer'}</Text>
         <Text style={styles.email} numberOfLines={1}>{user?.email || ''}</Text>
-        <View style={[styles.statsRow, statsLoading && styles.statsRowLoading]}>
+        <View style={styles.statsRow}>
           {statsLoading ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
+            // Placeholders shaped like the real stats — no spinner, no layout jump.
+            STAT_COLUMNS.map((label) => (
+              <View key={label} style={styles.stat}>
+                <Skeleton pulse style={styles.statSkeletonValue} />
+                <Skeleton pulse style={styles.statSkeletonLabel} />
+              </View>
+            ))
           ) : (
             [{ v: String(totalCount), l: 'Requests' }, { v: String(activeCount), l: 'Active' }, { v: String(completedCount), l: 'Completed' }].map((s) => (
               <View key={s.l} style={styles.stat}>
@@ -204,7 +217,7 @@ export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile,
           </Pressable>
         ))}
         <TouchableOpacity style={styles.logoutRow} onPress={() => setLogoutConfirmVisible(true)} activeOpacity={0.88} accessibilityRole="button" accessibilityLabel="Sign out">
-          <View style={styles.logoutIcon}><Ionicons name="close" size={18} color="#EF4444" /></View>
+          <View style={styles.logoutIcon}><Ionicons name="log-out-outline" size={18} color="#EF4444" /></View>
           <Text style={styles.logoutText}>Sign Out</Text>
         </TouchableOpacity>
       </View>
@@ -214,36 +227,49 @@ export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile,
         message="Are you sure you want to log out?"
         confirmLabel="Log Out"
         danger
-        accentColor={colors.customer}
         onCancel={() => setLogoutConfirmVisible(false)}
         onConfirm={() => { setLogoutConfirmVisible(false); onLogout?.(); }}
       />
-      <HelpSheet visible={helpVisible} role="customer" onClose={() => setHelpVisible(false)} />
+      <HelpSheet
+        visible={helpVisible}
+        role="customer"
+        onClose={() => setHelpVisible(false)}
+        onAskAssistant={() => {
+          setHelpVisible(false);
+          // Let the help sheet finish dismissing before the assistant slides in
+          // so the two modals never animate at the same time.
+          setTimeout(() => onOpenAssistant?.(), 220);
+        }}
+      />
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles({
   screen: { flex: 1, backgroundColor: '#F9FAFB' },
   content: { paddingBottom: 28 },
   header: { backgroundColor: DARK, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 32, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, alignItems: 'center' },
   avatarWrap: { marginBottom: 12 },
   avatar: { width: 56, height: 56, borderRadius: 28 },
   avatarPh: { backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: '#FFFFFF', fontSize: 22, fontFamily: fonts.extraBold },
-  name: { color: '#FFFFFF', fontSize: 20, fontFamily: fonts.extraBold },
+  avatarText: { color: colors.onAccent, fontSize: 22, fontFamily: fonts.extraBold },
+  name: { color: colors.onAccent, fontSize: 20, fontFamily: fonts.extraBold },
   email: { color: '#9CA3AF', fontSize: 13, fontFamily: fonts.regular, marginTop: 2 },
   statsRow: { flexDirection: 'row', gap: 24, marginTop: 16, minHeight: 38, alignItems: 'center' },
-  statsRowLoading: { justifyContent: 'center' },
   stat: { alignItems: 'center' },
-  statValue: { color: '#FFFFFF', fontSize: 17, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
+  statSkeletonValue: { width: 34, height: 17, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.22)' },
+  statSkeletonLabel: { width: 52, height: 10, borderRadius: 5, marginTop: 5, backgroundColor: 'rgba(255,255,255,0.14)' },
+  statValue: { color: colors.onAccent, fontSize: 17, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
   statLabel: { color: '#9CA3AF', fontSize: 11, fontFamily: fonts.regular, marginTop: 2 },
   body: { paddingHorizontal: 20, paddingTop: 20, gap: 12 },
   menuRow: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: '#F3F4F6' },
   menuIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#FFF7ED', alignItems: 'center', justifyContent: 'center' },
   menuLabel: { flex: 1, color: '#374151', fontSize: 14, fontFamily: fonts.semiBold },
-  logoutRow: { backgroundColor: '#FEF2F2', borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: '#FECACA' },
-  logoutIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center' },
+  // Appearance card sits between the menu list and Sign Out.
+  // Same row shape as the menu items above it; the danger colour lives only in
+  // the icon and label instead of a red card with a red outline.
+  logoutRow: { backgroundColor: colors.white, borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: colors.cardBorder },
+  logoutIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center' },
   logoutText: { color: '#EF4444', fontSize: 14, fontFamily: fonts.semiBold },
   // Edit sub-view (prototype EditProfile)
   editScroll: { flexGrow: 1, backgroundColor: '#FFFFFF', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 32, gap: 4 },
@@ -253,11 +279,11 @@ const styles = StyleSheet.create({
   avatarCenter: { alignItems: 'center', marginBottom: 20 },
   avatarLg: { width: 56, height: 56, borderRadius: 28 },
   avatarLgPh: { width: 56, height: 56, borderRadius: 28, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center' },
-  avatarLgText: { color: '#FFFFFF', fontSize: 22, fontFamily: fonts.extraBold },
+  avatarLgText: { color: colors.onAccent, fontSize: 22, fontFamily: fonts.extraBold },
   cameraBadge: { position: 'absolute', bottom: -2, right: -2, width: 24, height: 24, borderRadius: 12, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFFFFF' },
   changePhoto: { color: ORANGE, fontSize: 12, fontFamily: fonts.semiBold, marginTop: 8 },
   label: { color: '#6B7280', fontSize: 11, fontFamily: fonts.bold, letterSpacing: 0.8, marginTop: 16, marginBottom: 6 },
   input: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 16, minHeight: 52, fontSize: 14, fontFamily: fonts.medium, color: colors.ink, backgroundColor: '#F9FAFB' },
   saveBtn: { backgroundColor: ORANGE, borderRadius: 12, minHeight: 52, alignItems: 'center', justifyContent: 'center', marginTop: 24 },
-  saveBtnText: { color: '#FFFFFF', fontSize: 15, fontFamily: fonts.bold },
+  saveBtnText: { color: colors.onAccent, fontSize: 15, fontFamily: fonts.bold },
 });

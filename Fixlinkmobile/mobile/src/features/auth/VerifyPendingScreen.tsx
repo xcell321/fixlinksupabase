@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, View, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, themedStyles } from '../../theme';
 import { checkTechnicianStatus } from '../../services/api';
 
 const BLUE = colors.tech;
@@ -131,7 +131,7 @@ export default function VerifyPendingScreen({ onBackToLogin, email }: VerifyPend
             accessibilityState={{ disabled: checking }}
           >
             {checking
-              ? <ActivityIndicator size="small" color="#FFFFFF" />
+              ? <ActivityIndicator size="small" color={colors.onAccent} />
               : <Text style={styles.checkButtonText}>Check Status</Text>}
           </TouchableOpacity>
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -172,7 +172,7 @@ export default function VerifyPendingScreen({ onBackToLogin, email }: VerifyPend
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles({
   screen: { flex: 1, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingVertical: 24, gap: 4 },
   iconWrap: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#DBEAFE', alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
   title: { color: '#111827', fontSize: 24, fontFamily: fonts.extraBold, marginBottom: 8, textAlign: 'center' },
@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
   input: { borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#F9FAFB', borderRadius: 12, paddingHorizontal: 14, minHeight: 48, fontSize: 14, fontFamily: fonts.regular, color: '#111827' },
   checkButton: { backgroundColor: BLUE, borderRadius: 12, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
   checkButtonBusy: { opacity: 0.7 },
-  checkButtonText: { color: '#FFFFFF', fontSize: 14, fontFamily: fonts.bold },
+  checkButtonText: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bold },
   errorText: { color: colors.error, fontSize: 12, fontFamily: fonts.medium, lineHeight: 16 },
   resultCard: { borderRadius: 12, borderWidth: 1, padding: 12, gap: 3 },
   resultOk: { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' },

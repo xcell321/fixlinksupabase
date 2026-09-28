@@ -23,9 +23,11 @@ import TechMapScreen from '../features/technician/TechMapScreen';
 import AvailableJobsScreen from '../features/technician/AvailableJobsScreen';
 import TechnicianProfileScreen from '../features/technician/TechnicianProfileScreen';
 import { fetchNotifications, fetchUnreadMessageNotifications, setAuthToken, updateCustomerProfile, markJobMessagesRead, markNotificationRead, fetchJobById } from '../services/api';
-import { colors, fonts, shadows } from '../theme';
+import { colors, fonts, shadows, themedStyles } from '../theme';
 import type { IconName } from '../utils/applianceIcons';
 import MessageBanner from '../components/MessageBanner';
+import AssistantSheet from '../components/AssistantSheet';
+import type { AssistantContext } from '../components/AssistantSheet';
 
 type NavTab = { key: string; label: string; icon: IconName };
 
@@ -124,6 +126,8 @@ const formatNotificationTime = (iso?: string | null): string => {
 };
 
 export default function AppNavigator() {
+  // Consuming the theme here re-renders the whole tree on a mode switch, which
+  // is what makes the live colour tokens and themed style maps repaint.
   const [user, setUser] = useState<SessionUser | null>(null);
   const [authMode, setAuthMode] = useState('splash');
   const [authRole, setAuthRole] = useState<AuthRole>('customer');
@@ -148,6 +152,10 @@ export default function AppNavigator() {
   const [recoveryParams, setRecoveryParams] = useState<RecoveryParams | null>(null);
   const [banner, setBanner] = useState<NotificationItem | null>(null);
   const [activeChatJobId, setActiveChatJobId] = useState<string | null>(null);
+  // The FixLink Assistant thread is shared: Home's robot and Profile > Help &
+  // Support both open this same sheet.
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [assistantContext, setAssistantContext] = useState<AssistantContext>({});
   const bannerRef = useRef<NotificationItem | null>(null);
   const activeChatJobIdRef = useRef<string | null>(null);
   const seenNotifIdsRef = useRef<Set<string>>(new Set());
@@ -272,6 +280,8 @@ export default function AppNavigator() {
     setTechnicianHighlightedJobId(null);
     setActiveChatJobId(null);
     setBanner(null);
+    setAssistantOpen(false);
+    setAssistantContext({});
     setChatNotifications([]);
     setSelectedNotification(null);
     setNotifDetailError(null);
@@ -334,6 +344,13 @@ export default function AppNavigator() {
   const unreadNotifications = chatNotifications.filter((n) => n.read !== true);
   const readNotifications = chatNotifications.filter((n) => n.read === true);
 
+  // Any screen can surface the assistant; it opens with whatever live context
+  // the caller has, falling back to just the signed-in identity.
+  const openAssistant = (context?: AssistantContext) => {
+    setAssistantContext(context ?? { customerName: user.name, customerUid: user.uid });
+    setAssistantOpen(true);
+  };
+
   const dequeueBanner = () => {
     const next = bannerQueueRef.current.shift() || null;
     bannerRef.current = next;
@@ -345,27 +362,14 @@ export default function AppNavigator() {
   const openBannerNotification = (notification: NotificationItem | null) => {
     if (!notification) return;
     dequeueBanner();
-    if (notification.type === 'job') {
-      if (isCustomer) {
-        setAcceptedOnlyProgress(true);
-        setCustomerTab('progress');
-      } else {
-        setTechnicianTab('jobs');
-      }
-      return;
-    }
-    setSelectedChatTarget({
-      id: notification.jobId,
-      customerName: isCustomer ? user.name : notification.senderName,
-      technicianName: isCustomer ? notification.senderName : undefined,
-    });
-    markJobMessagesRead(notification.jobId as string, user?.uid as string).catch((error) => console.warn('Unable to mark banner chat read:', error));
-    // Also mark notification read if unread
+    // Mirror the feed-tap read marking, then reuse the feed-tap path so
+    // banners land on the specific job or chat thread (with fetched
+    // appliance, status, and phone) instead of a generic list.
     if (!notification.read && notification.id) {
-      markNotificationRead(notification.id).catch(() => {});
-      setChatNotifications((prev) => prev.map((n) => n.id === notification.id ? { ...n, read: true } : n));
+      setChatNotifications((prev) => prev.map((n) => String(n.id) === String(notification.id) ? { ...n, read: true, readAt: new Date().toISOString() } : n));
+      void markNotificationRead(notification.id).catch(() => {});
     }
-    setTab('chat');
+    void handleOpenNotification(notification);
   };
 
   const handleNotificationPress = (notification?: NotificationItem | null) => {
@@ -503,7 +507,7 @@ export default function AppNavigator() {
             <Text style={styles.notifAvatarText}>{initial}</Text>
           </View>
           <View style={[styles.notifTypeBadge, { backgroundColor: badgeBg }]}>
-            <Ionicons name={isJob ? 'construct' : 'chatbubble-ellipses'} size={10} color={colors.white} />
+            <Ionicons name={isJob ? 'construct' : 'chatbubble-ellipses'} size={10} color={colors.onAccent} />
           </View>
         </View>
 
@@ -523,14 +527,14 @@ export default function AppNavigator() {
   };
 
   const screen = isCustomer ? (
-    customerTab === 'dashboard' ? <DashboardScreen user={user} notificationCount={unreadCount} onOpenNotifications={() => setNotificationsOpen(true)} onNavigateToSubmit={() => setCustomerTab('submit')} onNavigateToProgress={() => { setAcceptedOnlyProgress(false); setCustomerTab('progress'); }} onTrackAcceptedJob={() => { setAcceptedOnlyProgress(true); setCustomerTab('progress'); }} onOpenRequest={(req) => { setSelectedRequest(req as SelectedJob); setCustomerTab('details'); }} /> :
+    customerTab === 'dashboard' ? <DashboardScreen user={user} notificationCount={unreadCount} onOpenNotifications={() => setNotificationsOpen(true)} onOpenAssistant={openAssistant} onNavigateToSubmit={() => setCustomerTab('submit')} onNavigateToProgress={() => { setAcceptedOnlyProgress(false); setCustomerTab('progress'); }} onTrackAcceptedJob={() => { setAcceptedOnlyProgress(true); setCustomerTab('progress'); }} onOpenRequest={(req) => { setSelectedRequest(req as SelectedJob); setCustomerTab('details'); }} /> :
     customerTab === 'submit' ? <SubmitRequestScreen currentUser={user} customerName={user?.name as string} onNavigateToProgress={() => setCustomerTab('progress')} onClose={() => setCustomerTab('dashboard')} /> :
     customerTab === 'details' ? <RequestDetailsScreen request={selectedRequest} onBack={() => setCustomerTab('progress')} onMessageTechnician={() => { setSelectedChatTarget(selectedRequest); setCustomerTab('chat'); }} onTrackMap={(req) => { setSelectedRequest(req); setCustomerTab('map'); }} onViewTechnicianProfile={(tech) => { setViewedTechnician({ uid: tech.uid, name: tech.name }); setCustomerTab('techProfile'); }} /> :
     customerTab === 'progress' ? <RequestProgressScreen customerName={user?.name as string} customerUid={user?.uid as string} acceptedOnly={acceptedOnlyProgress} focusedJobId={customerFocusedJobId} autoExpandReview={Boolean(customerFocusedJobId)} onViewDetails={(req) => { setSelectedRequest(req as SelectedJob); setCustomerTab('details'); }} onTrackMap={(req) => { setSelectedRequest(req as SelectedJob); setCustomerTab('map'); }} onViewTechnicianProfile={(tech) => { setViewedTechnician({ uid: tech.uid, name: tech.name }); setCustomerTab('techProfile'); }} onMessageTechnician={(req, tech) => { setSelectedChatTarget({ id: req.id, technicianName: tech.name, applianceType: req.applianceType, status: req.status }); setCustomerTab('chat'); }} onRate={(job) => { setSelectedJobForRate(job); setCustomerTab('rate'); }} /> :
     customerTab === 'rate' ? <RateTechnicianScreen job={(selectedJobForRate || {}) as RateJobProp} customerName={user?.name as string} onBack={() => setCustomerTab('progress')} onSubmitted={() => { setSelectedJobForRate(null); setCustomerFocusedJobId(null); setCustomerTab('progress'); }} /> :
     customerTab === 'techProfile' ? <TechnicianProfileScreen technician={(viewedTechnician || {}) as TechnicianScreenProp} readOnly onBack={() => setCustomerTab('progress')} /> :
     customerTab === 'map' ? <MapTrackerScreen currentUser={user} selectedJob={selectedRequest} onBack={() => setCustomerTab('progress')} /> :
-    customerTab === 'profile' ? <CustomerProfileScreen user={user} onLogout={handleLogout} onUpdateProfile={handleCustomerProfileUpdate} onNavigateToProgress={() => { setAcceptedOnlyProgress(false); setCustomerTab('progress'); }} onOpenNotifications={() => setNotificationsOpen(true)} /> : 
+    customerTab === 'profile' ? <CustomerProfileScreen user={user} onLogout={handleLogout} onUpdateProfile={handleCustomerProfileUpdate} onNavigateToProgress={() => { setAcceptedOnlyProgress(false); setCustomerTab('progress'); }} onOpenNotifications={() => setNotificationsOpen(true)} onOpenAssistant={() => openAssistant()} /> : 
     <ChatScreen currentUser={user} initialTarget={selectedChatTarget} onActiveConversationChange={setActiveChatJobId} />
   ) : (
     technicianTab === 'jobs' ? <AvailableJobsScreen technician={user} notificationCount={unreadCount} highlightedJobId={technicianHighlightedJobId} onOpenNotifications={() => setNotificationsOpen(true)} onNavigateToMap={(job) => { setSelectedJobForMap(job); setTechnicianTab('map'); }} onNavigateToChat={(job) => { setSelectedChatTarget(job); setTechnicianTab('chat'); }} /> : 
@@ -614,12 +618,19 @@ export default function AppNavigator() {
         </View>
       </Modal>
 
+      <AssistantSheet
+        visible={assistantOpen}
+        uid={user?.uid}
+        context={assistantContext}
+        onClose={() => setAssistantOpen(false)}
+      />
+
       {(isCustomer && customerTab === 'submit') ? null : (<View style={styles.bottomNav}>{navItems.map((item) => { const active = activeTab === item.key || (item.key === 'progress' && ['submit', 'details', 'map', 'techProfile', 'rate'].includes(activeTab)); return <Pressable key={item.key} accessibilityRole="button" accessibilityLabel={`${item.label} tab`} accessibilityState={{ selected: active }} style={({ pressed }) => [styles.navItem, pressed && styles.navItemPressed]} onPress={() => { if (isCustomer && item.key === 'progress') setAcceptedOnlyProgress(false); setTab(item.key); }}><View style={[styles.navIcon, active && { backgroundColor: roleSoft }]}><Ionicons name={active ? item.icon : (`${item.icon}-outline` as IconName)} size={20} color={active ? roleAccent : colors.muted} /></View><Text style={[styles.navLabel, active && { color: roleAccent }]}>{item.label}</Text></Pressable>; })}</View>)}
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles({
   container: { flex: 1, backgroundColor: colors.canvas }, authContainer: { flex: 1, backgroundColor: colors.canvas }, screenContainer: { flex: 1, width: '100%' as const, alignSelf: 'center' as const },
   modalBackdrop: { flex: 1, backgroundColor: colors.white },
   backdropPress: { flex: 1 },
@@ -645,7 +656,7 @@ const styles = StyleSheet.create({
   detailErrorText: { flex: 1, color: '#DC2626', fontSize: 12, fontFamily: fonts.medium, lineHeight: 16 },
   detailActions: { flexDirection: 'row', gap: 8 },
   detailPrimary: { flex: 1, minHeight: 44, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  detailPrimaryText: { color: colors.white, fontSize: 13, fontFamily: fonts.bold },
+  detailPrimaryText: { color: colors.onAccent, fontSize: 13, fontFamily: fonts.bold },
   detailSecondary: { flex: 1, minHeight: 44, borderRadius: 12, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   detailSecondaryText: { color: colors.muted, fontSize: 13, fontFamily: fonts.semiBold },
 

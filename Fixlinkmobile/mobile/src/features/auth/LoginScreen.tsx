@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import api, { setAuthToken } from '../../services/api';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, themedStyles } from '../../theme';
 
 // Prototype: CustomerLogin — dark #0D1B2A header, orange #F97316 primary. Logic unchanged.
 const ORANGE = colors.customer;
@@ -78,7 +78,7 @@ export default function LoginScreen({ onLoginSuccess, switchToRegister, switchTo
   return <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}><ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
     <View style={styles.header}>
       <View style={styles.logoRow}>
-        <View style={[styles.logo, { backgroundColor: accent }]}><Ionicons name="construct" size={22} color="#FFFFFF" /></View>
+        <View style={[styles.logo, { backgroundColor: accent }]}><Ionicons name="construct" size={22} color={colors.onAccent} /></View>
         <View>
           <Text style={styles.brandSmall}>FIXLINK</Text>
           <Text style={styles.roleSmall}>{role === 'technician' ? 'TECHNICIAN PORTAL' : 'HOME SERVICES'}</Text>
@@ -106,7 +106,7 @@ export default function LoginScreen({ onLoginSuccess, switchToRegister, switchTo
       <TouchableOpacity style={styles.forgotWrap} onPress={() => switchToForgotPassword(role)}><Text style={[styles.forgot, { color: accent }]}>Forgot password?</Text></TouchableOpacity>
       {loginError ? <Text style={styles.errorText}>{loginError}</Text>
        : null}<TouchableOpacity style={[styles.button, { backgroundColor: accent }]} onPress={handleLogin} disabled={loading} activeOpacity={0.88}>{loading ?
-        <ActivityIndicator color={colors.white} /> : <Text style={styles.buttonText}>Sign In</Text>}</TouchableOpacity>
+        <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.buttonText}>Sign In</Text>}</TouchableOpacity>
       <View style={styles.registerRow}><Text style={styles.registerText}>{role === 'technician' ? 'New technician? ' : "Don't have an account? "}</Text><TouchableOpacity onPress={() => switchToRegister(role)}><Text style={[styles.registerLink, { color: accent }]}>{role === 'technician' ? 'Apply Now' : 'Register'}</Text></TouchableOpacity></View>
       <View style={styles.techLoginRow}>
         <Text style={styles.techLoginText}>Log in as </Text>
@@ -124,7 +124,7 @@ export default function LoginScreen({ onLoginSuccess, switchToRegister, switchTo
     </View>
   </ScrollView></KeyboardAvoidingView>;
 }
-const styles = StyleSheet.create({ container: { flex: 1, backgroundColor: '#FFFFFF' },
+const styles = themedStyles({ container: { flex: 1, backgroundColor: '#FFFFFF' },
    scrollContent: { flexGrow: 1 },
    header: { backgroundColor: DARK, paddingHorizontal: 24, paddingTop: 56, paddingBottom: 40, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
    modeToggle: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 12, padding: 4, gap: 4, marginBottom: 24 },
@@ -132,12 +132,12 @@ const styles = StyleSheet.create({ container: { flex: 1, backgroundColor: '#FFFF
    modeTabCustomer: { backgroundColor: colors.customer },
    modeTabTech: { backgroundColor: colors.tech },
    modeText: { color: '#9CA3AF', fontSize: 13, fontFamily: fonts.semiBold },
-   modeTextOn: { color: '#FFFFFF' },
+   modeTextOn: { color: colors.onAccent },
    logoRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 24 },
    logo: { width: 40, height: 40, borderRadius: 12, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center' },
-   brandSmall: { color: '#FFFFFF', fontSize: 14, fontFamily: fonts.extraBold },
+   brandSmall: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.extraBold },
    roleSmall: { color: '#9CA3AF', fontSize: 9, letterSpacing: 1.3, fontFamily: fonts.bold },
-   title: { color: '#FFFFFF', fontSize: 28, fontFamily: fonts.extraBold, letterSpacing: -0.3 },
+   title: { color: colors.onAccent, fontSize: 28, fontFamily: fonts.extraBold, letterSpacing: -0.3 },
    subtitle: { color: '#9CA3AF', fontSize: 14, marginTop: 4, fontFamily: fonts.regular },
    form: { paddingHorizontal: 24, paddingTop: 32, paddingBottom: 24, gap: 4 },
    label: { color: '#6B7280', fontSize: 11, fontFamily: fonts.bold, letterSpacing: 0.8, marginTop: 16, marginBottom: 6 },
@@ -148,7 +148,7 @@ const styles = StyleSheet.create({ container: { flex: 1, backgroundColor: '#FFFF
    forgot: { color: ORANGE, fontSize: 13, fontFamily: fonts.semiBold },
     errorText: { color: colors.danger, fontSize: 11, marginTop: 10, textAlign: 'center', fontFamily: fonts.medium, lineHeight: 15 },
    button: { minHeight: 52, borderRadius: 12, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center', marginTop: 20 },
-   buttonText: { color: '#FFFFFF', fontSize: 15, fontFamily: fonts.bold },
+   buttonText: { color: colors.onAccent, fontSize: 15, fontFamily: fonts.bold },
     registerRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 20 },
     registerText: { color: '#6B7280', fontSize: 13, fontFamily: fonts.regular }, registerLink: { color: ORANGE, fontSize: 13, fontFamily: fonts.bold },
     techLoginRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 12, flexWrap: 'wrap' },

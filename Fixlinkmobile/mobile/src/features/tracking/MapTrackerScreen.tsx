@@ -18,7 +18,7 @@ import {
   updateCustomerLocation
 } from '../../services/api';
 import { geocodeAddressPrecise, getDrivingRoute } from '../../services/locationIq';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, themedStyles } from '../../theme';
 import { customerPinFromJob, distanceInKm } from './trackingGeometry';
 
 // The subset of a job this screen reads.
@@ -365,7 +365,7 @@ export default function MapTrackerScreen({ currentUser, selectedJob: initialJob,
           Open an accepted request from your Requests tab to track the assigned technician.
         </Text>
         <TouchableOpacity style={styles.emptyButton} onPress={onBack}>
-          <Ionicons name="arrow-back-outline" size={18} color={colors.white} />
+          <Ionicons name="arrow-back-outline" size={18} color={colors.onAccent} />
           <Text style={styles.emptyButtonText}>Back to Requests</Text>
         </TouchableOpacity>
       </View>
@@ -433,21 +433,21 @@ export default function MapTrackerScreen({ currentUser, selectedJob: initialJob,
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles({
   container: { flex: 1, backgroundColor: colors.canvas },
   selectorBar: { position: 'absolute', right: 12, top: 12, zIndex: 10, backgroundColor: 'rgba(255,255,255,0.92)', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 8, boxShadow: '0 3px 8px rgba(16,42,67,0.15)', elevation: 6 },
   selectorHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
   selectorKicker: { fontSize: 11, fontFamily: fonts.bold, color: colors.muted, letterSpacing: 0.6 },
   collapseBtn: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#F0F4F8', alignItems: 'center', justifyContent: 'center' },
   expandBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.customer, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 },
-  expandBtnText: { color: colors.white, fontSize: 11, fontFamily: fonts.bold },
+  expandBtnText: { color: colors.onAccent, fontSize: 11, fontFamily: fonts.bold },
   chipRow: { flexDirection: 'column', gap: 5 },
   jobChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 16, paddingHorizontal: 10, paddingVertical: 5 },
   jobChipActive: { backgroundColor: colors.customer, borderColor: colors.customer },
   jobChipDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.muted, marginRight: 6 },
   jobChipDotActive: { backgroundColor: colors.white },
   jobChipText: { fontSize: 12, fontFamily: fonts.semiBold, color: colors.ink },
-  jobChipTextActive: { color: colors.white },
+  jobChipTextActive: { color: colors.onAccent },
   mapArea: { flex: 1, minHeight: 250, position: 'relative' },
   map: { flex: 1 },
   bottomPanel: { backgroundColor: colors.white, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16, borderTopLeftRadius: 20, borderTopRightRadius: 20, gap: 14, borderTopWidth: 1, borderTopColor: colors.lineSoft, boxShadow: '0 -4px 16px rgba(16,42,67,0.08)', elevation: 8 },
@@ -469,7 +469,7 @@ const styles = StyleSheet.create({
   destinationName: { color: colors.ink, fontSize: 15, fontFamily: fonts.bold, lineHeight: 18 },
   destinationMeta: { color: colors.muted, fontSize: 11, fontFamily: fonts.regular, lineHeight: 15, marginTop: 2 },
   primaryCta: { height: 54, borderRadius: 13, backgroundColor: colors.customer, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 16, boxShadow: '0 4px 10px rgba(15,118,110,0.18)', elevation: 3 },
-  primaryCtaText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold, letterSpacing: 0.1 },
+  primaryCtaText: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bold, letterSpacing: 0.1 },
   secondaryCta: { height: 46, borderRadius: 12, backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.customer, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 16 },
   secondaryCtaText: { color: colors.customer, fontSize: 13, fontFamily: fonts.bold },
   quietCta: { height: 44, borderRadius: 12, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 16 },
@@ -480,6 +480,6 @@ const styles = StyleSheet.create({
   emptyTitle: { color: colors.ink, fontSize: 21, fontFamily: fonts.bold, marginBottom: 8 },
   emptySubtitle: { color: colors.muted, fontSize: 13, textAlign: 'center', lineHeight: 19, marginBottom: 24, fontFamily: fonts.medium },
   emptyButton: { height: 48, borderRadius: 14, backgroundColor: colors.customer, paddingHorizontal: 22, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  emptyButtonText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
+  emptyButtonText: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bold },
 });
 

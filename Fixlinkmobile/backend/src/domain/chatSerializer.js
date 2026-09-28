@@ -5,7 +5,9 @@ const serializeMessage = (row) => ({
   senderUid: row.sender_uid,
   senderName: row.sender_name,
   senderRole: row.sender_role,
+  // Empty string for an image-only message; the client renders the photo alone.
   text: row.text,
+  imageUrl: row.image_url || null,
   timestamp: row.timestamp ? new Date(row.timestamp).toISOString() : null,
 });
 

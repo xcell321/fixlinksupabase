@@ -4,7 +4,8 @@
 // destinationRow, primary "Navigate in Google Maps GPS" CTA,
 // secondary "Center Route" CTA and the empty state.
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
+import { themedStyles } from '../../../theme';
 
 type TripPanelProps = {
   distanceKm: number | null;
@@ -59,7 +60,7 @@ export const openExternalNavigation = (latitude: number, longitude: number): voi
   void import('expo-linking').then(({ default: Linking }) => Linking.openURL(url));
 };
 
-const styles = StyleSheet.create({
+const styles = themedStyles({
   panel: { backgroundColor: '#fff', borderRadius: 12, padding: 12, gap: 8 },
   tripRow: { flexDirection: 'row', alignItems: 'center' },
   tripCell: { flex: 1, alignItems: 'center' },

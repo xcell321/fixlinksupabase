@@ -55,6 +55,6 @@ export {
   fetchTechnicianSchedule,
   updateTechnicianProfile,
   updateCustomerProfile,
-  uploadPortfolioPhotos,
+  uploadPortfolioPhoto,
 } from './api/profileApi';
 export { fetchTechnicianRecommendations, askAssistant } from './api/aiApi';

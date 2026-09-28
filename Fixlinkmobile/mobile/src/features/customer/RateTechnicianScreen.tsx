@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, TextInput, ActivityIndicator, Alert, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { submitTechnicianReview } from '../../services/api';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, themedStyles } from '../../theme';
 
 const ORANGE = colors.customer;
 
@@ -77,14 +77,14 @@ export default function RateTechnicianScreen({ job, customerName, onBack, onSubm
           textAlignVertical="top"
         />
         <TouchableOpacity style={styles.primary} onPress={handleSubmit} disabled={submitting} activeOpacity={0.88} accessibilityRole="button" accessibilityLabel="Submit rating">
-          {submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>Submit Rating</Text>}
+          {submitting ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.primaryText}>Submit Rating</Text>}
         </TouchableOpacity>
       </ScrollView>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles({
   screen: { flex: 1, backgroundColor: '#FFFFFF' },
   backHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
   backBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
@@ -95,11 +95,11 @@ const styles = StyleSheet.create({
   copy: { color: '#6B7280', fontSize: 14, fontFamily: fonts.regular, textAlign: 'center' },
   techName: { color: '#374151', fontSize: 14, fontFamily: fonts.semiBold, marginTop: 2, marginBottom: 16 },
   avatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#3B82F6', alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
-  avatarText: { color: '#FFFFFF', fontSize: 20, fontFamily: fonts.extraBold },
+  avatarText: { color: colors.onAccent, fontSize: 20, fontFamily: fonts.extraBold },
   prompt: { color: '#4B5563', fontSize: 14, fontFamily: fonts.regular, marginBottom: 12 },
   stars: { flexDirection: 'row', gap: 12, marginBottom: 24 },
   label: { alignSelf: 'stretch', color: '#6B7280', fontSize: 11, fontFamily: fonts.bold, letterSpacing: 0.8, marginBottom: 6 },
   textArea: { alignSelf: 'stretch', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, minHeight: 88, fontSize: 14, fontFamily: fonts.regular, color: colors.ink, backgroundColor: '#F9FAFB', marginBottom: 16 },
   primary: { alignSelf: 'stretch', backgroundColor: ORANGE, borderRadius: 12, minHeight: 52, alignItems: 'center', justifyContent: 'center' },
-  primaryText: { color: '#FFFFFF', fontSize: 15, fontFamily: fonts.bold },
+  primaryText: { color: colors.onAccent, fontSize: 15, fontFamily: fonts.bold },
 });

@@ -59,13 +59,15 @@ const insertReads = async (rows) => supabase.from(MESSAGE_READS).insert(rows);
 const insertReadIfAbsent = async (row) => supabase.from(MESSAGE_READS).insert(row);
 
 // Atomic send: the RPC inserts the message and returns its id.
-const sendChatMessage = async ({ jobId, senderUid, senderName, senderRole, text }) =>
+// `imageUrl` is null for text-only messages.
+const sendChatMessage = async ({ jobId, senderUid, senderName, senderRole, text, imageUrl = null }) =>
   supabase.rpc('send_chat_message', {
     p_job_id: jobId,
     p_sender_uid: senderUid,
     p_sender_name: senderName,
     p_sender_role: senderRole,
     p_text: text,
+    p_image_url: imageUrl,
   });
 
 module.exports = {

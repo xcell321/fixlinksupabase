@@ -3,7 +3,7 @@ import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, ActivityInd
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import { fetchPlatformCategories, registerUser } from '../../services/api';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, themedStyles } from '../../theme';
 
 // Reference Register layout for both roles: dark rounded header, uppercase
 // labels, gray-50 inputs, full-width accent button.
@@ -385,7 +385,7 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
 
         {Object.keys(fieldErrors).length > 0 ? (
           <View style={styles.formErrorBox} accessibilityRole="alert">
-            <Ionicons name="alert-circle-outline" size={16} color="#B91C1C" />
+            <Ionicons name="alert-circle-outline" size={16} color={colors.dangerText} />
             <Text style={styles.formErrorText}>Please check the highlighted fields.</Text>
           </View>
         ) : null}
@@ -403,7 +403,7 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
         ) : null}
 
         <TouchableOpacity style={[styles.primary, { backgroundColor: accent }]} onPress={handleRegister} disabled={loading} activeOpacity={0.88} accessibilityRole="button" accessibilityLabel={isTechRole ? 'Submit application' : 'Create account'}>
-          {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>{isTechRole ? 'Submit Application' : 'Create Account'}</Text>}
+          {loading ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.primaryText}>{isTechRole ? 'Submit Application' : 'Create Account'}</Text>}
         </TouchableOpacity>
 
         <View style={styles.switchRow}>
@@ -417,13 +417,13 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles({
   screen: { flex: 1, backgroundColor: '#FFFFFF' },
   header: { backgroundColor: '#0D1B2A', paddingHorizontal: 24, paddingTop: 56, paddingBottom: 40, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
   headerTech: { backgroundColor: '#0D1B2A' },
   backLink: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 24 },
   backText: { color: '#9CA3AF', fontSize: 14, fontFamily: fonts.regular },
-  title: { color: '#FFFFFF', fontSize: 28, fontFamily: fonts.extraBold, letterSpacing: -0.3, marginBottom: 4 },
+  title: { color: colors.onAccent, fontSize: 28, fontFamily: fonts.extraBold, letterSpacing: -0.3, marginBottom: 4 },
   subtitle: { color: '#9CA3AF', fontSize: 14, fontFamily: fonts.regular },
   form: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 32, gap: 0 },
   roleTabs: { flexDirection: 'row', backgroundColor: '#F3F4F6', borderRadius: 12, padding: 4, gap: 4, marginBottom: 20 },
@@ -431,7 +431,7 @@ const styles = StyleSheet.create({
   roleTabCustomer: { backgroundColor: colors.customer },
   roleTabTech: { backgroundColor: colors.tech },
   roleTabText: { color: '#6B7280', fontSize: 13, fontFamily: fonts.semiBold },
-  roleTabTextOn: { color: '#FFFFFF' },
+  roleTabTextOn: { color: colors.onAccent },
   nameGrid: { flexDirection: 'row', gap: 12 },
   nameCell: { flex: 1, minWidth: 0 },
   field: { marginBottom: 16 },
@@ -459,7 +459,7 @@ const styles = StyleSheet.create({
   docButton: { flexDirection: 'row', alignItems: 'center', gap: 10, justifyContent: 'flex-start' },
   docButtonText: { flex: 1, color: '#4B5563', fontSize: 13, fontFamily: fonts.medium },
   primary: { borderRadius: 12, minHeight: 52, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
-  primaryText: { color: '#FFFFFF', fontSize: 15, fontFamily: fonts.semiBold },
+  primaryText: { color: colors.onAccent, fontSize: 15, fontFamily: fonts.semiBold },
   switchRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 16 },
   switchText: { color: '#6B7280', fontSize: 13, fontFamily: fonts.regular },
   switchLink: { fontSize: 13, fontFamily: fonts.semiBold },

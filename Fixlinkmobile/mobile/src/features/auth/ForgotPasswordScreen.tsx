@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { forgotPassword } from '../../services/api';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, themedStyles } from '../../theme';
 
 type ForgotPasswordScreenProps = {
   // Returns to the login screen (also used for the "Back to Login" button once
@@ -79,14 +79,14 @@ export default function ForgotPasswordScreen({ switchToLogin, role = 'customer' 
           accessibilityRole="button"
           accessibilityLabel={isSent ? 'Back to login' : 'Send reset link'}
         >
-          {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>{isSent ? 'Back to Login' : 'Send Reset Link'}</Text>}
+          {loading ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.primaryText}>{isSent ? 'Back to Login' : 'Send Reset Link'}</Text>}
         </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles({
   screen: { flex: 1, backgroundColor: '#FFFFFF' },
   // SafeAreaView in AppNavigator already clears the status bar; keep only a
   // small gap so the back row sits at the top instead of floating mid-screen.
@@ -101,5 +101,5 @@ const styles = StyleSheet.create({
   inputWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 14, backgroundColor: '#F9FAFB', minHeight: 52, marginBottom: 8 },
   input: { flex: 1, color: colors.ink, fontSize: 15, fontFamily: fonts.medium, paddingVertical: 12 },
   primary: { borderRadius: 12, minHeight: 52, alignItems: 'center', justifyContent: 'center', marginTop: 16 },
-  primaryText: { color: '#FFFFFF', fontSize: 15, fontFamily: fonts.bold },
+  primaryText: { color: colors.onAccent, fontSize: 15, fontFamily: fonts.bold },
 });

@@ -140,7 +140,10 @@ create table if not exists public.messages (
   sender_uid uuid not null,
   sender_name text not null,
   sender_role text not null check (sender_role in ('customer', 'technician', 'admin')),
+  -- `text` stays NOT NULL: an image-only message stores an empty string.
   text text not null,
+  -- Optional photo attached by either participant.
+  image_url text,
   timestamp timestamptz not null default now()
 );
 
@@ -208,6 +211,7 @@ create table if not exists public.reviews (
   id uuid primary key default gen_random_uuid(),
   technician_uid uuid references public.users(id) on delete set null,
   technician_name text,
+  customer_uid uuid references public.users(id) on delete set null,
   customer_name text not null,
   rating int not null check (rating between 1 and 5),
   comment text,
@@ -217,6 +221,7 @@ create table if not exists public.reviews (
 
 create index if not exists idx_reviews_technician on public.reviews (technician_uid);
 create index if not exists idx_reviews_technician_name on public.reviews (lower(technician_name));
+create index if not exists idx_reviews_customer on public.reviews (customer_uid);
 
 -- ---------------------------------------------------------------------
 -- REPORTS (admin panel "Reports & disputes"; no mobile write path yet)
@@ -299,12 +304,19 @@ end;
 $$;
 
 -- Insert a chat message + fan out a notification atomically.
+-- Insert a chat message + fan out a notification atomically.
+-- Recreated in the migration section below with the p_image_url parameter, so
+-- the old five-argument signature is dropped first (Postgres treats a changed
+-- argument list as an overload, which would make named RPC calls ambiguous).
+drop function if exists public.send_chat_message(uuid, uuid, text, text, text);
+
 create or replace function public.send_chat_message(
   p_job_id uuid,
   p_sender_uid uuid,
   p_sender_name text,
   p_sender_role text,
-  p_text text
+  p_text text,
+  p_image_url text default null
 ) returns uuid
 language plpgsql
 security definer set search_path = public
@@ -312,9 +324,12 @@ as $$
 declare
   v_message_id uuid;
   v_recipient uuid;
+  -- `text` is NOT NULL, so an image-only message is stored as an empty string
+  -- and the notification still carries something readable.
+  v_text text := coalesce(p_text, '');
 begin
-  insert into public.messages (job_id, sender_uid, sender_name, sender_role, text)
-  values (p_job_id, p_sender_uid, p_sender_name, p_sender_role, p_text)
+  insert into public.messages (job_id, sender_uid, sender_name, sender_role, text, image_url)
+  values (p_job_id, p_sender_uid, p_sender_name, p_sender_role, v_text, p_image_url)
   returning id into v_message_id;
 
   select case when p_sender_role = 'technician' then customer_uid else technician_uid end
@@ -324,7 +339,11 @@ begin
 
   if (v_recipient is not null and v_recipient <> p_sender_uid) then
     insert into public.notifications (recipient_uid, sender_uid, sender_name, job_id, message_id, type, text, timestamp)
-    values (v_recipient, p_sender_uid, p_sender_name, p_job_id, v_message_id, 'chat', p_text, now());
+    values (
+      v_recipient, p_sender_uid, p_sender_name, p_job_id, v_message_id, 'chat',
+      coalesce(nullif(v_text, ''), 'Sent a photo'),
+      now()
+    );
   end if;
 
   return v_message_id;
@@ -438,3 +457,11 @@ alter table public.jobs add constraint jobs_status_check check (status in ('Pend
 
 alter table public.notifications drop constraint if exists notifications_type_check;
 alter table public.notifications add constraint notifications_type_check check (type in ('chat', 'job', 'system'));
+
+-- Chat photos: a message may carry an image alongside (or instead of) text.
+alter table public.messages add column if not exists image_url text;
+
+-- Reviews now record the reviewer, so the technician's reviews tab can show the
+-- customer's current name and profile picture instead of a stored name only.
+alter table public.reviews add column if not exists customer_uid uuid references public.users(id) on delete set null;
+create index if not exists idx_reviews_customer on public.reviews (customer_uid);

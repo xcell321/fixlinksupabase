@@ -47,6 +47,7 @@ export const useJobActions = ({
   const [otpModalVisible, setOtpModalVisible] = useState<boolean>(false);
   const [selectedJobForOtp, setSelectedJobForOtp] = useState<JobItem | null>(null);
   const [otpCode, setOtpCode] = useState<string>('');
+  const [otpError, setOtpError] = useState<string | null>(null);
   const [verifyingOtp, setVerifyingOtp] = useState<boolean>(false);
 
   const [noShowJob, setNoShowJob] = useState<JobItem | null>(null);
@@ -235,18 +236,28 @@ export const useJobActions = ({
   const openOtpModal = (job: JobItem): void => {
     setSelectedJobForOtp(job);
     setOtpCode('');
+    setOtpError(null);
     setOtpModalVisible(true);
+  };
+
+  // Typing clears the last failure so the message never outlives the attempt.
+  const handleOtpCodeChange = (code: string): void => {
+    setOtpCode(code);
+    if (otpError) {
+      setOtpError(null);
+    }
   };
 
   const handleVerifyOtp = async (): Promise<void> => {
     const cleanCode = otpCode.trim();
     if (!validateOtpCode(cleanCode)) {
-      Alert.alert('Invalid Code', 'Please enter the complete 4-digit numeric code provided by the customer.');
+      setOtpError('Enter all 4 digits before verifying.');
       return;
     }
     if (!selectedJobForOtp) return;
 
     setVerifyingOtp(true);
+    setOtpError(null);
     try {
       await verifyCompletionCode(selectedJobForOtp.id, cleanCode);
       setOtpModalVisible(false);
@@ -255,7 +266,14 @@ export const useJobActions = ({
       loadJobs();
     } catch (error) {
       const err = error as { error?: string; message?: string };
-      Alert.alert('Verification Failed', err?.error || err?.message || 'Incorrect code entered.');
+      // Inline instead of an alert: the sheet stays open so the code can be
+      // retyped, and the field is cleared so all 4 digits can go in again.
+      setOtpError(
+        err?.error ||
+          err?.message ||
+          'That code did not match. Ask the customer to read their 4-digit code again.'
+      );
+      setOtpCode('');
     } finally {
       setVerifyingOtp(false);
     }
@@ -276,6 +294,7 @@ export const useJobActions = ({
     setOtpModalVisible,
     otpCode,
     setOtpCode,
+    otpError,
     verifyingOtp,
     handleAcceptJob,
     doAcceptJob,
@@ -287,5 +306,6 @@ export const useJobActions = ({
     doNoShow,
     openOtpModal,
     handleVerifyOtp,
+    handleOtpCodeChange,
   };
 };

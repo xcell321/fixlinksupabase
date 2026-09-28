@@ -50,13 +50,19 @@ export const updateCustomerProfile = async (uid: string, profile: { name?: strin
   return (await api.put(`/profile/${encodeURIComponent(uid)}/profile`, formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120000 })).data;
 };
 
-export const uploadPortfolioPhotos = async (uid: string, photos: Array<{ uri: string; fileName?: string; name?: string; mimeType?: string; type?: string }>): Promise<unknown> => {
+// One photo per call; the repair description rides along so the card can show
+// what was fixed and which model, not just the file name.
+export const uploadPortfolioPhoto = async (
+  uid: string,
+  photo: { uri: string; fileName?: string; name?: string; mimeType?: string; type?: string },
+  meta: { repairType: string; model: string },
+): Promise<unknown> => {
   const formData = new FormData();
-  for (const photo of photos) {
-    formData.append(
-      'photos',
-      (await buildUploadFile(photo, 'portfolio-photo.jpg', 'image/jpeg')) as unknown as Blob,
-    );
-  }
+  formData.append('repairType', meta.repairType);
+  formData.append('model', meta.model);
+  formData.append(
+    'photos',
+    (await buildUploadFile(photo, 'portfolio-photo.jpg', 'image/jpeg')) as unknown as Blob,
+  );
   return (await api.post(`/users/${uid}/portfolio`, formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120000 })).data;
 };

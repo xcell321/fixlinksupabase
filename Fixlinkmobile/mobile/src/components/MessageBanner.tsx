@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, Animated, StyleSheet, Platform, Vibration } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, fonts } from '../theme';
+import { colors, fonts, themedStyles } from '../theme';
 
 const useNative: boolean = Platform.OS !== 'web';
 
@@ -65,7 +65,7 @@ export default function MessageBanner({ banner, onDismiss, onPress }: MessageBan
               <Text style={styles.avatarText}>{initial}</Text>
             </View>
             <View style={styles.avatarBadge}>
-              <Ionicons name="chatbubble-ellipses" size={9} color={colors.white} />
+              <Ionicons name="chatbubble-ellipses" size={9} color={colors.onAccent} />
             </View>
           </View>
           <View style={styles.copy}>
@@ -81,7 +81,7 @@ export default function MessageBanner({ banner, onDismiss, onPress }: MessageBan
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles({
   overlay: {
     position: 'absolute',
     top: 0,
@@ -130,7 +130,7 @@ const styles = StyleSheet.create({
     borderColor: colors.ink,
   },
   copy: { flex: 1 },
-  title: { color: colors.white, fontSize: 13, fontFamily: fonts.bold, marginBottom: 2 },
+  title: { color: colors.onAccent, fontSize: 13, fontFamily: fonts.bold, marginBottom: 2 },
   text: { color: colors.line, fontSize: 12, fontFamily: fonts.medium, lineHeight: 16 },
   close: { width: 28, height: 28, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
 });

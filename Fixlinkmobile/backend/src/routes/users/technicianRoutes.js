@@ -15,8 +15,33 @@ const { getTechnicianPublicProfile } = require('../../services/technician/techni
 const portfolioUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
-  fileFilter: (req, file, callback) => callback(null, ['image/jpeg', 'image/png'].includes(file.mimetype)),
+  // Accept any image type (jpeg, png, webp, heic, and so forth). A strict
+  // allowlist silently dropped phone photos (for example HEIC) because multer
+  // discards them with no error, which surfaced as a misleading
+  // `400 'A photo is required.'` even though the user attached a picture.
+  fileFilter: (req, file, callback) => {
+    const isImage = !file.mimetype || String(file.mimetype).startsWith('image/');
+    if (!isImage) req.fileRejected = true;
+    callback(null, isImage);
+  },
 });
+
+// Multer errors default to an HTML 500 page, which the app cannot display.
+// Convert them to JSON so the portfolio sheet always shows a readable message.
+const handlePortfolioUpload = (req, res, next) => {
+  portfolioUpload.array('photos', 1)(req, res, (err) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ error: 'Each photo must be 10MB or smaller. Please use a smaller file.' });
+      }
+      if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+        return res.status(400).json({ error: 'Please attach one photo per request.' });
+      }
+      return res.status(400).json({ error: 'Photo upload failed. Please use an image file.' });
+    }
+    next();
+  });
+};
 
 router.get('/:id/profile', async (req, res) => {
   try {
@@ -74,29 +99,48 @@ router.put('/:id/location', requireAuth, async (req, res) => {
   res.json({ latitude, longitude });
 });
 
-router.post('/:id/portfolio', requireAuth, portfolioUpload.array('photos', 6), async (req, res) => {
+router.post('/:id/portfolio', requireAuth, handlePortfolioUpload, async (req, res) => {
   try {
     if (String(req.authUser.uid) !== String(req.params.id)) {
       return res.status(403).json({ error: 'You can only update your own portfolio.' });
+    }
+    if (req.fileRejected) {
+      return res.status(400).json({ error: 'Your photo must be an image file.' });
     }
     const { data: profile } = await supabase.from('users').select('portfolio, role').eq('id', req.params.id).maybeSingle();
     if (!profile || profile.role !== 'technician') {
       return res.status(404).json({ error: 'Technician profile not found' });
     }
-    const existing = profile.portfolio || [];
+    const existing = Array.isArray(profile.portfolio) ? profile.portfolio : [];
 
-    const files = [];
-    for (const file of (req.files || [])) {
-      try {
-        const url = await uploadBuffer({ folder: 'technician-portfolio', file, buffer: file.buffer, contentType: file.mimetype });
-        files.push({ name: file.originalname, url, uploadedAt: new Date().toISOString() });
-      } catch (uploadError) {
-        console.error('Portfolio upload failed for one photo:', uploadError.message);
-      }
+    // One photo per request. The technician describes the repair before the
+    // photo is stored, so the card can show what was fixed and which model
+    // instead of a raw file name.
+    const file = (req.files || [])[0];
+    if (!file) {
+      return res.status(400).json({ error: 'A photo is required.' });
+    }
+    const repairType = String(req.body?.repairType || '').trim().slice(0, 80);
+    const model = String(req.body?.model || '').trim().slice(0, 80);
+    if (!repairType || !model) {
+      return res.status(400).json({ error: 'Repair type and model are required.' });
     }
 
-    const portfolio = [...existing, ...files];
-    const { data: updated } = await supabase.from('users').update({ portfolio }).eq('id', req.params.id).select('portfolio').single();
+    let photo;
+    try {
+      const url = await uploadBuffer({ folder: 'technician-portfolio', file, buffer: file.buffer, contentType: file.mimetype });
+      photo = { name: file.originalname, url, uploadedAt: new Date().toISOString(), repairType, model };
+    } catch (uploadError) {
+      console.error('Portfolio upload failed:', uploadError.message);
+      return res.status(500).json({ error: 'Unable to store the photo.' });
+    }
+
+    const portfolio = [...existing, photo];
+    const { data: updated, error: updateError } = await supabase.from('users').update({ portfolio }).eq('id', req.params.id).select('portfolio').single();
+    if (updateError) {
+      console.error('Portfolio save failed:', updateError.message);
+      return res.status(500).json({ error: 'Unable to save the photo. Please try again.' });
+    }
     res.status(201).json({ portfolio: updated ? updated.portfolio : portfolio });
   } catch (error) {
     res.status(500).json({ error: error.message });

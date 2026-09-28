@@ -12,13 +12,14 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { fetchTechnicianProfile, fetchTechnicianSchedule, updateTechnicianProfile, uploadPortfolioPhotos } from '../../services/api';
+import { fetchTechnicianProfile, fetchTechnicianSchedule, updateTechnicianProfile } from '../../services/api';
 import { geocodeAddressStrict } from '../../services/locationIq';
 import Skeleton from '../../components/Skeleton';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import HelpSheet from '../../components/HelpSheet';
+import PortfolioPhotoSheet, { type PortfolioPhotoItem } from '../../components/PortfolioPhotoSheet';
 import { PhotoLightbox } from '../../components/RequestPhoto';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, themedStyles } from '../../theme';
 import type { TechnicianScheduleItem, TechnicianScheduleResponse } from '../../types/schedule';
 import {
   draftFromProfile,
@@ -27,6 +28,7 @@ import {
   formatRating,
   formatReviewDate,
   formatSkillList,
+  formatUploadTimestamp,
   getSkillLevel,
   getVerificationBadge,
   EMPTY_DRAFT,
@@ -46,6 +48,9 @@ interface Review {
   comment?: string;
   createdAt?: string | null;
   customerName?: string;
+  // The reviewer's current profile picture, resolved server-side. Null when the
+  // customer has none yet, in which case we fall back to their initials.
+  customerImage?: string | null;
   name?: string;
   customer?: string;
 }
@@ -55,6 +60,9 @@ interface PortfolioPhoto {
   // Stored with the upload: original file name + when it was added.
   name?: string;
   uploadedAt?: string;
+  // Described by the technician when they add the photo.
+  repairType?: string;
+  model?: string;
 }
 
 interface TechnicianProfile {
@@ -131,12 +139,12 @@ function StarRow({ value, size = 14 }: { value: number; size?: number }): React.
 
 export default function TechnicianProfileScreen({ technician, onLogout, readOnly = false, onBack, onProfileUpdate }: TechnicianProfileScreenProps): React.JSX.Element {
   const [profile, setProfile] = useState<TechnicianProfile | null>(null);
-  const [selectedPhotos, setSelectedPhotos] = useState<SelectedPhoto[]>([]);
+  // Add-photo sheet: one described photo per upload.
+  const [addPhotoVisible, setAddPhotoVisible] = useState<boolean>(false);
   // Avatar picked in the edit form, still to be uploaded on save.
   const [avatarAsset, setAvatarAsset] = useState<SelectedPhoto | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [uploading, setUploading] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
   const [editing, setEditing] = useState<boolean>(false);
   const [draft, setDraft] = useState<TechnicianDraft>(EMPTY_DRAFT);
@@ -279,45 +287,6 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
     }
   };
 
-  const choosePortfolioPhotos = async (): Promise<void> => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (permission.status !== 'granted') {
-      Alert.alert('Photo permission needed', 'Allow photo access to add completed repair photos.');
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsMultipleSelection: true,
-      selectionLimit: 6,
-      quality: 0.75,
-    });
-    if (!result.canceled) {
-      setSelectedPhotos(result.assets.map((asset) => ({
-        uri: asset.uri,
-        fileName: asset.fileName ?? undefined,
-        mimeType: asset.mimeType ?? undefined,
-      })));
-    }
-  };
-
-  const savePortfolio = async (): Promise<void> => {
-    if (selectedPhotos.length === 0) return;
-    setUploading(true);
-    try {
-      const result = await uploadPortfolioPhotos(technician.uid, selectedPhotos) as { portfolio: PortfolioPhoto[] };
-      setProfile((current) => ({ ...(current ?? {}), portfolio: result.portfolio ?? [] }));
-      setSelectedPhotos([]);
-      Alert.alert('Portfolio updated', 'Your completed repair photos are now in your portfolio.');
-    } catch (error) {
-      Alert.alert(
-        'Upload failed',
-        (error as { response?: { data?: { error?: string } } }).response?.data?.error || 'Unable to upload portfolio photos.',
-      );
-    } finally {
-      setUploading(false);
-    }
-  };
-
   const formatScheduleDate = (item: TechnicianScheduleItem): string => {
     if (item.scheduledDate) {
       const time = new Date(item.scheduledDate).getTime();
@@ -369,7 +338,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
           onPress={() => loadProfile()}
           style={({ pressed }) => [styles.primaryButtonSolid, pressed && styles.pressed]}
         >
-          <Ionicons name="refresh-outline" size={16} color={colors.white} />
+          <Ionicons name="refresh-outline" size={16} color={colors.onAccent} />
           <Text style={styles.primaryButtonText}>Try again</Text>
         </Pressable>
       </View>
@@ -422,7 +391,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
             )}
             {verification.isVerified && (
               <View style={styles.avatarVerifiedBadge}>
-                <Ionicons name="checkmark" size={10} color="#FFFFFF" />
+                <Ionicons name="checkmark" size={10} color={colors.onAccent} />
               </View>
             )}
           </View>
@@ -449,7 +418,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
               onPress={() => setEditing(true)}
               style={({ pressed }) => [styles.editProfileButtonDarkCentered, pressed && styles.pressedSoft]}
             >
-              <Ionicons name="pencil-outline" size={12} color="#FFFFFF" />
+              <Ionicons name="pencil-outline" size={12} color={colors.onAccent} />
               <Text style={styles.editProfileButtonTextDark}>Edit Profile</Text>
             </Pressable>
           )}
@@ -495,7 +464,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
                   </View>
                 )}
                 <View style={styles.avatarEditBadge}>
-                  <Ionicons name="camera" size={12} color="#FFFFFF" />
+                  <Ionicons name="camera" size={12} color={colors.onAccent} />
                 </View>
               </Pressable>
               <View style={{ flex: 1 }}>
@@ -512,7 +481,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
               <Text style={styles.inputLabel}>Full Name</Text>
               <View style={styles.inputContainer}>
                 <View style={styles.editInputIconBox}>
-                  <Ionicons name="person-outline" size={16} color="#2563EB" />
+                  <Ionicons name="person-outline" size={16} color={colors.tech} />
                 </View>
                 <TextInput
                   style={styles.textInput}
@@ -529,7 +498,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
               <Text style={styles.inputLabel}>Phone Number</Text>
               <View style={styles.inputContainer}>
                 <View style={styles.editInputIconBox}>
-                  <Ionicons name="call-outline" size={16} color="#2563EB" />
+                  <Ionicons name="call-outline" size={16} color={colors.tech} />
                 </View>
                 <TextInput
                   style={styles.textInput}
@@ -547,7 +516,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
               <Text style={styles.inputLabel}>Service Base Address</Text>
               <View style={[styles.inputContainer, styles.inputContainerMulti]}>
                 <View style={styles.editInputIconBoxMulti}>
-                  <Ionicons name="location-outline" size={16} color="#2563EB" />
+                  <Ionicons name="location-outline" size={16} color={colors.tech} />
                 </View>
                 <TextInput
                   style={[styles.textInput, styles.textInputMulti]}
@@ -587,7 +556,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
               <Text style={styles.inputLabel}>Professional Bio</Text>
               <View style={[styles.inputContainer, styles.inputContainerMulti]}>
                 <View style={styles.editInputIconBoxMulti}>
-                  <Ionicons name="document-text-outline" size={16} color="#2563EB" />
+                  <Ionicons name="document-text-outline" size={16} color={colors.tech} />
                 </View>
                 <TextInput
                   style={[styles.textInput, styles.textInputMulti]}
@@ -605,7 +574,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
               <Text style={styles.inputLabel}>Skills (comma-separated)</Text>
               <View style={styles.inputContainer}>
                 <View style={styles.editInputIconBox}>
-                  <Ionicons name="construct-outline" size={16} color="#2563EB" />
+                  <Ionicons name="construct-outline" size={16} color={colors.tech} />
                 </View>
                 <TextInput
                   style={styles.textInput}
@@ -622,7 +591,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
               <Text style={styles.inputLabel}>Years of Experience</Text>
               <View style={styles.inputContainer}>
                 <View style={styles.editInputIconBox}>
-                  <Ionicons name="time-outline" size={16} color="#2563EB" />
+                  <Ionicons name="time-outline" size={16} color={colors.tech} />
                 </View>
                 <TextInput
                   style={styles.textInput}
@@ -655,7 +624,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
                 style={({ pressed }) => [styles.saveButton, pressed && !saving && styles.pressed]}
               >
                 {saving ? (
-                  <ActivityIndicator size="small" color={colors.white} />
+                  <ActivityIndicator size="small" color={colors.onAccent} />
                 ) : (
                   <Text style={styles.saveButtonText}>Save Changes</Text>
                 )}
@@ -669,7 +638,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
           <View style={styles.infoCardsContainer}>
             <View style={styles.infoCardWhite}>
               <View style={styles.infoCardIconBox}>
-                <Ionicons name="mail-outline" size={16} color="#2563EB" />
+                <Ionicons name="mail-outline" size={16} color={colors.tech} />
               </View>
               <View style={styles.infoCardTextWrap}>
                 <Text style={styles.infoCardLabel}>Email</Text>
@@ -678,7 +647,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
             </View>
             <View style={styles.infoCardWhite}>
               <View style={styles.infoCardIconBox}>
-                <Ionicons name="call-outline" size={16} color="#2563EB" />
+                <Ionicons name="call-outline" size={16} color={colors.tech} />
               </View>
               <View style={styles.infoCardTextWrap}>
                 <Text style={styles.infoCardLabel}>Phone</Text>
@@ -687,7 +656,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
             </View>
             <View style={styles.infoCardWhite}>
               <View style={styles.infoCardIconBox}>
-                <Ionicons name="location-outline" size={16} color="#2563EB" />
+                <Ionicons name="location-outline" size={16} color={colors.tech} />
               </View>
               <View style={styles.infoCardTextWrap}>
                 <Text style={styles.infoCardLabel}>Service Area</Text>
@@ -696,7 +665,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
             </View>
             <View style={styles.infoCardWhite}>
               <View style={styles.infoCardIconBox}>
-                <Ionicons name="shield-checkmark-outline" size={16} color="#2563EB" />
+                <Ionicons name="shield-checkmark-outline" size={16} color={colors.tech} />
               </View>
               <View style={styles.infoCardTextWrap}>
                 <Text style={styles.infoCardLabel}>Verified Since</Text>
@@ -725,9 +694,13 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
                 return (
                   <View key={`${customerName}-${date}-${i}`} style={styles.reviewCardWhite}>
                     <View style={styles.reviewCardHeader}>
-                      <View style={styles.reviewAvatarOrange}>
-                        <Text style={styles.reviewAvatarText}>{initials}</Text>
-                      </View>
+                      {r.customerImage ? (
+                        <Image source={{ uri: r.customerImage }} style={styles.reviewAvatarImage} />
+                      ) : (
+                        <View style={styles.reviewAvatarOrange}>
+                          <Text style={styles.reviewAvatarText}>{initials}</Text>
+                        </View>
+                      )}
                       <View style={{ flex: 1 }}>
                         <Text style={styles.reviewName}>{customerName}</Text>
                         <StarRow value={value} size={12} />
@@ -835,55 +808,27 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
           </View>
         )}
 
-        {/* 9. PORTFOLIO - Match Make image 3: image + text cards */}
+        {/* 9. PORTFOLIO - one described photo per card */}
         {ptab === 'portfolio' && (
           <View style={{ gap: 12 }}>
             {!readOnly && (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Add portfolio photos"
-                disabled={uploading}
-                hitSlop={6}
-                onPress={choosePortfolioPhotos}
-                style={({ pressed }) => [styles.addPhotosButtonFull, pressed && !uploading && styles.pressedSoft]}
+                accessibilityLabel="Add portfolio photo"
+                onPress={() => setAddPhotoVisible(true)}
+                style={({ pressed }) => [styles.addPhotoButton, pressed && styles.pressedSoft]}
               >
-                <Ionicons name="add" size={14} color="#FFFFFF" />
-                <Text style={styles.addPhotosText}>Add photos</Text>
+                <Ionicons name="add" size={18} color={colors.onAccent} />
+                <Text style={styles.addPhotoText}>Add photo</Text>
               </Pressable>
-            )}
-            {!readOnly && selectedPhotos.length > 0 && (
-              <View style={styles.selectedPreview}>
-                <View style={styles.photoGrid}>
-                  {selectedPhotos.map((photo) => (
-                    <Pressable key={photo.uri} onPress={() => setPreviewUrl(photo.uri)} style={({ pressed }) => [pressed && { opacity: 0.85 }]}>
-                      <Image source={{ uri: photo.uri }} style={styles.photo} />
-                    </Pressable>
-                  ))}
-                </View>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Upload selected portfolio photos"
-                  accessibilityState={{ disabled: uploading }}
-                  onPress={savePortfolio}
-                  disabled={uploading}
-                  style={({ pressed }) => [styles.primaryButtonSolid, styles.uploadAction, pressed && !uploading && styles.pressed]}
-                >
-                  {uploading
-                    ? <ActivityIndicator size="small" color={colors.white} />
-                    : (
-                      <>
-                        <Ionicons name="cloud-upload-outline" size={16} color={colors.white} />
-                        <Text style={styles.primaryButtonText}>Upload {selectedPhotos.length} photo{selectedPhotos.length === 1 ? '' : 's'}</Text>
-                      </>
-                    )}
-                </Pressable>
-              </View>
             )}
             {portfolio.length > 0 ? (
               <View style={{ gap: 12 }}>
                 {portfolio.map((photo) => {
-                  const title = portfolioTitle(photo.name);
-                  const uploaded = formatReviewDate(photo.uploadedAt);
+                  // Prefer the repair the technician described; fall back to a
+                  // cleaned-up file name only for older uploads that have none.
+                  const title = photo.repairType?.trim() || portfolioTitle(photo.name);
+                  const uploaded = formatUploadTimestamp(photo.uploadedAt);
                   return (
                     <Pressable
                       key={photo.url}
@@ -895,9 +840,15 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
                       <Image source={{ uri: photo.url }} style={styles.portfolioThumb} resizeMode="cover" />
                       <View style={styles.portfolioBody}>
                         <Text style={styles.portfolioTitle} numberOfLines={2}>{title}</Text>
-                        <Text style={styles.portfolioSubtitle} numberOfLines={2}>
-                          {uploaded ? `Uploaded ${uploaded}` : 'Completed repair photo'}
-                        </Text>
+                        {photo.model?.trim() ? (
+                          <Text style={styles.portfolioModel} numberOfLines={1}>{photo.model}</Text>
+                        ) : null}
+                        <View style={styles.portfolioDateRow}>
+                          <Ionicons name="time-outline" size={12} color={colors.muted} />
+                          <Text style={styles.portfolioDate} numberOfLines={1}>
+                            {uploaded ? `Uploaded ${uploaded}` : 'Upload date unavailable'}
+                          </Text>
+                        </View>
                       </View>
                     </Pressable>
                   );
@@ -905,8 +856,8 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
               </View>
             ) : (
               <View style={styles.emptyTabBox}>
-                <Text style={styles.emptyTabText}>Not yet uploaded.</Text>
-                <Text style={styles.emptyTabSub}>Completed repair photos appear here.</Text>
+                <Text style={styles.emptyTabText}>No portfolio photos yet.</Text>
+                <Text style={styles.emptyTabSub}>Add a photo of a completed repair and describe what you fixed.</Text>
               </View>
             )}
           </View>
@@ -924,7 +875,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
               style={({ pressed }) => [styles.logoutButton, pressed && styles.pressedSoft]}
             >
               <View style={styles.logoutIcon}>
-                <Ionicons name="close" size={18} color="#EF4444" />
+                <Ionicons name="log-out-outline" size={18} color="#EF4444" />
               </View>
               <Text style={styles.logoutButtonText}>Sign Out</Text>
             </Pressable>
@@ -937,18 +888,23 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
           message="Are you sure you want to log out?"
           confirmLabel="Log Out"
           danger
-          accentColor={colors.tech}
           onCancel={() => setLogoutConfirmVisible(false)}
           onConfirm={() => { setLogoutConfirmVisible(false); onLogout?.(); }}
         />
         <HelpSheet visible={helpVisible} role="technician" onClose={() => setHelpVisible(false)} />
         <PhotoLightbox visible={!!previewUrl} photoUrl={previewUrl} title="Portfolio photo" subtitle="Completed work showcase" onClose={() => setPreviewUrl(null)} />
+        <PortfolioPhotoSheet
+          visible={addPhotoVisible}
+          technicianUid={technician.uid}
+          onClose={() => setAddPhotoVisible(false)}
+          onUploaded={(next: PortfolioPhotoItem[]) => setProfile((current) => ({ ...(current ?? {}), portfolio: next as PortfolioPhoto[] }))}
+        />
       </View>
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles({
   screen: { padding: 16, paddingBottom: 36, backgroundColor: colors.canvas, flexGrow: 1 },
   inner: { width: '100%', maxWidth: 480, alignSelf: 'center' },
   screenLoading: { flex: 1, backgroundColor: colors.canvas, padding: 16, paddingTop: 20 },
@@ -969,15 +925,15 @@ elevation: 0 },
   // Prototype dark identity header
   coverCardDark: { backgroundColor: colors.dark, borderRadius: 22, padding: 18, marginBottom: 14 },
   avatarTech: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.tech, alignItems: 'center', justifyContent: 'center' },
-  coverNameDark: { color: colors.white, fontSize: 19, fontFamily: fonts.extraBold, letterSpacing: -0.2 },
+  coverNameDark: { color: colors.onAccent, fontSize: 19, fontFamily: fonts.extraBold, letterSpacing: -0.2 },
   coverRatingTextDark: { color: '#D1D5DB', fontSize: 12, fontFamily: fonts.medium },
   coverRatingTextMutedDark: { color: colors.muted, fontSize: 12, fontFamily: fonts.medium },
   editProfileButtonDark: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.tech, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, marginTop: 10, alignSelf: 'flex-start' },
-  editProfileButtonTextDark: { color: colors.white, fontSize: 12, fontFamily: fonts.bold },
+  editProfileButtonTextDark: { color: colors.onAccent, fontSize: 12, fontFamily: fonts.bold },
   coverDividerDark: { height: 1, backgroundColor: 'rgba(255,255,255,0.12)', marginVertical: 14 },
   coverContactIconDark: { width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.10)', alignItems: 'center', justifyContent: 'center' },
   coverContactMetaDark: { color: colors.muted, fontSize: 10, fontFamily: fonts.bold, letterSpacing: 1 },
-  coverContactTextDark: { color: colors.white, fontSize: 13, fontFamily: fonts.semiBold, marginTop: 2 },
+  coverContactTextDark: { color: colors.onAccent, fontSize: 13, fontFamily: fonts.semiBold, marginTop: 2 },
   // Prototype tab bar: info / skills / reviews / portfolio
   // -16 / 16 matches the screen's 16px gutter: a -20 bleed used to push the
   // strip 4px past the viewport on phones, clipping the last tab.
@@ -989,7 +945,7 @@ elevation: 0 },
   coverTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
   avatar: { width: 68, height: 68, borderRadius: 20, backgroundColor: colors.tech, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
   avatarImage: { width: 68, height: 68, borderRadius: 20, flexShrink: 0 },
-  avatarText: { color: colors.white, fontSize: 28, fontFamily: fonts.bold },
+  avatarText: { color: colors.onAccent, fontSize: 28, fontFamily: fonts.bold },
   coverIdentity: { flex: 1, gap: 6, minWidth: 0 },
   coverNameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   coverName: { color: colors.ink, fontSize: 20, fontFamily: fonts.bold, lineHeight: 24, letterSpacing: -0.3 },
@@ -1018,13 +974,13 @@ elevation: 0 },
   headerAvatarWrap: { position: 'relative', marginBottom: 12 },
   avatarImageLarge: { width: 72, height: 72, borderRadius: 36 },
   avatarTechLarge: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center' },
-  avatarTextLarge: { color: '#FFFFFF', fontSize: 28, fontFamily: fonts.extraBold },
+  avatarTextLarge: { color: colors.onAccent, fontSize: 28, fontFamily: fonts.extraBold },
   avatarVerifiedBadge: { position: 'absolute', bottom: -2, right: -2, width: 20, height: 20, borderRadius: 10, backgroundColor: '#2563EB', borderWidth: 2, borderColor: '#0D1B2A', alignItems: 'center', justifyContent: 'center' },
-  headerNameCentered: { color: '#FFFFFF', fontSize: 18, fontFamily: fonts.extraBold, letterSpacing: -0.2, textAlign: 'center' },
+  headerNameCentered: { color: colors.onAccent, fontSize: 18, fontFamily: fonts.extraBold, letterSpacing: -0.2, textAlign: 'center' },
   headerSubCentered: { color: '#9CA3AF', fontSize: 12, fontFamily: fonts.medium, marginTop: 2, textAlign: 'center' },
   headerStatsRowCentered: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 24, marginTop: 14 },
   headerStatCentered: { alignItems: 'center', minWidth: 60 },
-  headerStatValue: { color: '#FFFFFF', fontSize: 18, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
+  headerStatValue: { color: colors.onAccent, fontSize: 18, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
   headerStatLabel: { color: '#9CA3AF', fontSize: 11, fontFamily: fonts.medium, marginTop: 2 },
   headerStatDivider: { width: 1, height: 28, backgroundColor: 'rgba(255,255,255,0.12)' },
   editProfileButtonDarkCentered: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#2563EB', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, marginTop: 12 },
@@ -1049,7 +1005,7 @@ elevation: 0 },
   avatarEditRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 18 },
   avatarEditImage: { width: 64, height: 64, borderRadius: 32 },
   avatarEditPlaceholder: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center' },
-  avatarEditInitial: { color: '#FFFFFF', fontSize: 24, fontFamily: fonts.extraBold },
+  avatarEditInitial: { color: colors.onAccent, fontSize: 24, fontFamily: fonts.extraBold },
   avatarEditBadge: { position: 'absolute', right: -2, bottom: -2, width: 22, height: 22, borderRadius: 11, backgroundColor: '#2563EB', borderWidth: 2, borderColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   avatarEditTitle: { color: colors.ink, fontSize: 13, fontFamily: fonts.semiBold },
   avatarEditHint: { color: colors.muted, fontSize: 11, fontFamily: fonts.regular, marginTop: 2, lineHeight: 15 },
@@ -1069,13 +1025,13 @@ elevation: 0 },
   geoRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6, paddingHorizontal: 4 },
   geoHint: { fontSize: 11, lineHeight: 15, fontFamily: fonts.medium, fontVariant: ['tabular-nums'], flexShrink: 1 },
   geoPending: { color: colors.muted },
-  geoOk: { color: colors.techDark },
+  geoOk: { color: colors.tech },
   geoWarn: { color: colors.error },
   editActions: { flexDirection: 'row', gap: 10, marginTop: 16 },
   cancelButton: { flex: 1, minHeight: 48, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' },
   cancelButtonText: { color: colors.muted, fontSize: 14, fontFamily: fonts.bold },
   saveButton: { flex: 2, minHeight: 48, borderRadius: 14, backgroundColor: colors.tech, alignItems: 'center', justifyContent: 'center', elevation: 0 },
-  saveButtonText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
+  saveButtonText: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bold },
 
   // Shared Card Surface (About, Skills, Service Area, Schedule)
   cardSurface: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 20, padding: 18, marginBottom: 18, elevation: 0 },
@@ -1116,7 +1072,9 @@ elevation: 0 },
   reviewCardWhite: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#F3F4F6', borderRadius: 16, padding: 14 },
   reviewCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
   reviewAvatarOrange: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F97316', alignItems: 'center', justifyContent: 'center' },
-  reviewAvatarText: { color: '#FFFFFF', fontSize: 11, fontFamily: fonts.bold },
+  // Same footprint as the initials avatar so the header height never shifts.
+  reviewAvatarImage: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F3F4F6' },
+  reviewAvatarText: { color: colors.onAccent, fontSize: 11, fontFamily: fonts.bold },
   reviewName: { color: '#111827', fontSize: 13, fontFamily: fonts.semiBold },
   reviewDate: { color: '#9CA3AF', fontSize: 11, fontFamily: fonts.regular, marginLeft: 'auto' },
   reviewText: { color: '#4B5563', fontSize: 13, fontFamily: fonts.regular, lineHeight: 19 },
@@ -1130,7 +1088,8 @@ elevation: 0 },
   portfolioBody: { flex: 1, minWidth: 0, justifyContent: 'center', paddingHorizontal: 14, paddingVertical: 12, gap: 3 },
   portfolioTitle: { color: '#111827', fontSize: 14, fontFamily: fonts.bold, lineHeight: 19 },
   portfolioSubtitle: { color: '#6B7280', fontSize: 12, fontFamily: fonts.regular, lineHeight: 17 },
-  addPhotosButtonFull: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#2563EB', borderRadius: 12, paddingVertical: 12, marginBottom: 12 },
+  addPhotoButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.tech, borderRadius: 14, minHeight: 48, paddingHorizontal: 16 },
+  addPhotoText: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bold },
 
   // Service Area
   serviceAddress: { color: colors.ink, fontSize: 14, fontFamily: fonts.semiBold, lineHeight: 20, marginBottom: 12 },
@@ -1179,17 +1138,15 @@ elevation: 0 },
   portfolioHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 },
   portfolioHeaderCopy: { flex: 1, minWidth: 0 },
   addPhotosButton: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, paddingHorizontal: 14, borderRadius: 12, backgroundColor: colors.tech, elevation: 0, flexShrink: 0 },
-  addPhotosText: { color: colors.white, fontSize: 13, fontFamily: fonts.bold, letterSpacing: 0.1 },
-  selectedPreview: { marginBottom: 14, gap: 10 },
-  photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  photo: { width: '31%', aspectRatio: 1, borderRadius: 12, backgroundColor: colors.lineSoft, borderWidth: 1, borderColor: colors.lineSoft },
-  selectionHint: { color: colors.muted, fontSize: 11, fontFamily: fonts.medium, fontStyle: 'italic' },
+  addPhotosText: { color: colors.onAccent, fontSize: 13, fontFamily: fonts.bold, letterSpacing: 0.1 },
+  portfolioModel: { color: colors.ink, fontSize: 12.5, fontFamily: fonts.semiBold, lineHeight: 17 },
+  portfolioDateRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
+  portfolioDate: { flex: 1, color: colors.muted, fontSize: 11.5, fontFamily: fonts.regular },
   portfolioHint: { color: colors.muted, fontSize: 11, fontFamily: fonts.regular, lineHeight: 15, marginTop: 10, fontStyle: 'italic' },
-  uploadAction: { marginTop: 2 },
 
   // Shared buttons
   primaryButtonSolid: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.tech, borderRadius: 14, paddingHorizontal: 18, minHeight: 48, elevation: 0 },
-  primaryButtonText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
+  primaryButtonText: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bold },
 
   // Footer: Help + Logout
   footerBreak: { marginTop: 8, gap: 12, paddingBottom: 12 },
@@ -1199,8 +1156,10 @@ elevation: 0 },
   helpCopy: { flex: 1, minWidth: 0 },
   helpTitle: { color: colors.ink, fontSize: 13, fontFamily: fonts.bold },
   helpSub: { color: colors.muted, fontSize: 11, fontFamily: fonts.regular, marginTop: 2 },
-  logoutButton: { backgroundColor: '#FEF2F2', borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: '#FECACA' },
-  logoutIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center' },
+  // Matches the customer profile's sign-out row exactly, and the neutral rows
+  // elsewhere in this screen: no red fill, no red outline.
+  logoutButton: { backgroundColor: colors.white, borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: colors.cardBorder },
+  logoutIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center' },
   logoutButtonText: { color: '#EF4444', fontSize: 14, fontFamily: fonts.semiBold },
 
   // Loading / Error

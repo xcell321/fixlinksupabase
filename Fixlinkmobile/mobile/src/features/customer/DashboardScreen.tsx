@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl, Modal, TextInput, KeyboardAvoidingView, Platform, Image, Animated, PanResponder, Dimensions } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl, Image, Animated, PanResponder, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { fetchCompletedJobs, fetchCustomerRequests, fetchPlatformCategories, askAssistant } from '../../services/api';
+import { fetchCompletedJobs, fetchCustomerRequests, fetchPlatformCategories } from '../../services/api';
 import Skeleton from '../../components/Skeleton';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, themedStyles } from '../../theme';
 import { getApplianceIcon, getStatusColor, getStatusIcon } from '../../utils/applianceIcons';
+import type { AssistantContext } from '../../components/AssistantSheet';
 
 // Prototype: FixIt Customer Home (orange #F97316 on dark #0D1B2A).
 // Logic preserved: real requests, active hero, stats, recent, categories, tip.
@@ -27,8 +27,6 @@ type JobItem = {
 
 type CategoryItem = { id?: string; name?: string };
 
-type AiMessage = { id: string; from: 'ai' | 'me'; text: string };
-
 type DashboardScreenProps = {
   user?: { name?: string; uid?: string; profileImage?: string | null } | null;
   notificationCount?: number;
@@ -39,6 +37,8 @@ type DashboardScreenProps = {
   onTrackJob?: (job: JobItem) => void;
   // Passed by the navigator for the hero card's track action.
   onTrackAcceptedJob?: () => void;
+  // Opens the shared FixLink Assistant with this screen's live context.
+  onOpenAssistant?: (context: AssistantContext) => void;
 };
 
 const getNextAction = (req?: JobItem | null): { icon: IconName; text: string } | null => {
@@ -54,7 +54,7 @@ const getNextAction = (req?: JobItem | null): { icon: IconName; text: string } |
 const ORANGE = colors.customer;
 const DARK = colors.dark;
 
-export default function DashboardScreen({ user, notificationCount = 0, onOpenNotifications, onNavigateToSubmit, onNavigateToProgress, onOpenRequest, onTrackJob }: DashboardScreenProps) {
+export default function DashboardScreen({ user, notificationCount = 0, onOpenNotifications, onNavigateToSubmit, onNavigateToProgress, onOpenRequest, onTrackJob, onOpenAssistant }: DashboardScreenProps) {
   const [trackedRequests, setTrackedRequests] = useState<JobItem[]>([]);
   const [completedJobs, setCompletedJobs] = useState<JobItem[]>([]);
   const [categories, setCategories] = useState<CategoryItem[]>([]);
@@ -91,52 +91,8 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
     },
     onPanResponderTerminate: () => { fabPos.flattenOffset(); },
   })).current;
-  const [aiVisible, setAiVisible] = useState(false);
-  const [aiInput, setAiInput] = useState('');
-  const [aiTyping, setAiTyping] = useState(false);
-  const [aiMessages, setAiMessages] = useState<AiMessage[]>([
-    { id: 'ai-hello', from: 'ai', text: 'Hi! I am your FixLink Assistant. Ask me about repairs, technicians, or tracking.' },
-  ]);
-  // Keep the assistant thread pinned to the newest bubble: when the sheet opens,
-  // when a bubble is added, and after the keyboard resizes the sheet.
-  const aiScrollRef = useRef<ScrollView | null>(null);
-  const scrollAiToEnd = (animated = false, delay = 0) => {
-    const run = () => aiScrollRef.current?.scrollToEnd({ animated });
-    if (delay > 0) setTimeout(run, delay); else run();
-  };
-  useEffect(() => {
-    if (!aiVisible) return undefined;
-    scrollAiToEnd(false, 80);
-    const timer = setTimeout(() => scrollAiToEnd(false), 420);
-    return () => clearTimeout(timer);
-  }, [aiVisible]);
-  useEffect(() => {
-    if (aiVisible) scrollAiToEnd(true, 60);
-  }, [aiMessages.length, aiTyping]);
-  // Persisted conversation: survives reload/restart, per customer.
-  // NOTE: uses user?.uid directly (uid const is declared further below).
-  const aiChatKey = `fixlink_ai_chat_${user?.uid || 'guest'}`;
-  const [aiChatReady, setAiChatReady] = useState(false);
-  useEffect(() => {
-    let on = true;
-    setAiChatReady(false);
-    AsyncStorage.getItem(aiChatKey).then((raw) => {
-      if (!on) return;
-      try {
-        const saved = raw ? JSON.parse(raw) : null;
-        if (Array.isArray(saved) && saved.length > 0 && saved.every((m) => m && typeof m.text === 'string')) {
-          setAiMessages(saved.slice(-50));
-        }
-      } catch {}
-      setAiChatReady(true);
-    }).catch(() => { if (on) setAiChatReady(true); });
-    return () => { on = false; };
-  }, [aiChatKey]);
-  useEffect(() => {
-    if (!aiChatReady) return;
-    AsyncStorage.setItem(aiChatKey, JSON.stringify(aiMessages.slice(-50))).catch(() => {});
-  }, [aiMessages, aiChatReady, aiChatKey]);
-
+  // The assistant thread itself lives in components/AssistantSheet.tsx so the
+  // Profile's Help & Support can open the exact same conversation.
   const firstName = (user?.name || 'there').split(' ')[0];
   const fullName = user?.name || 'there';
   const name = user?.name;
@@ -188,38 +144,20 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
     { key: 'Repairs Done', value: String(completedCount) },
     { key: 'Active', value: String(activeCount) },
     { key: 'Pending', value: String(pendingCount) },
-  ];
-
-  // No hardcoded answers: every reply comes from the real AI (OmniRoute)
-  // with live FixLink data. When the gateway is down, say so honestly.
-  const AI_DOWN = 'AI service is unavailable right now. Please check your connection and try again.';
-  const aiSend = (preset?: string) => {
-    const text = String(preset ?? aiInput).trim();
-    if (!text || aiTyping) return;
-    setAiMessages((cur) => [...cur, { id: `me-${Date.now()}`, from: 'me', text }]);
-    setAiInput('');
-    setAiTyping(true);
-    const ctx = {
-      customerName: fullName,
-      customerUid: uid || null,
-      activeJob: heroJob ? {
-        applianceType: heroJob.applianceType || null,
-        status: heroJob.status || null,
-        technicianName: heroJob.technicianName || null,
-        preferredTime: heroJob.preferredTime || null,
-      } : null,
-      activeCount,
-      pendingCount,
-      completedCount,
-    };
-    askAssistant(text, ctx).then((r) => {
-      const reply = String(r?.reply || '').trim() || AI_DOWN;
-      setAiMessages((cur) => [...cur, { id: `ai-${Date.now()}`, from: 'ai', text: reply }]);
-      setAiTyping(false);
-    }).catch(() => {
-      setAiMessages((cur) => [...cur, { id: `ai-${Date.now()}`, from: 'ai', text: AI_DOWN }]);
-      setAiTyping(false);
-    });
+  ];  // Live state handed to the shared assistant so its answers are grounded in
+  // this customer's real jobs instead of generic advice.
+  const assistantContext: AssistantContext = {
+    customerName: fullName,
+    customerUid: uid || null,
+    activeJob: heroJob ? {
+      applianceType: heroJob.applianceType || null,
+      status: heroJob.status || null,
+      technicianName: heroJob.technicianName || null,
+      preferredTime: heroJob.preferredTime || null,
+    } : null,
+    activeCount,
+    pendingCount,
+    completedCount,
   };
 
   return (
@@ -248,7 +186,7 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
               hitSlop={8}
               activeOpacity={0.85}
             >
-              <Ionicons name="notifications-outline" size={18} color="#FFFFFF" />
+              <Ionicons name="notifications-outline" size={18} color={colors.onAccent} />
               {notificationCount > 0 ? <View style={styles.bellDot} /> : <View style={styles.bellDotDim} />}
             </TouchableOpacity>
           </View>
@@ -377,7 +315,7 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
 
         {!tipDismissed && (
           <View style={styles.tipHint}>
-            <Ionicons name="sparkles-outline" size={16} color="#D97706" />
+            <Ionicons name="sparkles-outline" size={16} color={colors.gold} />
             <View style={{ flex: 1, gap: 2 }}>
               <Text style={styles.tipTitle}>Quick tip</Text>
               <Text style={styles.tipCopy}>Add a photo to your request so technicians can prepare before they arrive.</Text>
@@ -394,7 +332,7 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
       <Animated.View style={[styles.aiFabWrap, { transform: fabPos.getTranslateTransform() }]} {...fabPan.panHandlers}>
         <TouchableOpacity
           style={styles.aiFab}
-          onPress={() => setAiVisible(true)}
+          onPress={() => onOpenAssistant?.(assistantContext)}
           activeOpacity={0.88}
           accessibilityRole="button"
           accessibilityLabel="Open FixLink Assistant. Drag to move."
@@ -404,103 +342,31 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
         </TouchableOpacity>
       </Animated.View>
 
-      {/* FixLink Assistant sheet (Image 3, no Estimate price) */}
-      <Modal visible={aiVisible} transparent animationType="slide" onRequestClose={() => setAiVisible(false)}>
-        <View style={styles.aiOverlay}>
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.aiSheet}>
-            <View style={styles.aiHeader}>
-              <Image source={require('../../../assets/ai-assistant.png')} style={styles.aiHeaderImage} accessibilityLabel="FixLink Assistant" />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.aiTitle}>FixLink Assistant</Text>
-                <View style={styles.aiReadyRow}>
-                  <View style={styles.aiReadyDot} />
-                  <Text style={styles.aiReadyText}>Ready to help</Text>
-                </View>
-              </View>
-              <TouchableOpacity onPress={() => setAiVisible(false)} hitSlop={8} style={styles.aiClose} accessibilityRole="button" accessibilityLabel="Close assistant">
-                <Ionicons name="close" size={18} color={colors.ink} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView
-              ref={aiScrollRef}
-              style={styles.aiMessages}
-              contentContainerStyle={{ gap: 8, paddingBottom: 4 }}
-              showsVerticalScrollIndicator={false}
-              onContentSizeChange={() => scrollAiToEnd(false)}
-            >
-              {aiMessages.map((m) => (
-                <View key={m.id} style={[styles.aiBubbleRow, m.from === 'me' ? styles.aiBubbleRowMe : styles.aiBubbleRowAi]}>
-                  {m.from === 'ai' ? (
-                    <Image source={require('../../../assets/ai-assistant.png')} style={styles.aiMiniImage} accessibilityLabel="FixLink Assistant" />
-                  ) : null}
-                  <View style={[styles.aiBubble, m.from === 'me' ? styles.aiBubbleMe : styles.aiBubbleAi]}>
-                    <Text style={[styles.aiBubbleText, m.from === 'me' ? styles.aiBubbleTextMe : styles.aiBubbleTextAi]}>{m.text}</Text>
-                  </View>
-                </View>
-              ))}
-              {aiTyping ? (
-                <View style={[styles.aiBubbleRow, styles.aiBubbleRowAi]}>
-                  <Image source={require('../../../assets/ai-assistant.png')} style={styles.aiMiniImage} accessibilityLabel="FixLink Assistant" />
-                  <View style={[styles.aiBubble, styles.aiBubbleAi]}>
-                    <Text style={styles.aiBubbleTextAi}>Typing...</Text>
-                  </View>
-                </View>
-              ) : null}
-            </ScrollView>
-
-            <View style={styles.aiChips}>
-              {['Find nearby technician', 'Track my repair'].map((c) => (
-                <TouchableOpacity key={c} style={styles.aiChip} onPress={() => aiSend(c)} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={c}>
-                  <Text style={styles.aiChipText}>{c}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <View style={styles.aiInputRow}>
-              <TextInput
-                style={styles.aiInput}
-                value={aiInput}
-                onChangeText={setAiInput}
-                placeholder="Ask FixLink AI..."
-                placeholderTextColor="#9CA3AF"
-                onFocus={() => scrollAiToEnd(false, 180)}
-                onSubmitEditing={() => aiSend()}
-                returnKeyType="send"
-                accessibilityLabel="Ask FixLink AI"
-              />
-              <TouchableOpacity style={styles.aiSend} onPress={() => aiSend()} activeOpacity={0.88} accessibilityRole="button" accessibilityLabel="Send message">
-                <Ionicons name="send" size={16} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-          </KeyboardAvoidingView>
-        </View>
-      </Modal>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles({
   screen: { flex: 1, backgroundColor: '#F9FAFB' },
   content: { paddingBottom: 110 },
   header: { backgroundColor: DARK, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 32, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, gap: 10 },
   kicker: { color: '#9CA3AF', fontSize: 12, fontFamily: fonts.regular },
-  greeting: { color: '#FFFFFF', fontSize: 21, fontFamily: fonts.extraBold, letterSpacing: -0.3, marginTop: 2 },
+  greeting: { color: colors.onAccent, fontSize: 21, fontFamily: fonts.extraBold, letterSpacing: -0.3, marginTop: 2 },
   bell: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.10)', alignItems: 'center', justifyContent: 'center' },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerAvatar: { width: 36, height: 36, borderRadius: 18 },
   headerAvatarFallback: { backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center' },
-  headerAvatarText: { color: '#FFFFFF', fontSize: 14, fontFamily: fonts.bold },
+  headerAvatarText: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bold },
   bellDot: { position: 'absolute', top: 8, right: 9, width: 8, height: 8, borderRadius: 4, backgroundColor: ORANGE, borderWidth: 2, borderColor: DARK },
   bellDotDim: { position: 'absolute', top: 8, right: 9, width: 8, height: 8, borderRadius: 4, backgroundColor: 'transparent' },
   activeCard: { backgroundColor: 'rgba(255,255,255,0.10)', borderRadius: 16, padding: 16 },
   activeKicker: { color: '#D1D5DB', fontSize: 12, fontFamily: fonts.regular, marginBottom: 6 },
   activeRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  activeTitle: { color: '#FFFFFF', fontSize: 14, fontFamily: fonts.bold },
+  activeTitle: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bold },
   activeSub: { color: ORANGE, fontSize: 12, fontFamily: fonts.medium, marginTop: 2 },
   trackBtn: { backgroundColor: ORANGE, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 },
-  trackBtnText: { color: '#FFFFFF', fontSize: 12, fontFamily: fonts.bold },
+  trackBtnText: { color: colors.onAccent, fontSize: 12, fontFamily: fonts.bold },
   progressTrack: { marginTop: 12, height: 6, backgroundColor: 'rgba(255,255,255,0.20)', borderRadius: 999, overflow: 'hidden' },
   skelKicker: { width: 86, height: 12, borderRadius: 6, marginBottom: 6, backgroundColor: 'rgba(255,255,255,0.18)' },
   skelTitle: { width: '88%', height: 14, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.18)' },
@@ -538,34 +404,6 @@ const styles = StyleSheet.create({
   tipDismiss: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   homeWrap: { flex: 1 },
   aiFabWrap: { position: 'absolute', right: 20, bottom: 90 },
-  aiFab: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', elevation: 6, boxShadow: '0 6px 14px rgba(16,42,67,0.25)', overflow: 'hidden' },
+  aiFab: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', elevation: 6, boxShadow: '0 6px 14px rgba(16,42,67,0.25)', overflow: 'hidden' },
   aiFabImage: { width: 56, height: 56, borderRadius: 28 },
-  aiHeaderImage: { width: 32, height: 32, borderRadius: 10 },
-  aiMiniImage: { width: 20, height: 20, borderRadius: 10 },
-  aiOverlay: { flex: 1, backgroundColor: 'rgba(16,42,67,0.4)', justifyContent: 'flex-end' },
-  aiSheet: { flex: 1, backgroundColor: '#FFFFFF', paddingTop: 12, paddingHorizontal: 16, paddingBottom: 20 },
-  aiHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
-  aiHeaderIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center' },
-  aiTitle: { color: '#111827', fontSize: 15, fontFamily: fonts.bold },
-  aiReadyRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
-  aiReadyDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#10B981' },
-  aiReadyText: { color: '#6B7280', fontSize: 11, fontFamily: fonts.regular },
-  aiClose: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
-  aiMessages: { flex: 1 },
-  aiBubbleRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 6 },
-  aiBubbleRowMe: { justifyContent: 'flex-end' },
-  aiBubbleRowAi: { justifyContent: 'flex-start' },
-  aiMiniIcon: { width: 20, height: 20, borderRadius: 10, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center' },
-  aiBubble: { maxWidth: '80%', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 9 },
-  aiBubbleMe: { backgroundColor: ORANGE, borderTopRightRadius: 4 },
-  aiBubbleAi: { backgroundColor: '#F3F4F6', borderTopLeftRadius: 4 },
-  aiBubbleText: { fontSize: 13, lineHeight: 18, fontFamily: fonts.regular },
-  aiBubbleTextMe: { color: '#FFFFFF' },
-  aiBubbleTextAi: { color: '#374151' },
-  aiChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
-  aiChip: { borderWidth: 1, borderColor: '#FDBA74', backgroundColor: '#FFF7ED', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
-  aiChipText: { color: '#EA580C', fontSize: 12, fontFamily: fonts.semiBold },
-  aiInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
-  aiInput: { flex: 1, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#F9FAFB', borderRadius: 999, paddingHorizontal: 14, minHeight: 44, fontSize: 13, fontFamily: fonts.regular, color: '#111827' },
-  aiSend: { width: 44, height: 44, borderRadius: 22, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center' },
 });

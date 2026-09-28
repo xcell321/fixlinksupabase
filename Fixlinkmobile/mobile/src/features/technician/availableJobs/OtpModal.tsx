@@ -1,30 +1,58 @@
-// 4-digit OTP completion handshake modal.
-// Moved verbatim from AvailableJobsScreen.tsx, including the input
-// auto-focus effect. No visual or behavior change.
-import React, { useEffect, useRef } from 'react';
-import { ActivityIndicator, Modal, Pressable, Text, TextInput, View } from 'react-native';
+// 4-digit OTP completion handshake sheet.
+// Follows the compact reference layout: title, one instruction line, then the
+// dot field and the verify button on a single row. The dot field is the only
+// visible affordance — an invisible input sits on top of it so tapping
+// anywhere in the field opens the number pad.
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  Text,
+  TextInput,
+  View
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../../theme';
 import { styles } from './availableJobsStyles';
+
+const CODE_LENGTH = 4;
 
 interface OtpModalProps {
   visible: boolean;
   otpCode: string;
   verifying: boolean;
+  // Inline failure copy from the last verify attempt; null when there is none.
+  error?: string | null;
   onChangeCode: (code: string) => void;
   onClose: () => void;
   onVerify: () => void;
 }
 
-export const OtpModal = ({ visible, otpCode, verifying, onChangeCode, onClose, onVerify }: OtpModalProps): React.JSX.Element => {
-  const otpInputRef = useRef<any>(null);
+export const OtpModal = ({
+  visible,
+  otpCode,
+  verifying,
+  error = null,
+  onChangeCode,
+  onClose,
+  onVerify
+}: OtpModalProps): React.JSX.Element => {
+  const otpInputRef = useRef<TextInput>(null);
+  const [focused, setFocused] = useState(false);
 
   useEffect(() => {
     if (visible) {
       const t = setTimeout(() => otpInputRef.current?.focus?.(), 300);
       return () => clearTimeout(t);
     }
+    setFocused(false);
   }, [visible]);
+
+  const isComplete = otpCode.length === CODE_LENGTH;
+  const isVerifyDisabled = verifying || !isComplete;
 
   return (
     <Modal
@@ -33,86 +61,92 @@ export const OtpModal = ({ visible, otpCode, verifying, onChangeCode, onClose, o
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.modalOverlay}
+      >
         <View style={styles.modalCard}>
           <View style={styles.modalHeaderRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.modalKicker}>COMPLETION HANDSHAKE</Text>
-              <Text style={styles.modalTitle}>Enter 4-Digit Code</Text>
+            <View style={styles.modalHeaderCopy}>
+              <Text style={styles.modalTitle}>Verify completion OTP</Text>
+              <Text style={styles.modalSubtitle}>Ask the customer for their 4-digit code.</Text>
             </View>
             <Pressable
               hitSlop={12}
               onPress={onClose}
               accessibilityRole="button"
-              accessibilityLabel="Close OTP modal"
+              accessibilityLabel="Close OTP verification"
               style={styles.modalCloseTarget}
             >
               <Ionicons name="close" size={20} color={colors.ink} />
             </Pressable>
           </View>
 
-          <Text style={styles.modalDesc}>
-            Ask the customer to display their 4-digit completion code on their FixLink phone screen to confirm repair closeout.
-          </Text>
-
-          {/* Tappable 4-Box PIN Display - tap to focus keyboard */}
-          <Pressable
-            onPress={() => otpInputRef.current?.focus?.()}
-            accessibilityRole="button"
-            accessibilityLabel="Enter 4-digit code"
-          >
-            <View style={styles.pinBoxesContainer}>
-              {[0, 1, 2, 3].map((idx) => {
-                const digit = otpCode[idx] ?? '';
-                const isFocused = otpCode.length === idx;
-                return (
+          <View style={styles.otpRow}>
+            <View
+              style={[
+                styles.otpField,
+                focused && styles.otpFieldFocused,
+                error ? styles.otpFieldError : null
+              ]}
+            >
+              <View style={styles.otpDots} pointerEvents="none">
+                {[0, 1, 2, 3].map((idx) => (
                   <View
                     key={idx}
-                    style={[
-                      styles.pinBox,
-                      digit !== '' && styles.pinBoxFilled,
-                      isFocused && styles.pinBoxActive
-                    ]}
-                  >
-                    <Text style={styles.pinDigit}>{digit}</Text>
-                  </View>
-                );
-              })}
+                    style={[styles.otpDot, idx < otpCode.length && styles.otpDotFilled]}
+                  />
+                ))}
+              </View>
+              <TextInput
+                ref={otpInputRef}
+                style={styles.otpCaptureInput}
+                value={otpCode}
+                onChangeText={(text) => onChangeCode(text.replace(/[^0-9]/g, '').slice(0, CODE_LENGTH))}
+                keyboardType="number-pad"
+                maxLength={CODE_LENGTH}
+                autoFocus={true}
+                caretHidden={true}
+                contextMenuHidden={true}
+                onFocus={() => setFocused(true)}
+                onBlur={() => setFocused(false)}
+                accessibilityLabel="4-digit completion code"
+                accessibilityHint="Type the code shown on the customer's FixLink screen, then verify"
+              />
             </View>
-          </Pressable>
 
-          {/* Visible numeric input - drives the 4-box display */}
-          <TextInput
-            ref={otpInputRef}
-            style={styles.otpVisibleInput}
-            value={otpCode}
-            onChangeText={(text) => onChangeCode(text.replace(/[^0-9]/g, '').slice(0, 4))}
-            keyboardType="number-pad"
-            maxLength={4}
-            autoFocus={true}
-            placeholder="Type 4-digit code here"
-            placeholderTextColor={colors.muted}
-            textAlign="center"
-          />
+            <Pressable
+              style={({ pressed }) => [
+                styles.otpVerifyBtn,
+                isVerifyDisabled && styles.otpVerifyBtnDisabled,
+                pressed && !isVerifyDisabled && styles.pressedSoft
+              ]}
+              onPress={onVerify}
+              disabled={isVerifyDisabled}
+              accessibilityRole="button"
+              accessibilityLabel="Verify OTP"
+              accessibilityState={{ disabled: isVerifyDisabled, busy: verifying }}
+            >
+              {verifying ? (
+                <ActivityIndicator color={colors.onAccent} size="small" />
+              ) : (
+                <Text
+                  style={[styles.otpVerifyBtnText, isVerifyDisabled && styles.otpVerifyBtnTextDisabled]}
+                >
+                  Verify OTP
+                </Text>
+              )}
+            </Pressable>
+          </View>
 
-          <Pressable
-            style={[styles.primaryBtn, { width: '100%', marginTop: 8 }]}
-            onPress={onVerify}
-            disabled={verifying}
-            accessibilityRole="button"
-            accessibilityLabel="Verify and finalize job"
-          >
-            {verifying ? (
-              <ActivityIndicator color={colors.white} size="small" />
-            ) : (
-              <>
-                <Ionicons name="shield-checkmark" size={16} color={colors.white} style={{ marginRight: 6 }} />
-                <Text style={styles.primaryBtnText}>Verify and Complete Job</Text>
-              </>
-            )}
-          </Pressable>
+          {error ? (
+            <View style={styles.otpErrorRow} accessibilityRole="alert">
+              <Ionicons name="alert-circle" size={14} color={colors.danger} />
+              <Text style={styles.otpErrorText}>{error}</Text>
+            </View>
+          ) : null}
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };

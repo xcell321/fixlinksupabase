@@ -111,6 +111,10 @@ const sendTechnicianApprovedEmail = async (to, name) => {
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
     throw new Error('Email credentials not configured.');
   }
+  // Fail fast on a bad recipient instead of burning a 15s SMTP timeout.
+  if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(to).trim())) {
+    throw new Error('Recipient email address is invalid.');
+  }
 
   const firstName = escapeHtml(String(name || '').trim().split(/\s+/)[0] || 'Technician');
   const registeredEmail = escapeHtml(to);
