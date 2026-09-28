@@ -1,4 +1,3 @@
-﻿// @ts-nocheck - migrated from .js, preserve working state; types to be refined incrementally
 import React, { useEffect, useState, useRef } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl, Modal, TextInput, KeyboardAvoidingView, Platform, Image, Animated, PanResponder, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,7 +10,35 @@ import { getApplianceIcon, getStatusColor, getStatusIcon } from '../../utils/app
 // Logic preserved: real requests, active hero, stats, recent, categories, tip.
 const ACTIVE_STATUSES = ['accepted', 'confirmed', 'customer ready', 'in progress'];
 
-const getNextAction = (req) => {
+type IconName = React.ComponentProps<typeof Ionicons>['name'];
+
+// The subset of a job this screen reads. Optional because it is fed straight
+// from the API payload.
+type JobItem = {
+  id?: string;
+  status?: string;
+  applianceType?: string;
+  description?: string;
+  technicianName?: string;
+  preferredTime?: string;
+  createdAt?: string;
+};
+
+type CategoryItem = { id?: string; name?: string };
+
+type AiMessage = { id: string; from: 'ai' | 'me'; text: string };
+
+type DashboardScreenProps = {
+  user?: { name?: string; uid?: string } | null;
+  notificationCount?: number;
+  onOpenNotifications?: () => void;
+  onNavigateToSubmit?: () => void;
+  onNavigateToProgress?: () => void;
+  onOpenRequest?: (job: JobItem) => void;
+  onTrackJob?: (job: JobItem) => void;
+};
+
+const getNextAction = (req?: JobItem | null): { icon: IconName; text: string } | null => {
   const s = String(req?.status || '').toLowerCase();
   if (s === 'accepted') return { icon: 'checkmark-circle', text: 'Confirm repair' };
   if (s === 'confirmed') return { icon: 'flag', text: 'Mark ready for visit' };
@@ -24,10 +51,10 @@ const getNextAction = (req) => {
 const ORANGE = colors.customer;
 const DARK = colors.dark;
 
-export default function DashboardScreen({ user, notificationCount = 0, onOpenNotifications, onNavigateToSubmit, onNavigateToProgress, onOpenRequest, onTrackJob }) {
-  const [trackedRequests, setTrackedRequests] = useState([]);
-  const [completedJobs, setCompletedJobs] = useState([]);
-  const [categories, setCategories] = useState([]);
+export default function DashboardScreen({ user, notificationCount = 0, onOpenNotifications, onNavigateToSubmit, onNavigateToProgress, onOpenRequest, onTrackJob }: DashboardScreenProps) {
+  const [trackedRequests, setTrackedRequests] = useState<JobItem[]>([]);
+  const [completedJobs, setCompletedJobs] = useState<JobItem[]>([]);
+  const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [tipDismissed, setTipDismissed] = useState(false);
@@ -41,7 +68,7 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
     const id = fabPos.addListener((v) => { fabLast.current = { x: v.x, y: v.y }; });
     return () => fabPos.removeListener(id);
   }, [fabPos]);
-  const clampFab = (x, y) => ({
+  const clampFab = (x: number, y: number) => ({
     x: Math.max(-(homeSize.w - 56 - 40), Math.min(0, x)),
     y: Math.max(-(homeSize.h - 56 - 200), Math.min(40, y)),
   });
@@ -64,7 +91,7 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
   const [aiVisible, setAiVisible] = useState(false);
   const [aiInput, setAiInput] = useState('');
   const [aiTyping, setAiTyping] = useState(false);
-  const [aiMessages, setAiMessages] = useState([
+  const [aiMessages, setAiMessages] = useState<AiMessage[]>([
     { id: 'ai-hello', from: 'ai', text: 'Hi! I am your FixLink Assistant. Ask me about repairs, technicians, or tracking.' },
   ]);
   // Persisted conversation: survives reload/restart, per customer.
@@ -97,8 +124,10 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
   const uid = user?.uid;
 
   const fetchAll = () => Promise.all([
-    fetchCompletedJobs(name, uid).then(setCompletedJobs).catch(() => setCompletedJobs([])),
-    fetchCustomerRequests(name, uid).then(setTrackedRequests).catch(() => setTrackedRequests([])),
+    // `name` may still be undefined before the session resolves; the call shape
+    // is unchanged from before the types were added.
+    fetchCompletedJobs(name as string, uid).then((data) => setCompletedJobs(data as JobItem[])).catch(() => setCompletedJobs([])),
+    fetchCustomerRequests(name as string, uid).then((data) => setTrackedRequests(data as JobItem[])).catch(() => setTrackedRequests([])),
   ]);
 
   useEffect(() => {
@@ -145,7 +174,7 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
   // No hardcoded answers: every reply comes from the real AI (OmniRoute)
   // with live FixLink data. When the gateway is down, say so honestly.
   const AI_DOWN = 'AI service is unavailable right now. Please check your connection and try again.';
-  const aiSend = (preset) => {
+  const aiSend = (preset?: string) => {
     const text = String(preset ?? aiInput).trim();
     if (!text || aiTyping) return;
     setAiMessages((cur) => [...cur, { id: `me-${Date.now()}`, from: 'me', text }]);
@@ -205,7 +234,7 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
                 <Text style={styles.activeTitle} numberOfLines={1}>{heroJob.applianceType || 'Repair request'}{heroJob.description ? ` · ${heroJob.description.slice(0, 24)}` : ''}</Text>
                 <Text style={styles.activeSub} numberOfLines={1}>{heroJob.status || 'Pending'}{heroJob.preferredTime ? ` · ETA ${heroJob.preferredTime}` : ''}</Text>
               </View>
-              <TouchableOpacity style={styles.trackBtn} onPress={() => onOpenRequest(heroJob)} activeOpacity={0.88} accessibilityRole="button" accessibilityLabel="Track active repair">
+              <TouchableOpacity style={styles.trackBtn} onPress={() => onOpenRequest?.(heroJob)} activeOpacity={0.88} accessibilityRole="button" accessibilityLabel="Track active repair">
                 <Text style={styles.trackBtnText}>Track</Text>
               </TouchableOpacity>
             </View>
@@ -274,7 +303,7 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
               const color = getStatusColor(req.status);
               const next = getNextAction(req);
               return (
-                <TouchableOpacity key={req.id} style={styles.recentCard} onPress={() => onOpenRequest(req)} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={`${req.applianceType}, ${req.status}`}>
+                <TouchableOpacity key={req.id} style={styles.recentCard} onPress={() => onOpenRequest?.(req)} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={`${req.applianceType}, ${req.status}`}>
                   <View style={styles.recentIcon}>
                     <Ionicons name={getApplianceIcon(req.applianceType)} size={18} color="#6B7280" />
                   </View>

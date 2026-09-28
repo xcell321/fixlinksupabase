@@ -1,4 +1,12 @@
-export const getApplianceIcon = (type: string = ''): string => {
+import type { ComponentProps } from 'react';
+import type { Ionicons } from '@expo/vector-icons';
+
+// Every branch below returns a real Ionicons glyph name, so the return type is
+// the icon set's own union rather than `string`. Callers can therefore drop the
+// result straight into `<Ionicons name={...} />` without a cast.
+export type IconName = ComponentProps<typeof Ionicons>['name'];
+
+export const getApplianceIcon = (type: string = ''): IconName => {
   const t = String(type).toLowerCase();
   if (t.includes('refrigerator') || t.includes('fridge') || t.includes('freezer')) return 'snow';
   if (t.includes('washing') || t.includes('laundry')) return 'water';
@@ -37,7 +45,7 @@ export const getStatusColor = (status: unknown): string => {
   }
 };
 
-export const getStatusIcon = (status: unknown): string => {
+export const getStatusIcon = (status: unknown): IconName => {
   switch (String(status ?? '').toLowerCase()) {
     case 'completed':
       return 'checkmark-circle';
