@@ -25,7 +25,12 @@ const calculateDistanceKm = (start: LatLng, end: LatLng): number => {
   return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
-export const getDrivingRoute = async (startCoords: LatLng, endCoords: LatLng): Promise<unknown | null> => {
+// The tracker screens hold pins that may not be resolved yet (latitude or
+// longitude still null), so the route call accepts those shapes and simply
+// returns null when either endpoint is unusable.
+type RouteEndpoint = { latitude: number | null; longitude: number | null } | null | undefined;
+
+export const getDrivingRoute = async (startCoords: RouteEndpoint, endCoords: RouteEndpoint): Promise<unknown | null> => {
   if (!startCoords?.latitude || !startCoords?.longitude || !endCoords?.latitude || !endCoords?.longitude) {
     return null;
   }
@@ -49,7 +54,12 @@ export const getDrivingRoute = async (startCoords: LatLng, endCoords: LatLng): P
     const err = error as { response?: { status?: number }; message?: string };
     console.warn('LocationIQ Route Notice (falling back to direct road link):', err?.response?.status ?? err?.message);
   }
-  const fallbackKm: number = calculateDistanceKm(startCoords, endCoords);
+  // Rebuilt explicitly: the guard above proves both endpoints are usable, but
+  // TS keeps the declared nullable property types on the original objects.
+  const fallbackKm: number = calculateDistanceKm(
+    { latitude: startCoords.latitude, longitude: startCoords.longitude },
+    { latitude: endCoords.latitude, longitude: endCoords.longitude }
+  );
   const fallbackRoute = {
     distance: Math.round(fallbackKm * 1000),
     duration: Math.max(60, Math.round((fallbackKm / 25) * 3600)),

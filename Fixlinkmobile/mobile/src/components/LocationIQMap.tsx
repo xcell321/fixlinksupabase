@@ -2,7 +2,9 @@ import React, { useRef, useEffect, useMemo } from 'react';
 import { StyleSheet, View, Platform, ActivityIndicator, type StyleProp, type ViewStyle } from 'react-native';
 import { getLocationIqTileUrl } from '../services/locationIq';
 
-type LatLng = { latitude: number; longitude: number; name?: string; address?: string };
+// Latitude/longitude are nullable because a job pin is genuinely unresolved
+// until geocoding or live tracking fills it; every use below guards first.
+type LatLng = { latitude: number | null; longitude: number | null; name?: string; address?: string };
 
 export interface LocationIQMapProps {
   technicianCoords?: LatLng | null;

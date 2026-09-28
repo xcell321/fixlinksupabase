@@ -1,4 +1,3 @@
-// @ts-nocheck - migrated from .js, preserve working state; types to be refined incrementally
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -22,27 +21,80 @@ import { geocodeAddressPrecise, getDrivingRoute } from '../../services/locationI
 import { colors, fonts } from '../../theme';
 import { customerPinFromJob, distanceInKm } from './trackingGeometry';
 
+// The subset of a job this screen reads.
+type JobItem = {
+  id?: string;
+  status?: string;
+  applianceType?: string;
+  technicianName?: string;
+  customerName?: string;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+  location?: string;
+};
+
+type MapCoord = {
+  latitude: number | null;
+  longitude: number | null;
+  name: string;
+  // The technician pin has no address, only the job pin does.
+  address?: string;
+};
+
+// Polyline points as the map component wants them: [lat, lng] pairs.
+type DrivingRoute = {
+  // [lng, lat] pairs exactly as LocationIQ returns them.
+  geometry?: { coordinates?: Array<[number, number]> } | null;
+  distance?: number | null;
+  duration?: number | null;
+};
+
+// Shape of the `{ technician, customer }` payload from live tracking.
+type LiveTracking = {
+  technician?: { latitude?: number | string | null; longitude?: number | string | null; name?: string } | null;
+  customer?: {
+    latitude?: number | string | null;
+    longitude?: number | string | null;
+    name?: string;
+    address?: string | null;
+  } | null;
+};
+
+type UserRef = { uid?: string; name?: string; role?: string } | null | undefined;
+
+type MapTrackerScreenProps = {
+  currentUser?: UserRef;
+  selectedJob?: JobItem | null;
+  onBack?: () => void;
+  onNavigateToJobs?: () => void;
+};
+
 // Derive the customer/destination marker strictly from the selected job.
 // The pin is `null` when the job has no real lat/lng yet and is only filled by
 // geocoding, the live-tracking poll, or the GPS watcher -- see
 // ./trackingGeometry for why fabricating a default broke the map.
 // A technician viewing someone else's job sees that customer's name; the
 // customer sees their own.
-const deriveCustomerCoords = (job, isTechnician, currentUser) =>
+const deriveCustomerCoords = (job: JobItem | null | undefined, isTechnician: boolean, currentUser: UserRef) =>
   customerPinFromJob(
     job,
     isTechnician ? (job?.customerName || 'Customer') : (currentUser?.name || 'Customer')
   );
 
-const resetJobScopedRouteState = (setters) => {
+const resetJobScopedRouteState = (setters: {
+  setRouteCoordinates: (value: number[][]) => void;
+  setDistanceKm: (value: number | null) => void;
+  setTravelMinutes: (value: number | null) => void;
+  setIsRouting: (value: boolean) => void;
+}) => {
   setters.setRouteCoordinates([]);
   setters.setDistanceKm(null);
   setters.setTravelMinutes(null);
   setters.setIsRouting(false);
 };
 
-export default function MapTrackerScreen({ currentUser, selectedJob: initialJob, onBack, onNavigateToJobs }) {
-  const [activeJob, setActiveJob] = useState(initialJob);
+export default function MapTrackerScreen({ currentUser, selectedJob: initialJob, onBack, onNavigateToJobs }: MapTrackerScreenProps) {
+  const [activeJob, setActiveJob] = useState<JobItem | null>(initialJob ?? null);
 
   // Sync activeJob when initialJob prop changes from parent navigation
   useEffect(() => {
@@ -53,7 +105,7 @@ export default function MapTrackerScreen({ currentUser, selectedJob: initialJob,
     }
   }, [currentUser, initialJob]);
 
-  const isAccepted = ['Accepted', 'Confirmed', 'Customer Ready', 'In Progress'].includes(activeJob?.status);
+  const isAccepted = ['Accepted', 'Confirmed', 'Customer Ready', 'In Progress'].includes(activeJob?.status ?? '');
 
   // Always reflect the currently selected job. Any late response from a
   // previous job (route request, geocode, refresh) is discarded with this ref.
@@ -74,18 +126,18 @@ export default function MapTrackerScreen({ currentUser, selectedJob: initialJob,
   // The customer's technician pin starts empty. Only the live-tracking poll (or
   // the live tracking response) fills it - never the job's coordinates, so the
   // technician pin can never sit on the customer's home.
-  const initialTechnicianCoords = null;
+  const initialTechnicianCoords: MapCoord | null = null;
 
   const initialCustomerCoords = useMemo(
     () => deriveCustomerCoords(activeJob, false, currentUser),
     [currentUser, activeJob]
   );
 
-  const [technicianCoords, setTechnicianCoords] = useState(initialTechnicianCoords);
-  const [customerCoords, setCustomerCoords] = useState(initialCustomerCoords);
-  const [routeCoordinates, setRouteCoordinates] = useState([]);
-  const [distanceKm, setDistanceKm] = useState(null);
-  const [travelMinutes, setTravelMinutes] = useState(null);
+  const [technicianCoords, setTechnicianCoords] = useState<MapCoord | null>(initialTechnicianCoords);
+  const [customerCoords, setCustomerCoords] = useState<MapCoord>(initialCustomerCoords);
+  const [routeCoordinates, setRouteCoordinates] = useState<number[][]>([]);
+  const [distanceKm, setDistanceKm] = useState<number | null>(null);
+  const [travelMinutes, setTravelMinutes] = useState<number | null>(null);
   const [isRouting, setIsRouting] = useState(false);
 
   // Sync state when initialCoords change
@@ -98,6 +150,9 @@ export default function MapTrackerScreen({ currentUser, selectedJob: initialJob,
   useEffect(() => {
     if (!activeJob?.location) return;
     const jobId = activeJob.id;
+    // Captured before the async callback: property narrowing does not survive
+    // into a nested closure.
+    const jobLocation = activeJob.location;
     const lat = Number(activeJob.latitude);
     const lon = Number(activeJob.longitude);
     const hasValidCoords = Number.isFinite(lat) && Number.isFinite(lon) && lat !== 0;
@@ -112,7 +167,7 @@ export default function MapTrackerScreen({ currentUser, selectedJob: initialJob,
             ...prev,
             latitude: res.latitude,
             longitude: res.longitude,
-            address: activeJob.location,
+            address: jobLocation,
           }));
         }
       }).catch((err) => console.warn('Geocoding job location failed:', err));
@@ -127,7 +182,11 @@ export default function MapTrackerScreen({ currentUser, selectedJob: initialJob,
     // written back to the job), so GPS-over-GPS updates are native-only.
     if (Platform.OS === 'web') return undefined;
     let active = true;
-    let watcher;
+    let watcher: Location.LocationSubscription | null = null;
+    // Captured for the watcher callback; narrowing does not cross the closure.
+    const jobId = activeJob.id;
+    const uid = currentUser?.uid;
+    if (!uid) return undefined;
 
     const syncLocation = async () => {
       try {
@@ -139,7 +198,7 @@ export default function MapTrackerScreen({ currentUser, selectedJob: initialJob,
           async (pos) => {
             const next = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
             if (!active) return;
-            try { await updateCustomerLocation(activeJob.id, currentUser.uid, next); } catch (e) {}
+            try { await updateCustomerLocation(jobId, uid, next); } catch (e) {}
           }
         );
       } catch (err) {
@@ -158,10 +217,11 @@ export default function MapTrackerScreen({ currentUser, selectedJob: initialJob,
   useEffect(() => {
     if (!isAccepted || !activeJob?.id) return undefined;
     let active = true;
+    const jobId = activeJob.id;
 
     const refresh = async () => {
       try {
-        const tracking = await fetchJobLiveTracking(activeJob.id);
+        const tracking = (await fetchJobLiveTracking(jobId)) as LiveTracking | null;
         if (!active || !tracking) return;
 
         const techLat = Number(tracking.technician?.latitude);
@@ -199,17 +259,17 @@ export default function MapTrackerScreen({ currentUser, selectedJob: initialJob,
   useEffect(() => {
     let isMounted = true;
     const jobId = activeJob?.id;
-    const loadRoute = async (origin, destination) => {
+    const loadRoute = async (origin: MapCoord | null, destination: MapCoord | null) => {
       if (!isAccepted || !destination?.latitude || !origin?.latitude) {
         if (jobId === activeJobIdRef.current) setRouteCoordinates([]);
         return;
       }
       try {
-        const route = await getDrivingRoute(origin, destination);
+        const route = (await getDrivingRoute(origin, destination)) as DrivingRoute | null;
         // Discard stale responses: the technician may have switched to
         // another customer while this route request was in flight, and that
         // previous job's line must never overwrite the current one.
-        if (isMounted && jobId === activeJobIdRef.current && route?.geometry?.coordinates) {
+        if (isMounted && jobId === activeJobIdRef.current && route && route.geometry?.coordinates) {
           setRouteCoordinates(route.geometry.coordinates.map(([lon, lat]) => [lat, lon]));
           if (route.distance) setDistanceKm(Number((route.distance / 1000).toFixed(1)));
           if (route.duration) setTravelMinutes(Math.max(1, Math.round(route.duration / 60)));
@@ -251,9 +311,12 @@ export default function MapTrackerScreen({ currentUser, selectedJob: initialJob,
     const webUrl = `https://www.google.com/maps/dir/?api=1&destination=${destLat},${destLng}&travelmode=driving`;
 
     try {
-      const canOpen = await Linking.canOpenURL(appUrl);
+      // Platform.select returns undefined off-platform, so fall back to the web
+      // link up front rather than letting canOpenURL throw on undefined.
+      const target = appUrl ?? webUrl;
+      const canOpen = await Linking.canOpenURL(target);
       if (canOpen) {
-        await Linking.openURL(appUrl);
+        await Linking.openURL(target);
       } else {
         await Linking.openURL(webUrl);
       }
@@ -269,12 +332,14 @@ export default function MapTrackerScreen({ currentUser, selectedJob: initialJob,
     const destination = customerCoords;
     setIsRouting(true);
     try {
-      const route = await getDrivingRoute(origin, destination);
+      const route = (await getDrivingRoute(origin, destination)) as DrivingRoute | null;
       if (jobId !== activeJobIdRef.current) return;
-      if (route?.geometry?.coordinates) {
+      if (route && route.geometry?.coordinates) {
         setRouteCoordinates(route.geometry.coordinates.map(([lon, lat]) => [lat, lon]));
-        const dist = (route.distance / 1000).toFixed(1);
-        const mins = Math.max(1, Math.round(route.duration / 60));
+        // distance/duration always accompany a real geometry; defaulting keeps
+        // the display deterministic instead of rendering "NaN km".
+        const dist = (Number(route.distance ?? 0) / 1000).toFixed(1);
+        const mins = Math.max(1, Math.round(Number(route.duration ?? 0) / 60));
         setDistanceKm(Number(dist));
         setTravelMinutes(mins);
         Alert.alert('Route Centered', `Driving distance: ${dist} km\nEstimated travel time: ~${mins} minutes.`);
