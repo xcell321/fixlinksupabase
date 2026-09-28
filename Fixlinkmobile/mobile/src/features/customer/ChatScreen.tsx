@@ -111,7 +111,7 @@ interface ConversationRowProps {
 const ConversationRow = memo(function ConversationRow({ item, currentUid, accent, online, onOpen }: ConversationRowProps): React.JSX.Element {
   const isUnread = (item.unreadCount ?? 0) > 0;
   const preview = item.lastMessage
-    ? `${String(item.lastMessage.senderUid ?? '') === String(currentUid) ? 'You: ' : ''}${item.lastMessage.text}`
+    ? `${String(item.lastMessage.senderUid ?? '') === String(currentUid) ? 'You: ' : ''}${item.lastMessage.text || (item.lastMessage.imageUrl ? 'Sent a photo' : '')}`
     : 'No messages yet. Say hello!';
   const timeLabel = item.lastMessage?.timestamp ? formatMessageTime(item.lastMessage.timestamp) : '';
 
@@ -368,7 +368,7 @@ ChatScreenProps): React.JSX.Element {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       quality: 0.7,
     });

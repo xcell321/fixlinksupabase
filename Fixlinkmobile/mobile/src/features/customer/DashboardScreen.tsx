@@ -34,9 +34,6 @@ type DashboardScreenProps = {
   onNavigateToSubmit?: () => void;
   onNavigateToProgress?: () => void;
   onOpenRequest?: (job: JobItem) => void;
-  onTrackJob?: (job: JobItem) => void;
-  // Passed by the navigator for the hero card's track action.
-  onTrackAcceptedJob?: () => void;
   // Opens the shared FixLink Assistant with this screen's live context.
   onOpenAssistant?: (context: AssistantContext) => void;
 };
@@ -54,7 +51,7 @@ const getNextAction = (req?: JobItem | null): { icon: IconName; text: string } |
 const ORANGE = colors.customer;
 const DARK = colors.dark;
 
-export default function DashboardScreen({ user, notificationCount = 0, onOpenNotifications, onNavigateToSubmit, onNavigateToProgress, onOpenRequest, onTrackJob, onOpenAssistant }: DashboardScreenProps) {
+export default function DashboardScreen({ user, notificationCount = 0, onOpenNotifications, onNavigateToSubmit, onNavigateToProgress, onOpenRequest, onOpenAssistant }: DashboardScreenProps) {
   const [trackedRequests, setTrackedRequests] = useState<JobItem[]>([]);
   const [completedJobs, setCompletedJobs] = useState<JobItem[]>([]);
   const [categories, setCategories] = useState<CategoryItem[]>([]);

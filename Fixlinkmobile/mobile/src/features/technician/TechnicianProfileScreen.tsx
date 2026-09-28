@@ -16,7 +16,6 @@ import { fetchTechnicianProfile, fetchTechnicianSchedule, updateTechnicianProfil
 import { geocodeAddressStrict } from '../../services/locationIq';
 import Skeleton from '../../components/Skeleton';
 import ConfirmDialog from '../../components/ConfirmDialog';
-import HelpSheet from '../../components/HelpSheet';
 import PortfolioPhotoSheet, { type PortfolioPhotoItem } from '../../components/PortfolioPhotoSheet';
 import { PhotoLightbox } from '../../components/RequestPhoto';
 import { colors, fonts, themedStyles } from '../../theme';
@@ -152,7 +151,6 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
   const [geoStatus, setGeoStatus] = useState<GeoStatus>('idle');
   const [schedule, setSchedule] = useState<TechnicianScheduleItem[]>([]);
   const [scheduleLoading, setScheduleLoading] = useState<boolean>(false);
-  const [helpVisible, setHelpVisible] = useState<boolean>(false);
   const [showAllReviews, setShowAllReviews] = useState<boolean>(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [logoutConfirmVisible, setLogoutConfirmVisible] = useState<boolean>(false);
@@ -891,7 +889,6 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
           onCancel={() => setLogoutConfirmVisible(false)}
           onConfirm={() => { setLogoutConfirmVisible(false); onLogout?.(); }}
         />
-        <HelpSheet visible={helpVisible} role="technician" onClose={() => setHelpVisible(false)} />
         <PhotoLightbox visible={!!previewUrl} photoUrl={previewUrl} title="Portfolio photo" subtitle="Completed work showcase" onClose={() => setPreviewUrl(null)} />
         <PortfolioPhotoSheet
           visible={addPhotoVisible}
