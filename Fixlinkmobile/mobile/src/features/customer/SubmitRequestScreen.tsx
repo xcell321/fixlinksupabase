@@ -8,6 +8,7 @@ import DateTimePicker from "../../components/DateTimePicker";
 import { PhotoLightbox } from "../../components/RequestPhoto";
 import { submitRepairRequest, fetchPlatformCategories } from "../../services/api";
 import { geocodeAddress, geocodeAddressPrecise, geocodeAddressStructured, reverseGeocodePrecise } from "../../services/locationIq";
+import { collectBestFix, distanceInMeters } from "./locationFix";
 import CustomerLocationMap from "../../components/CustomerLocationMap";
 import { colors, fonts, shadows } from '../../theme';
 import { getApplianceIcon } from '../../utils/applianceIcons';
@@ -137,56 +138,6 @@ const LOCATE_STAGES = {
   address: { short: 'Finding address...', long: 'Matching your coordinates to a street address' },
   pin: { short: 'Confirming pin...', long: 'Confirming the pin on the map' },
 };
-
-// Pulsing placeholder block. Shown while the live location is still resolving
-// so the step never looks frozen or empty mid-request.
-// Straight-line metres between two coordinates (haversine).
-const distanceInMeters = (fromLat, fromLon, toLat, toLon) => {
-  if (![fromLat, fromLon, toLat, toLon].every(Number.isFinite)) return Infinity;
-  const toRad = (v) => (v * Math.PI) / 180;
-  const dLat = toRad(toLat - fromLat);
-  const dLon = toRad(toLon - fromLon);
-  const a = Math.sin(dLat / 2) ** 2
-    + Math.cos(toRad(fromLat)) * Math.cos(toRad(toLat)) * Math.sin(dLon / 2) ** 2;
-  return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-};
-
-// Best-of-N GPS fix. A single reading can be tens of metres off (worst indoors),
-// so keep sampling in high-accuracy mode and resolve with the tightest radius.
-// Returns early once a rooftop-grade fix (<= 12 m) is in hand, so the common
-// case still finishes in a couple of seconds.
-const collectBestFix = (budgetMs = 12000) => new Promise((resolve, reject) => {
-  let best = null;
-  let samples = 0;
-  let finished = false;
-  let subscription = null;
-  let timer = null;
-  const finish = () => {
-    if (finished) return;
-    finished = true;
-    if (timer) clearTimeout(timer);
-    try { subscription?.remove?.(); } catch {}
-    if (best) resolve(best);
-    else reject(new Error('Location request timed out. Try again outside or type the address manually.'));
-  };
-  timer = setTimeout(finish, budgetMs);
-  try {
-    Location.watchPositionAsync(
-      { accuracy: Location.Accuracy.Highest, distanceInterval: 0, timeInterval: 1000 },
-      (pos) => {
-        if (finished) return;
-        const accuracy = Number(pos?.coords?.accuracy);
-        if (!best || (Number.isFinite(accuracy) && accuracy < Number(best.coords.accuracy))) best = pos;
-        samples += 1;
-        if ((Number.isFinite(accuracy) && accuracy <= 12) || samples >= 6) finish();
-      },
-    )
-      .then((sub) => { subscription = sub; if (finished) { try { sub.remove(); } catch {} } })
-      .catch(() => finish());
-  } catch {
-    finish();
-  }
-});
 
 function Skeleton({ width = '100%', height = 14, radius = 8, color = '#E1E6EB', style }): React.JSX.Element {
   const pulse = useRef(new Animated.Value(0)).current;
