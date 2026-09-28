@@ -22,7 +22,7 @@
 | longitude | Number | User's current longitude coordinate. |
 | locationUpdatedAt | String | Date and time the location was last updated (ISO-8601). |
 | fcmToken | String | Device push-notification token (reserved column; push dispatch is not actively used in the current release). |
-| portfolio | Array of Object | List of work samples. Each item contains {name, url, uploadedAt} or {title, description, imageUrl, completedAt}. |
+| portfolio | Array of Object | List of work samples. Each item contains {name, url, uploadedAt, repairType, model}. Single photo per request. Upload requires trimmed repairType and model. |
 | rating | Number | Average rating of the technician. |
 | totalReviews | Number | Total number of reviews received. |
 | isAvailable | Boolean | Availability status of the technician. Values: true, false. |
@@ -84,8 +84,9 @@
 |---|---|---|
 | senderUid | String | Unique identifier of the message sender (references users.uid). |
 | senderName | String | Full name of the message sender. |
-| senderRole | String | Role of the sender. Values: customer, technician. |
-| text | String | Content of the chat message. |
+| senderRole | String | Role of the sender. Values: customer, technician, admin. |
+| text | String | Content of the chat message. Stays NOT NULL. Image-only messages store an empty string. At least text or photo is required. |
+| imageUrl | String | Public URL of an optional chat photo. Uploaded as multipart photo to chat-images bucket. Rendered inline with PhotoLightbox. |
 | timestamp | String | Date and time the message was sent (ISO-8601). |
 | readBy | Array of String | List of UIDs who have read the message (derived from the `message_reads` association table). |
 
@@ -95,6 +96,7 @@
 |---|---|---|
 | technicianUid | String | Unique identifier of the technician being reviewed (references users.uid). |
 | technicianName | String | Full name of the technician. |
+| customerUid | String | Unique identifier of the reviewing customer (references users.uid). Indexed for lookup. |
 | customerName | String | Full name of the customer who left the review. |
 | rating | Number | Rating given by the customer, integer from 1 to 5. |
 | comment | String | Written feedback/comment from the customer. |

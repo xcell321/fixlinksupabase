@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, Animated, StyleSheet, Platform, Vibration } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, fonts } from '../theme';
+import { colors, fonts, themedStyles } from '../theme';
 
 const useNative: boolean = Platform.OS !== 'web';
 
@@ -46,12 +46,27 @@ export default function MessageBanner({ banner, onDismiss, onPress }: MessageBan
 
   if (!banner) return null;
 
+  // The banner leads with the sender's initials so a technician's message reads
+  // as that person, not a generic system alert.
+  const initial = (banner.senderName || '?').trim().charAt(0).toUpperCase();
+
   return (
     <View pointerEvents="box-none" style={styles.overlay}>
       <Animated.View style={[styles.banner, { transform: [{ translateY }], opacity }]}>
-        <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={styles.bannerBody}>
-          <View style={styles.iconWrap}>
-            <Ionicons name="chatbubble-ellipses" size={20} color={colors.white} />
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={onPress}
+          style={styles.bannerBody}
+          accessibilityRole="button"
+          accessibilityLabel={`Open notification from ${banner.senderName}`}
+        >
+          <View style={styles.avatarWrap}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{initial}</Text>
+            </View>
+            <View style={styles.avatarBadge}>
+              <Ionicons name="chatbubble-ellipses" size={9} color={colors.onAccent} />
+            </View>
           </View>
           <View style={styles.copy}>
             <Text style={styles.title} numberOfLines={1}>{banner.senderName}</Text>
@@ -66,7 +81,7 @@ export default function MessageBanner({ banner, onDismiss, onPress }: MessageBan
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles({
   overlay: {
     position: 'absolute',
     top: 0,
@@ -91,17 +106,31 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   bannerBody: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  iconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 13,
+  avatarWrap: { width: 40, height: 40, flexShrink: 0 },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.tealLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: { color: colors.tealDark, fontSize: 16, fontFamily: fonts.extraBold },
+  avatarBadge: {
+    position: 'absolute',
+    right: -3,
+    bottom: -3,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     backgroundColor: colors.teal,
     alignItems: 'center',
     justifyContent: 'center',
-    flexShrink: 0,
+    borderWidth: 2,
+    borderColor: colors.ink,
   },
   copy: { flex: 1 },
-  title: { color: colors.white, fontSize: 13, fontFamily: fonts.bold, marginBottom: 2 },
-  text: { color: '#BCCCDC', fontSize: 12, fontFamily: fonts.medium, lineHeight: 16 },
+  title: { color: colors.onAccent, fontSize: 13, fontFamily: fonts.bold, marginBottom: 2 },
+  text: { color: colors.line, fontSize: 12, fontFamily: fonts.medium, lineHeight: 16 },
   close: { width: 28, height: 28, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
 });

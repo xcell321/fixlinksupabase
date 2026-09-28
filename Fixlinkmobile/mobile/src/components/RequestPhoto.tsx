@@ -1,13 +1,16 @@
 import React from 'react';
 import { Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, fonts } from '../theme';
+import { colors, fonts, themedStyles } from '../theme';
 
 interface PhotoLightboxProps {
   visible: boolean;
   photoUrl: string | null | undefined;
   title?: string;
   subtitle?: string;
+  // The viewer is shared by repair photos and chat photos, so the closing line
+  // is caller-supplied instead of hardcoded to the repair flow.
+  caption?: string;
   onClose: () => void;
 }
 
@@ -17,7 +20,7 @@ interface PhotoLightboxProps {
  * so viewing a repair photo feels like the rest of the app — no fullscreen
  * black gallery, no decorative effects.
  */
-export function PhotoLightbox({ visible, photoUrl, title = 'Problem photo', subtitle = 'Attached by the customer', onClose }: PhotoLightboxProps): React.JSX.Element {
+export function PhotoLightbox({ visible, photoUrl, title = 'Problem photo', subtitle = 'Attached by the customer', caption = 'Use this photo to understand the issue before travelling to the site.', onClose }: PhotoLightboxProps): React.JSX.Element {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
@@ -48,7 +51,7 @@ export function PhotoLightbox({ visible, photoUrl, title = 'Problem photo', subt
             </View>
           )}
 
-          <Text style={styles.caption}>Use this photo to understand the issue before travelling to the site.</Text>
+          <Text style={styles.caption}>{caption}</Text>
         </View>
       </View>
     </Modal>
@@ -82,7 +85,7 @@ export function PhotoThumb({ photoUrl, onPress, label = 'tap to view' }: PhotoTh
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles({
   pressedSoft: { transform: [{ scale: 0.97 }], opacity: 0.94 },
 
   overlay: { flex: 1, backgroundColor: 'rgba(16, 42, 67, 0.4)', justifyContent: 'flex-end' },

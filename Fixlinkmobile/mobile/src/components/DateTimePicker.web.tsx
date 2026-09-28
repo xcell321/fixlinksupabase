@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, View, Text } from 'react-native';
+import { View, Text } from 'react-native';
+import { themedStyles } from '../theme';
 
 export interface DateTimePickerWebProps {
   value: Date;
@@ -44,7 +45,7 @@ export default function DateTimePicker({ value, mode, onChange, minimumDate }: D
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles({
   container: {
     marginVertical: 8,
   },

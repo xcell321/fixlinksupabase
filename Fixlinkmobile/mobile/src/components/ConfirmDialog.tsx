@@ -1,6 +1,6 @@
 import React from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, fonts } from '../theme';
+import { colors, fonts, shadows, themedStyles } from '../theme';
 
 interface ConfirmDialogProps {
   visible: boolean;
@@ -59,7 +59,7 @@ export default function ConfirmDialog({
               ]}
             >
               {busy ? (
-                <ActivityIndicator color={colors.white} size="small" />
+                <ActivityIndicator color={colors.onAccent} size="small" />
               ) : (
                 <Text style={styles.confirmText}>{confirmLabel}</Text>
               )}
@@ -71,15 +71,16 @@ export default function ConfirmDialog({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles({
   backdrop: { flex: 1, backgroundColor: 'rgba(13,27,42,0.5)', alignItems: 'center', justifyContent: 'center', padding: 24 },
-  card: { width: '100%', maxWidth: 360, backgroundColor: colors.white, borderRadius: 18, padding: 20 },
+  card: { width: '100%', maxWidth: 360, backgroundColor: colors.white, borderRadius: 18, padding: 20, ...shadows.hud },
   title: { fontSize: 16, fontFamily: fonts.bold, color: colors.ink },
   message: { fontSize: 13, fontFamily: fonts.regular, color: colors.muted, marginTop: 8, lineHeight: 19 },
   actions: { flexDirection: 'row', gap: 10, marginTop: 16 },
-  cancelButton: { flex: 1, minHeight: 48, borderRadius: 12, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' },
+  // Borderless quiet button, matching every other secondary action in the app.
+  cancelButton: { flex: 1, minHeight: 48, borderRadius: 12, backgroundColor: colors.appBg, alignItems: 'center', justifyContent: 'center' },
   cancelText: { fontSize: 14, fontFamily: fonts.bold, color: colors.muted },
   confirmButton: { flex: 2, minHeight: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexDirection: 'row' },
-  confirmText: { fontSize: 14, fontFamily: fonts.bold, color: colors.white },
+  confirmText: { fontSize: 14, fontFamily: fonts.bold, color: colors.onAccent },
   pressedSoft: { opacity: 0.85, transform: [{ scale: 0.98 }] },
 });

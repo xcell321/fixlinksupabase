@@ -70,18 +70,28 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/maps', mapsRoutes);
 
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server is running on port ${PORT}`);
-    try {
-        const { getLocalIp } = require('./utils/network');
-        const autoIp = getLocalIp();
-        const autoUrl = `http://${autoIp}:${PORT}`;
-        const envUrl = String(process.env.PUBLIC_BASE_URL || '').trim();
-        console.log(`🔗 Auto-detected PUBLIC_BASE_URL=${autoUrl} (for password-reset email links)`);
-        if (envUrl && envUrl !== autoUrl) {
-            console.log(`   .env PUBLIC_BASE_URL=${envUrl} will be used if set; leave empty to auto-detect, or set https domain for prod`);
-        } else if (!envUrl) {
-            console.log(`   .env PUBLIC_BASE_URL is empty — using auto-detected IP; email links will be reachable from phone on same WiFi`);
-        }
-    } catch (_) {}
-});
+// Exported so tests can boot the app on an ephemeral port without the
+// production listener. `node src/index.js` still starts the server normally.
+function startServer() {
+    return app.listen(PORT, '0.0.0.0', () => {
+        console.log(`Server is running on port ${PORT}`);
+        try {
+            const { getLocalIp } = require('./utils/network');
+            const autoIp = getLocalIp();
+            const autoUrl = `http://${autoIp}:${PORT}`;
+            const envUrl = String(process.env.PUBLIC_BASE_URL || '').trim();
+            console.log(`🔗 Auto-detected PUBLIC_BASE_URL=${autoUrl} (for password-reset email links)`);
+            if (envUrl && envUrl !== autoUrl) {
+                console.log(`   .env PUBLIC_BASE_URL=${envUrl} will be used if set; leave empty to auto-detect, or set https domain for prod`);
+            } else if (!envUrl) {
+                console.log(`   .env PUBLIC_BASE_URL is empty — using auto-detected IP; email links will be reachable from phone on same WiFi`);
+            }
+        } catch (_) {}
+    });
+}
+
+if (require.main === module) {
+    startServer();
+}
+
+module.exports = { app, startServer };

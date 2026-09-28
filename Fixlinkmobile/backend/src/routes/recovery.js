@@ -1,18 +1,55 @@
 const express = require('express');
 const router = express.Router();
 
+const { supabase } = require('../config/supabase');
+const { verifyResetToken, hashResetToken } = require('../utils/resetToken');
+
 // GET /reset-password — landing page linked from the password-reset email.
 // Email clients render custom schemes like "fixlink://" as plain text, so the
 // email always points to this standard https:// URL instead. The page lets the
 // user change the password right away (posts to /api/auth/reset-password).
-router.get('/reset-password', (req, res) => {
+//
+// The link is verified BEFORE the form is shown: the signed token must still be
+// unused and unexpired, otherwise the page renders the "link unavailable" state.
+// This is what makes a link inaccessible once the password has been changed,
+// rather than only rejecting the second submit.
+//
+// The page mirrors the mobile app theme (mobile/src/theme.tsx): dark #0D1B2A
+// header, customer orange #F97316 primary action, Inter fallback stack, 12px
+// radii. Copy is intentionally minimal.
+const isResetLinkRedeemable = async ({ uid, email, token }) => {
+  const payload = verifyResetToken(token);
+  if (!payload || String(payload.sub) !== String(uid)) return false;
+  if (email && payload.email !== String(email).trim().toLowerCase()) return false;
+
+  try {
+    const { data, error } = await supabase
+      .from('password_resets')
+      .select('id')
+      .eq('token_hash', hashResetToken(token))
+      .eq('user_id', uid)
+      .gt('expires_at', new Date().toISOString())
+      .is('used_at', null)
+      .maybeSingle();
+    if (error) {
+      console.error('Reset link lookup failed:', error.message);
+      return false;
+    }
+    return Boolean(data);
+  } catch (error) {
+    console.error('Reset link verification failed:', error.message);
+    return false;
+  }
+};
+
+router.get('/reset-password', async (req, res) => {
   const { uid, email, token } = req.query || {};
 
   const safe = (value) => String(value == null ? '' : value).replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   }[c]));
 
-  const hasCredential = Boolean(uid && token);
+  const hasCredential = Boolean(uid && token) && await isResetLinkRedeemable({ uid, email, token });
 
   res.send(`<!DOCTYPE html>
 <html lang="en">
@@ -21,47 +58,67 @@ router.get('/reset-password', (req, res) => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FixLink — Reset Password</title>
   <style>
-    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #F5F8FA; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
-    .card { background: #FFFFFF; max-width: 380px; width: 90%; border-radius: 20px; padding: 32px 24px; text-align: center; box-shadow: 0 12px 24px rgba(16,42,67,0.12); }
-    .logo { width: 54px; height: 54px; border-radius: 19px; background: #0F766E; color: #fff; font-weight: 800; font-size: 20px; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; }
-    h1 { color: #102A43; font-size: 22px; margin: 0 0 8px; }
-    p.sub { color: #5A7A91; font-size: 14px; line-height: 1.5; margin: 0 0 20px; }
-    .field { text-align: left; margin-bottom: 14px; }
-    .field label { display: block; color: #102A43; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
-    .field input { width: 100%; box-sizing: border-box; padding: 12px 14px; border: 1px solid #D9E2EC; border-radius: 10px; font-size: 14px; color: #102A43; background: #fff; }
-    .field input:focus { outline: none; border-color: #0F766E; }
-    .submit { width: 100%; background: #0F766E; color: #fff; border: none; font-weight: 700; font-size: 15px; padding: 14px; border-radius: 12px; margin-bottom: 18px; }
-    .submit:disabled { opacity: 0.6; }
-    .msg { font-size: 13px; font-weight: 600; padding: 10px 12px; border-radius: 8px; margin-bottom: 16px; display: none; }
-    .msg.error { display: block; background: #FDF0EF; color: #B23B2F; border: 1px solid #F4C4BE; }
-    .msg.success { display: block; background: #E6F6F3; color: #0F766E; border: 1px solid #B5E7DE; }
-    .msg:empty { display: none; }
+    :root {
+      --dark: #0D1B2A; --accent: #F97316; --accent-dark: #EA580C;
+      --ink: #102A43; --muted: #6B7280; --line: #E5E7EB; --field: #F9FAFB;
+      --bg: #F9FAFB; --danger: #DC2626; --success: #0F766E;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px;
+      background: var(--bg); font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    .card { width: 100%; max-width: 400px; background: #fff; border-radius: 24px; overflow: hidden; box-shadow: 0 12px 32px rgba(16,42,67,0.10); }
+    .head { background: var(--dark); padding: 28px 24px 24px; }
+    .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+    .logo { width: 40px; height: 40px; border-radius: 12px; background: var(--accent); color: #fff; font-weight: 800; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+    .brand-name { color: #fff; font-size: 13px; font-weight: 800; letter-spacing: 1px; }
+    h1 { margin: 0; color: #fff; font-size: 22px; font-weight: 800; letter-spacing: -0.2px; }
+    .body { padding: 24px; }
+    .field { margin-bottom: 14px; }
+    label { display: block; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.8px; margin-bottom: 6px; }
+    input { width: 100%; min-height: 52px; padding: 0 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--field); color: var(--ink); font-size: 15px; }
+    input:focus { outline: none; border-color: var(--accent); background: #fff; }
+    button { width: 100%; min-height: 52px; margin-top: 8px; border: none; border-radius: 12px; background: var(--accent); color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; }
+    button:hover { background: var(--accent-dark); }
+    button:disabled { opacity: 0.6; cursor: default; }
+    .hint { margin: 12px 0 0; color: var(--muted); font-size: 11px; text-align: center; }
+    .msg { margin: 0 0 14px; font-size: 13px; font-weight: 600; padding: 10px 12px; border-radius: 10px; display: none; }
+    .msg.show { display: block; }
+    .msg.error { background: #FEF2F2; color: var(--danger); }
+    .msg.success { background: #E6F6F3; color: var(--success); }
+    .empty { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
   </style>
 </head>
 <body>
   <div class="card">
-    <div class="logo">FL</div>
-    <h1>FixLink Password Reset</h1>
-    ${hasCredential ? `
-    <p class="sub">Enter a new password below.</p>
-    <form id="resetForm">
-      <input type="hidden" id="f_uid" value="${safe(uid)}" />
-      <input type="hidden" id="f_email" value="${safe(email)}" />
-      <input type="hidden" id="f_token" value="${safe(token)}" />
-      <div class="msg" id="msg"></div>
-      <div class="field">
-        <label for="newPassword">New Password</label>
-        <input type="password" id="newPassword" autocomplete="new-password" placeholder="At least 6 characters" minlength="6" required />
+    <div class="head">
+      <div class="brand">
+        <div class="logo">FL</div>
+        <div class="brand-name">FIXLINK</div>
       </div>
-      <div class="field">
-        <label for="confirmPassword">Confirm Password</label>
-        <input type="password" id="confirmPassword" autocomplete="new-password" placeholder="Repeat your new password" required />
-      </div>
-      <button class="submit" id="submitBtn" type="submit">Save New Password</button>
-    </form>
-    ` : `
-    <p class="sub">This password recovery link is invalid or has expired. Please request a new one from the FixLink app.</p>
-    `}
+      <h1>${hasCredential ? 'Reset password' : 'Link unavailable'}</h1>
+    </div>
+    <div class="body">
+      ${hasCredential ? `
+      <form id="resetForm">
+        <input type="hidden" id="f_uid" value="${safe(uid)}" />
+        <input type="hidden" id="f_email" value="${safe(email)}" />
+        <input type="hidden" id="f_token" value="${safe(token)}" />
+        <div class="msg" id="msg"></div>
+        <div class="field">
+          <label for="newPassword">NEW PASSWORD</label>
+          <input type="password" id="newPassword" autocomplete="new-password" placeholder="At least 8 characters" minlength="8" required />
+        </div>
+        <div class="field">
+          <label for="confirmPassword">CONFIRM PASSWORD</label>
+          <input type="password" id="confirmPassword" autocomplete="new-password" placeholder="Repeat password" required />
+        </div>
+        <button id="submitBtn" type="submit">Save password</button>
+        <p class="hint">One-time link. Expires in 24 hours.</p>
+      </form>
+      ` : `
+      <p class="empty">This link has already been used or has expired. Request a new one in the FixLink app.</p>
+      `}
+    </div>
   </div>
 
   ${hasCredential ? `<script>
@@ -71,14 +128,15 @@ router.get('/reset-password', (req, res) => {
     const uid   = document.getElementById('f_uid').value;
     const email = document.getElementById('f_email').value;
     const token = document.getElementById('f_token').value;
+    const show = (kind, text) => { msg.className = 'msg show ' + kind; msg.textContent = text; };
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       const newPassword = document.getElementById('newPassword').value;
       const confirmPassword = document.getElementById('confirmPassword').value;
       msg.className = 'msg';
       msg.textContent = '';
-      if (String(newPassword).trim().length < 6) { msg.className = 'msg error'; msg.textContent = 'Password must be at least 6 characters.'; return; }
-      if (newPassword !== confirmPassword) { msg.className = 'msg error'; msg.textContent = 'Passwords do not match.'; return; }
+      if (String(newPassword).trim().length < 8) return show('error', 'At least 8 characters.');
+      if (newPassword !== confirmPassword) return show('error', 'Passwords do not match.');
       btn.disabled = true;
       btn.textContent = 'Saving...';
       try {
@@ -89,19 +147,19 @@ router.get('/reset-password', (req, res) => {
         });
         const result = await response.json().catch(() => ({}));
         if (!response.ok) {
-          msg.className = 'msg error';
-          msg.textContent = result.error || 'Unable to reset password. Please try again.';
+          show('error', result.error || 'Unable to reset password. Please try again.');
+          btn.disabled = false;
+          btn.textContent = 'Save password';
         } else {
-          msg.className = 'msg success';
-          msg.textContent = 'Password updated successfully. You can now sign in to the FixLink app.';
+          // The link is now spent: hide the form so the page cannot be reused.
+          show('success', 'Password updated. Sign in to the FixLink app.');
           form.reset();
+          form.style.display = 'none';
         }
       } catch (err) {
-        msg.className = 'msg error';
-        msg.textContent = 'Unable to reset password. Please try again.';
-      } finally {
+        show('error', 'Unable to reset password. Please try again.');
         btn.disabled = false;
-        btn.textContent = 'Save New Password';
+        btn.textContent = 'Save password';
       }
     });
   </script>` : ''}

@@ -5,40 +5,78 @@ import {
   Inter_700Bold,
   Inter_800ExtraBold,
 } from '@expo-google-fonts/inter';
+import type { ImageStyle, TextStyle, ViewStyle } from 'react-native';
+
+// -----------------------------------------------------------------------------
+// FIXLINK THEME — one palette, the original one.
+// These values are the FixLink brand palette. Keep them as they are: screens
+// import `colors` directly into their (module-level) style maps, so a value
+// changed here changes every screen at once.
+// -----------------------------------------------------------------------------
 
 export const colors = {
   ink: '#102A43',
-  // Prototype (FigMake FixIt) — normative for UI reskin. Keep legacy teal for compat.
+  // Strongest text. Deliberately a different value from `dark` so the two stay
+  // distinguishable if a surface token is ever re-derived from a literal.
+  inkStrong: '#0A1C2E',
   dark: '#0D1B2A',
+
+  // Role accents: customer orange, technician blue.
   customer: '#F97316',
   customerDark: '#EA580C',
   customerSoft: '#FFF7ED',
   customerMist: '#FFEDD5',
+
   tech: '#2563EB',
   techDark: '#1D4ED8',
   techSoft: '#EFF6FF',
   techMist: '#DBEAFE',
+
   appBg: '#F9FAFB',
+  canvas: '#F5F8FA',
+  white: '#FFFFFF',
+  elevated: '#FFFFFF',
+  surfaceSunken: '#FBFDFE',
   cardBorder: '#F3F4F6',
+  line: '#D9E2EC',
+  lineSoft: '#E3ECF2',
+  edge: 'rgba(16,42,67,0.06)',
+
+  // Text hierarchy on light surfaces. `subtle` is the placeholder / quiet-icon
+  // grey the screens were designed around.
+  muted: '#3F5A6E',
+  subtle: '#9CA3AF',
+  // Foreground that sits ON a role-accent fill (never a surface).
+  onAccent: '#FFFFFF',
+
   teal: '#0F766E',
   tealDark: '#075E59',
   tealLight: '#E6F6F3',
-  canvas: '#F5F8FA',
-  white: '#FFFFFF',
-  muted: '#3F5A6E',
-  line: '#D9E2EC',
-  lineSoft: '#E3ECF2',
+
   error: '#E53935',
   danger: '#DC2626',
+  dangerSoft: '#FEF2F2',
+  dangerBorder: '#FECACA',
+  dangerText: '#B91C1C',
+
   gold: '#D97706',
-  green: '#059669',
   orange: '#F59E0B',
-  // telemetry / HUD accents for anti-slop + industrial brutalist unification
+  lamp: '#D97706',
+
+  green: '#059669',
+  successSoft: '#ECFDF5',
+  successBorder: '#A7F3D0',
+  successText: '#047857',
+
+  warningSoft: '#FFFBEB',
+  warningBorder: '#FDE68A',
+  warningText: '#92400E',
+
+  // Telemetry / HUD accents for the anti-slop + industrial brutalist systems.
   hudGrid: 'rgba(15, 118, 110, 0.06)',
   hudBorder: '#CBE7E1',
   accentAmber: '#D97706',
   accentBlue: '#2563EB',
-  surfaceSunken: '#FBFDFE',
 } as const;
 
 export const fonts = {
@@ -57,7 +95,7 @@ export const appFonts = {
   Inter_800ExtraBold,
 } as const;
 
-// Anti-slop token scale — inherits existing visual world, expands system for Stage 1 compliance
+// Anti-slop token scale.
 export const radii = {
   xs: 10,
   sm: 12,
@@ -97,10 +135,23 @@ export const shadows = {
   },
 } as const;
 
+type NamedStyles<T> = { [P in keyof T]: ViewStyle | TextStyle | ImageStyle };
+
+// Style maps are plain objects. This stays as the one entry point screens use so
+// the literal types survive (e.g. alignItems: 'center'), which is what the React
+// Native style props accept.
+export function themedStyles<T extends NamedStyles<T> | NamedStyles<unknown>>(
+  raw: T & NamedStyles<unknown>,
+): T {
+  return raw;
+}
+
 // Telemetry mono for industrial brutalist HUD numbers — use only for actual data
 export const monoStack = 'monospace' as const;
 
 export type Colors = typeof colors;
+export type ThemeColors = Colors;
+export type ThemeShadows = typeof shadows;
 export type Fonts = typeof fonts;
 export type Radii = typeof radii;
 export type Spacing = typeof spacing;

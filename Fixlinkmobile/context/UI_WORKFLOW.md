@@ -280,8 +280,9 @@ graph TD
     - Technician messages: Teal bubbles aligned to the right.
     - Timestamps beneath each bubble (`10:42 AM`).
   - **Bottom Input Bar:**
-    - Text input: *"Type a message..."*.
-    - Send button: Teal paper plane icon. Calls `POST /api/requests/accepted/:id/messages`.
+    - Text input: *"Type a message..."* plus photo attach. Text-only sends JSON. Photo sends multipart `photo` to the `chat-images` bucket. Image-only messages store empty `text`.
+    - Send button: Teal paper plane icon. Calls `POST /api/requests/:id/messages`.
+    - Bubbles render `imageUrl` with `PhotoLightbox`. Header info button opens `ConversationInfoSheet`.
 
 ---
 
@@ -295,8 +296,8 @@ graph TD
     - `100%` Verified
   - **Verified Skill Tags:** Badges representing administrator-approved competencies (`Refrigerator`, `Washing Machine`, `Computer`).
   - **Portfolio Gallery (Proof-of-Work):**
-    - Grid of completed repair projects with photos and captions (e.g., *"Samsung Inverter Refrigerator PCB repair"*).
-    - `+ Add Project` button opening photo upload and description modal.
+    - Grid of completed repair projects with photos and captions (for example, *"Samsung Inverter Refrigerator PCB repair"*).
+    - `+ Add Project` button opens `PortfolioPhotoSheet`. Single photo per request requires `repairType` and `model`.
   - **Account Controls:** Availability toggle switch (`Available for Jobs` / `Offline`), Logout button.
 
 ---
@@ -319,12 +320,12 @@ graph TD
 | `LoginScreen` | Tap "Sign In" | Valid Technician Credentials | Redirect to `AvailableJobsScreen` (Tech Stack) |
 | `DashboardScreen` | Tap "+ Request Service" | User clicks button or category | Opens `SubmitRequestScreen` with pre-selected category |
 | `SubmitRequestScreen` | Tap "Locate Me" | GPS permission granted | LocationIQ reverse-geocodes coords $\rightarrow$ auto-fills address |
-| `SubmitRequestScreen` | Tap "Submit Request" | Valid fields & photo | Saves to `repairRequests` $\rightarrow$ opens `RequestProgressScreen` |
-| `AvailableJobsScreen` | Tap "Accept Job" | Job is pending & within skill | Moves to `acceptedJobs`, creates OTP $\rightarrow$ opens Active Card |
-| `AvailableJobsScreen` | Tap "Decline" | Technician dismisses job | Job hidden from this technician's local feed |
+| `SubmitRequestScreen` | Tap "Submit Request" | Valid fields and photo | Saves to `jobs` as `Pending` then opens `RequestProgressScreen` |
+| `AvailableJobsScreen` | Tap "Accept Job" | Job is pending and within skill | Updates `jobs` in place with `accept_job`, creates OTP then opens Active Card |
+| `AvailableJobsScreen` | Tap "Decline" | Technician dismisses job | Job hidden from this technician feed only |
 | `AvailableJobsScreen` | Tap "Open Live Tracker" | Job status = `Accepted` | Opens `MapTrackerScreen` with driving route |
 | `RequestProgressScreen`| Tap "Track Technician" | Job status = `Accepted` | Opens `MapTrackerScreen` showing approaching technician |
 | `MapTrackerScreen` | Tap "Call" / "Chat" | Active job context | Launches phone dialer or transitions to `ChatScreen` |
-| `AvailableJobsScreen` | Tap "Complete Job" | Tech enters customer's 4-digit OTP | Validates code $\rightarrow$ updates status to `Completed` |
-| `RequestProgressScreen`| Job marked `Completed` | Customer sees prompt | Rating modal opens $\rightarrow$ submits 1-5 star review |
-| `TechnicianProfileScreen`| Tap "+ Add Project" | Photo + title entered | Uploads to portfolio and updates profile gallery |
+| `AvailableJobsScreen` | Tap "Complete Job" | Tech enters customer 4-digit OTP | Validates code then updates status to `Completed` |
+| `RequestProgressScreen`| Job marked `Completed` | Customer sees prompt | Rating modal opens then submits 1-5 star review with `customerUid` |
+| `TechnicianProfileScreen`| Tap "+ Add Project" | Photo plus repairType and model entered | Uploads single photo to portfolio and updates profile gallery |

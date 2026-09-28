@@ -116,6 +116,10 @@ Anti-slop press tokens: `pressed {scale 0.97, opacity 0.96}`, `pressedSoft {scal
 | `LocationIQMap` | `LocationIQMap.tsx` | `customer {lat,lon}, technician {lat,lon}, status` | `WebView` Leaflet + LocationIQ tiles, `teal` polyline, house/wrench pins, HUD `3.4 km / 12 mins` |
 | `DateTimePicker` / `.web` | `DateTimePicker.tsx` | `value, mode date/time, onChange` | Platform-adaptive, `teal` accent, `canvas` bg |
 | `ApplianceIcons` | `utils/applianceIcons.tsx` | `getApplianceIcon, getStatusColor, getStatusIcon, getStatusGuidance, STEPS, PROGRESS_STEPS` | Centralizes color/icon per status |
+| `AssistantSheet` | `components/AssistantSheet.tsx` | `visible, context, onClose` | AI chatbot bottom sheet. Per-user history key. Shared instance owned by `AppNavigator` |
+| `ConversationInfoSheet` | `components/ConversationInfoSheet.tsx` | `visible, onClose` | Chat safety sheet with role accent and OTP reminder. Opened from `ChatScreen` |
+| `PortfolioPhotoSheet` | `components/PortfolioPhotoSheet.tsx` | `visible, onClose, onSubmit` | Single photo plus required `repairType` and `model`. Auto `uploadedAt`. Used by `TechnicianProfileScreen` |
+| `RecommendedTechSheet` | `components/RecommendedTechSheet.tsx` | `jobId, applianceType, visible` | AI match sheet backed by `GET /api/ai/recommend`. Shows rank, match percent, reason, workload, and skills. View Profile only |
 
 **Shared molecule:** `StatusPill` (`backgroundColor color15, borderColor color40, gap 4, radius 999`), `MetaItem` (icon 14 muted + text 12 medium), `ProgressRail` (4 steps `Accepted/Confirmed/Ready/In Progress`, dots + lines).
 
@@ -167,10 +171,11 @@ Anti-slop press tokens: `pressed {scale 0.97, opacity 0.96}`, `pressedSoft {scal
 
 ### 8.8 Chat (`ChatScreen.tsx`)
 - Inbox `FlatList` `ConversationRow` `48 radius16 teal` + `unreadPill error` + `badgePill color15/40` + `jobCode 10 extraBold tealLight` + `phone masked`. Filters `All/Active/Completed/Unread` + `StatCard Total/Active/Unread`. Thread `navBar` + `chatHeaderCard white` + `call/copy` teal `44` + `msgBubble 78% radius18` `myMsg teal` / `otherMsg white border line` + `inputContainer canvas 24`.
+- Chat supports text plus optional photo. Text-only sends JSON. Photo sends multipart `photo` to the `chat-images` bucket. Image-only messages store empty `text`. Bubbles render `imageUrl` with `PhotoLightbox`. Header info button opens `ConversationInfoSheet` with safety and OTP notes.
 
 ### 8.9 Profiles
-- **TechnicianProfileScreen:** header avatar `verified badge`, `★ 4.9 · 38 · 100%`, skill chips teal, `Portfolio Gallery` grid + `+ Add Project`, availability toggle.
-- **CustomerProfileScreen:** name/email/phone/address + `Service History` + logout.
+- **TechnicianProfileScreen:** header avatar `verified badge`, `★ 4.9 · 38 · 100%`, skill chips teal, `Portfolio Gallery` grid + `+ Add Project` opens `PortfolioPhotoSheet`. Single photo per request requires `repairType` and `model`. Availability toggle.
+- **CustomerProfileScreen:** name/email/phone/address + `Service History` + logout. Help entry opens `HelpSheet` with assistant handoff.
 
 ### 8.10 Notifications (7b) — Two-Step
 - `Modal` `notificationPanel`: `panelHeader FIXLINK UPDATES + close 34 canvas`, `detailCard F0FDFA` (icon + `sender · request update` / `New message from` + `Read/Unread · Just now · #CODE` + text + `Tap again…` + `detailError` red + `Open request/conversation →` teal / `Close` white), list `notice` (icon `38 radius13 E6F6F3 / FFF8E7` → `noticeRead 0.72` → `noticeSelected F0FDFA 2` + `tapHint teal pill` + `unreadDot 8 teal`) + static `You’re all set` / `Need something fixed?`. Badge `dot 18 error` hides at 0, poll `GET /api/requests/notifications` 10s `limit100 sorted desc`.
