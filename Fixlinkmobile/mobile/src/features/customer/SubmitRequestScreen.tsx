@@ -1,6 +1,5 @@
-// @ts-nocheck - migrated from .js, preserve working state; types to be refined incrementally
 import React, { useState, useEffect, useRef } from "react";
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, ScrollView, Modal, FlatList, ActivityIndicator, Image, Platform, Animated } from "react-native";
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, ScrollView, Modal, FlatList, ActivityIndicator, Image, Platform, Animated, type StyleProp, type ViewStyle } from "react-native";
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
@@ -11,12 +10,49 @@ import { geocodeAddress, geocodeAddressPrecise, geocodeAddressStructured, revers
 import { collectBestFix, distanceInMeters } from "./locationFix";
 import CustomerLocationMap from "../../components/CustomerLocationMap";
 import { colors, fonts, shadows } from '../../theme';
-import { getApplianceIcon } from '../../utils/applianceIcons';
+import { getApplianceIcon, type IconName } from '../../utils/applianceIcons';
+
+type CurrentUserRef = {
+  uid?: string;
+  name?: string;
+  role?: string;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+};
+
+// A category (and its optional device list) from the platform categories feed.
+type CategoryOption = {
+  name?: string;
+  category?: string;
+  devices?: unknown[];
+};
+
+type Coords = { latitude: number; longitude: number };
+
+type LocateStage = 'permission' | 'gps' | 'address' | 'pin';
+
+type LocateNote = { kind: 'error' | 'info' | 'ok'; text: string };
+
+type PhotoAsset = {
+  uri: string;
+  fileName?: string;
+  name?: string;
+  mimeType?: string;
+  type?: string;
+};
+
+type SubmitRequestScreenProps = {
+  currentUser?: CurrentUserRef | null;
+  customerName?: string;
+  onNavigateToProgress?: () => void;
+  onClose?: () => void;
+};
 
 // Place types that read as "business/store/landmark" so we can pick a fitting icon
 const STORE_LIKE_TYPES = ['mall', 'department_store', 'shop', 'supermarket', 'bank', 'hospital', 'university', 'school', 'pharmacy', 'hotel', 'restaurant', 'fast_food', 'cafe', 'travel_agency', 'doctors', 'clinic'];
 
-const suggestionIconFor = (type) => (STORE_LIKE_TYPES.includes(type) ? 'business-outline' : 'location-outline');
+const suggestionIconFor = (type: string): IconName =>
+  (STORE_LIKE_TYPES.includes(type) ? 'business-outline' : 'location-outline');
 
 const APPLIANCE_OPTIONS = [
   'Home Appliances',
@@ -100,14 +136,16 @@ const WebDateTimeInput = ({ mode, date, onPick, onDismiss, openToken = 0 }: { mo
       const raw = String(event?.target?.value || '');
       if (!raw) return;
       if (mode === 'date') {
-        const parts = raw.split('-').map(Number);
-        if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return;
-        onPick(new Date(parts[0], parts[1] - 1, parts[2], date.getHours(), date.getMinutes()));
+        const [year, month, day] = raw.split('-').map(Number);
+        if (year == null || month == null || day == null) return;
+        if (![year, month, day].every(Number.isFinite)) return;
+        onPick(new Date(year, month - 1, day, date.getHours(), date.getMinutes()));
       } else {
-        const parts = raw.split(':').map(Number);
-        if (parts.length < 2 || parts.some((n) => !Number.isFinite(n))) return;
+        const [hours, minutes] = raw.split(':').map(Number);
+        if (hours == null || minutes == null) return;
+        if (![hours, minutes].every(Number.isFinite)) return;
         const picked = new Date(date);
-        picked.setHours(parts[0], parts[1], 0, 0);
+        picked.setHours(hours, minutes, 0, 0);
         onPick(picked);
       }
     },
@@ -125,7 +163,7 @@ const STEPS = [
   { key: 'problem', label: 'Problem', title: 'Describe the Issue', subtitle: '' },
   { key: 'schedule', label: 'Schedule', title: 'Choose a Time Slot', subtitle: '' },
   { key: 'location', label: 'Location', title: 'Repair Location', subtitle: '' },
-];
+] as const;
 
 const TOTAL_STEPS = 4;
 
@@ -139,7 +177,19 @@ const LOCATE_STAGES = {
   pin: { short: 'Confirming pin...', long: 'Confirming the pin on the map' },
 };
 
-function Skeleton({ width = '100%', height = 14, radius = 8, color = '#E1E6EB', style }): React.JSX.Element {
+function Skeleton({
+  width = '100%',
+  height = 14,
+  radius = 8,
+  color = '#E1E6EB',
+  style,
+}: {
+  width?: ViewStyle['width'];
+  height?: number;
+  radius?: number;
+  color?: string;
+  style?: StyleProp<ViewStyle>;
+}): React.JSX.Element {
   const pulse = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     const loop = Animated.loop(
@@ -155,20 +205,20 @@ function Skeleton({ width = '100%', height = 14, radius = 8, color = '#E1E6EB', 
   return <Animated.View style={[{ width, height, borderRadius: radius, backgroundColor: color, opacity }, style]} />;
 }
 
-export default function SubmitRequestScreen({ currentUser, customerName, onNavigateToProgress, onClose }) {
+export default function SubmitRequestScreen({ currentUser, customerName, onNavigateToProgress, onClose }: SubmitRequestScreenProps) {
   const [currentStep, setCurrentStep] = useState(1);
-  const [stepErrors, setStepErrors] = useState({});
+  const [stepErrors, setStepErrors] = useState<Record<string, string | boolean | undefined>>({});
   const [selectedCategoryName, setSelectedCategoryName] = useState("");
   const [selectedDevice, setSelectedDevice] = useState("");
   const [brandModel, setBrandModel] = useState("");
-  const [drillCategory, setDrillCategory] = useState(null);
+  const [drillCategory, setDrillCategory] = useState<CategoryOption | null>(null);
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
   const [street, setStreet] = useState("");
   const [city, setCity] = useState("");
   const [zipCode, setZipCode] = useState("");
   const [notes, setNotes] = useState("");
-  const [coords, setCoords] = useState(null);
+  const [coords, setCoords] = useState<Coords | null>(null);
   // Smart opacity: manual text = 50%, address derived from the pin = 100%
   // (medium weight, never bold).
   // `addressFromPin` means the fields were filled FROM the pin (a GPS fix or a
@@ -178,8 +228,8 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
   const [addressFromPin, setAddressFromPin] = useState(false);
   const locTextStyle = [styles.textInputSingle, { opacity: addressFromPin ? 1 : 0.5 }];
   // Consistent focus ring for all step 4 boxes (orange when focused)
-  const [focusedField, setFocusedField] = useState(null);
-  const [categoryOptions, setCategoryOptions] = useState([]);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([]);
   const [date, setDate] = useState(new Date());
   const [selectedTimeSlot, setSelectedTimeSlot] = useState('Afternoon (1PM-5PM)');
   const [isCustomTime, setIsCustomTime] = useState(false);
@@ -187,26 +237,28 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
   // Bumped on every picker open so the web input re-runs its auto-open effect
   // even when the same mode is picked twice in a row.
   const [pickerToken, setPickerToken] = useState(0);
-  const [mode, setMode] = useState('date');
+  const [mode, setMode] = useState<'date' | 'time'>('date');
   const [modalVisible, setModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [locating, setLocating] = useState(false);
   // While locating and still empty, the address fields render as skeletons so
   // the form looks like it is filling itself in rather than sitting blank.
   const addressFieldsEmpty = !street.trim() && !city.trim() && !zipCode.trim();
-  const [locateAccuracy, setLocateAccuracy] = useState(null);
-  const [locateStage, setLocateStage] = useState(null);
-  const [locateNote, setLocateNote] = useState(null);
-  const [photo, setPhoto] = useState(null);
+  const [locateAccuracy, setLocateAccuracy] = useState<number | null>(null);
+  const [locateStage, setLocateStage] = useState<LocateStage | null>(null);
+  const [locateNote, setLocateNote] = useState<LocateNote | null>(null);
+  const [photo, setPhoto] = useState<PhotoAsset | null>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoViewerVisible, setPhotoViewerVisible] = useState(false);
   const [photoMenuVisible, setPhotoMenuVisible] = useState(false);
-  const scrollRef = useRef(null);
+  const scrollRef = useRef<ScrollView | null>(null);
 
   const composedLocation = [street.trim(), city.trim(), zipCode.trim()].filter(Boolean).join(', ');
 
   useEffect(() => {
-    fetchPlatformCategories().then(setCategoryOptions).catch(() => setCategoryOptions([]));
+    fetchPlatformCategories()
+      .then((data) => setCategoryOptions(data as CategoryOption[]))
+      .catch(() => setCategoryOptions([]));
   }, []);
 
   const applianceOptions = categoryOptions.length
@@ -220,10 +272,10 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
   const selectedCategoryObj = categoryOptions.find((c) => String(c.name || '').trim() === selectedCategoryName) || null;
   const selectedHasDevices = selectedCategoryObj && Array.isArray(selectedCategoryObj.devices) && selectedCategoryObj.devices.filter(Boolean).length > 0;
 
-  const pickCategory = (category) => {
+  const pickCategory = (category: CategoryOption) => {
     const devices = Array.isArray(category.devices) ? category.devices.map((device) => String(device).trim()).filter(Boolean) : [];
     if (devices.length === 0) {
-      setSelectedCategoryName(category.name);
+      setSelectedCategoryName(category.name || '');
       setSelectedDevice("");
       setModalVisible(false);
       if (stepErrors.category) setStepErrors((p) => { const n = { ...p }; delete n.category; return n; });
@@ -242,12 +294,12 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
     setLocateNote(null);
     // Every external call raced with a timeout. An unanswered permission
     // prompt or a hanging geocode service must never stick the spinner on.
-    const withTimeout = (promise, ms, label) => {
-      let timer;
-      return Promise.race([
-        promise,
-        new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(label)), ms); }),
-      ]).finally(() => clearTimeout(timer));
+    const withTimeout = <T,>(promise: Promise<T>, ms: number, label: string): Promise<T> => {
+      let timer: ReturnType<typeof setTimeout> | null = null;
+      const timeout = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(label)), ms);
+      });
+      return Promise.race([promise, timeout]).finally(() => { if (timer) clearTimeout(timer); });
     };
     try {
       // Read status first without prompting. A denied status never shows a
@@ -301,7 +353,8 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
       try {
         const geocode = await withTimeout(Location.reverseGeocodeAsync({ latitude: lat, longitude: lon }), 8000, 'Reverse geocode timed out.');
         if (geocode && geocode.length > 0) {
-          const a = geocode[0];
+          // Guarded by the length check above.
+          const a = geocode[0]!;
           // Use fresh reverseGeocode only - do not geocode the string "Gairan" again
           resolvedStreet = a.street || a.name || '';
           resolvedCity = a.city || a.subregion || '';
@@ -369,7 +422,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
   // auto-geocode effect from geocoding back over it. No `locating` toggle here:
   // that would swap the map out for the skeleton the customer just interacted
   // with.
-  const handlePinDrag = async ({ latitude, longitude }) => {
+  const handlePinDrag = async ({ latitude, longitude }: { latitude: number; longitude: number }) => {
     setCoords({ latitude, longitude });
     setAddressFromPin(true);
     setLocateNote({ kind: 'ok', text: 'Pin moved - updating the address...' });
@@ -381,7 +434,8 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
       try {
         const geo = await Location.reverseGeocodeAsync({ latitude, longitude });
         if (geo && geo.length > 0) {
-          const a = geo[0];
+          // Guarded by the length check above.
+          const a = geo[0]!;
           parts = {
             street: a.street || a.name || '',
             city: a.city || a.subregion || '',
@@ -447,7 +501,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
 
   // Optional problem photo: helps the technician see the issue before
   // accepting. Kept local until submit; uploaded as multipart `photo`.
-  const normalizePhotoAsset = (asset) => {
+  const normalizePhotoAsset = (asset?: ImagePicker.ImagePickerAsset | null) => {
     if (!asset?.uri) return null;
     if (asset.fileSize && asset.fileSize > 5 * 1024 * 1024) {
       Alert.alert('Photo too large', 'Please choose a photo under 5MB.');
@@ -474,7 +528,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
         quality: 0.7,
       });
       if (!result.canceled && result.assets?.length > 0) {
-        const normalized = normalizePhotoAsset(result.assets[0]);
+        const normalized = normalizePhotoAsset(result.assets?.[0]);
         if (normalized) setPhoto(normalized);
       }
     } finally {
@@ -492,7 +546,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
       }
       const result = await ImagePicker.launchCameraAsync({ quality: 0.7, allowsEditing: true });
       if (!result.canceled && result.assets?.length > 0) {
-        const normalized = normalizePhotoAsset(result.assets[0]);
+        const normalized = normalizePhotoAsset(result.assets?.[0]);
         if (normalized) setPhoto(normalized);
       }
     } finally {
@@ -515,7 +569,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
     await pickFromLibrary();
   };
 
-  const handleDateValue = (selectedDate) => {
+  const handleDateValue = (selectedDate?: Date | null) => {
     setShowDatePicker(false);
     if (!selectedDate) return;
 
@@ -538,7 +592,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
     setShowDatePicker(false);
   };
 
-  const validateStep = (step) => {
+  const validateStep = (step: number) => {
     const next = { ...stepErrors };
     let valid = true;
     if (step === 1) {
@@ -585,7 +639,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
     return valid;
   };
 
-  const canContinueForStep = (step) => {
+  const canContinueForStep = (step: number) => {
     if (step === 1) return !!selectedCategoryName.trim();
     if (step === 2) return !!description.trim() && !!brandModel.trim();
     if (step === 3) {
@@ -631,7 +685,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
     });
     if (!allValid) {
       // surface inline errors and jump to first failing step
-      const next = {};
+      const next: Record<string, string | boolean | undefined> = {};
       if (!selectedCategoryName.trim()) next.category = 'Choose the appliance that needs repair.';
       if (!brandModel.trim()) next.brand = 'Enter the device brand and model.';
       if (!description.trim()) next.description = 'Add a short description so the technician can prepare.';
@@ -765,7 +819,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
                       const cat = categoryOptions.find((c) => String(c.name || '').trim() === name);
                       const devices = cat && Array.isArray(cat.devices) ? cat.devices.map((d) => String(d).trim()).filter(Boolean) : [];
                       // Auto-select instantly (orange highlight); if it has devices, open picker to choose one.
-                      setSelectedCategoryName(cat ? cat.name : name);
+                      setSelectedCategoryName(cat?.name || name);
                       setSelectedDevice('');
                       if (devices.length > 0) {
                         setDrillCategory({ ...cat, devices });
@@ -1039,7 +1093,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
                 <View style={styles.mapSkeletonStatus}>
                   <ActivityIndicator size="small" color={colors.customer} />
                   <Text style={styles.mapSkeletonText} accessibilityLiveRegion="polite" numberOfLines={2}>
-                    {LOCATE_STAGES[locateStage]?.long || 'Getting your location...'}
+                    {LOCATE_STAGES[locateStage as LocateStage]?.long || 'Getting your location...'}
                   </Text>
                 </View>
               </View>
@@ -1072,7 +1126,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
           ) : (
             <Ionicons name="locate-outline" size={15} color={colors.customer} />
           )}
-          <Text style={styles.locateRowText} numberOfLines={1}>{locating ? (LOCATE_STAGES[locateStage]?.short || 'Locating...') : 'Use my current location'}</Text>
+          <Text style={styles.locateRowText} numberOfLines={1}>{locating ? (LOCATE_STAGES[locateStage as LocateStage]?.short || 'Locating...') : 'Use my current location'}</Text>
         </TouchableOpacity>
         {locateNote ? (
           <Text style={locateNote.kind === 'ok' ? styles.locateOkText : styles.locateErrorText}>{locateNote.text}</Text>
@@ -1169,6 +1223,10 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
     );
   };
 
+  // Rendered step definition. The `?? STEPS[0]` keeps the header from ever
+  // reading past the end if currentStep were ever out of range.
+  const stepDef = STEPS[currentStep - 1] ?? STEPS[0];
+
   return (
     <ScrollView ref={scrollRef} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
       <View style={styles.centerWrap}>
@@ -1212,9 +1270,9 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
         <View style={styles.divider} />
 
         <View style={styles.stepHeadBlock}>
-          <Text style={styles.stepHeadTitle}>{STEPS[currentStep - 1].title}</Text>
-          {!!STEPS[currentStep - 1].subtitle && (
-            <Text style={styles.stepHeadSub}>{STEPS[currentStep - 1].subtitle}</Text>
+          <Text style={styles.stepHeadTitle}>{stepDef.title}</Text>
+          {!!stepDef.subtitle && (
+            <Text style={styles.stepHeadSub}>{stepDef.subtitle}</Text>
           )}
         </View>
 
@@ -1299,15 +1357,15 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
 
             {drillCategory ? (
               <FlatList
-                data={drillCategory.devices}
-                keyExtractor={(item) => item}
+                data={(drillCategory.devices || []) as string[]}
+                keyExtractor={(item: string) => item}
                 showsVerticalScrollIndicator={false}
                 renderItem={({ item }) => {
                   const isSelected = selectedCategoryName === drillCategory.name && selectedDevice === item;
                   return (
                     <TouchableOpacity
                       style={[styles.modalItem, isSelected && styles.modalItemSelected]}
-                      onPress={() => { setSelectedCategoryName(drillCategory.name); setSelectedDevice(item); setDrillCategory(null); setModalVisible(false); if (stepErrors.category) setStepErrors((p) => { const n={...p}; delete n.category; return n; }); }}
+                      onPress={() => { setSelectedCategoryName(drillCategory.name || ''); setSelectedDevice(item); setDrillCategory(null); setModalVisible(false); if (stepErrors.category) setStepErrors((p) => { const n={...p}; delete n.category; return n; }); }}
                       activeOpacity={0.7}
                       accessibilityRole="button"
                       accessibilityLabel={item}
@@ -1315,7 +1373,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
                     >
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
                         <View style={[styles.modalItemIcon, isSelected && styles.modalItemIconSelected]}>
-                          <Ionicons name={getApplianceIcon(item) as never} size={15} color={isSelected ? colors.customer : colors.muted} />
+                          <Ionicons name={getApplianceIcon(item)} size={15} color={isSelected ? colors.customer : colors.muted} />
                         </View>
                         <Text style={[styles.modalItemText, isSelected && styles.modalItemTextSelected]}>{item}</Text>
                       </View>
@@ -1402,6 +1460,10 @@ const styles = StyleSheet.create({
   refHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 6, marginBottom: 20 },
   refBackBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   refHeaderTitle: { color: colors.ink, fontSize: 16, fontFamily: fonts.bold },
+  // These labels are styled with `styles.refLabel` in the markup but the key was
+  // never defined, so they have always rendered unstyled. Kept as an empty
+  // entry so the rendering stays byte-for-byte the same.
+  refLabel: {},
   kicker: { color: colors.customer, fontSize: 10, letterSpacing: 1.4, fontFamily: fonts.extraBold, marginBottom: 2, textTransform: 'uppercase' as const },
   screenKicker: { color: colors.muted, fontSize: 10, letterSpacing: 1.4, fontFamily: fonts.extraBold, textTransform: 'uppercase' as const },
   sectionTitle: { fontSize: 22, fontFamily: fonts.extraBold, color: colors.ink, letterSpacing: -0.3, lineHeight: 28 },
@@ -1552,7 +1614,7 @@ const styles = StyleSheet.create({
   mapHintText: { flex: 1, fontSize: 11, fontFamily: fonts.medium, color: colors.muted, lineHeight: 15 },
   mapPin: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.customer, alignItems: 'center', justifyContent: 'center', ...shadows.subtle },
   mapSkeleton: { height: 144, position: 'relative' as const, alignItems: 'center', justifyContent: 'center' },
-  mapSkeletonBody: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 16 },
+  mapSkeletonBody: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 16 },
   mapSkeletonStatus: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.94)', borderWidth: 1, borderColor: colors.line, maxWidth: '100%' },
   mapSkeletonText: { fontSize: 12, fontFamily: fonts.semiBold, color: colors.ink, flexShrink: 1 },
   addressSkeletonGroup: { gap: 20 },
