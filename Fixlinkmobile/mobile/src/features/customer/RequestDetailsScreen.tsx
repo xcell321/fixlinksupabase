@@ -23,7 +23,7 @@ type RequestDetails = {
   applianceType?: string;
   description?: string;
   location?: string;
-  photoUrl?: string;
+  photoUrl?: string | null;
   verificationCode?: string;
   createdAt?: string;
   acceptedAt?: string;

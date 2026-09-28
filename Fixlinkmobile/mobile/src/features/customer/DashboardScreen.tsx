@@ -36,6 +36,8 @@ type DashboardScreenProps = {
   onNavigateToProgress?: () => void;
   onOpenRequest?: (job: JobItem) => void;
   onTrackJob?: (job: JobItem) => void;
+  // Passed by the navigator for the hero card's track action.
+  onTrackAcceptedJob?: () => void;
 };
 
 const getNextAction = (req?: JobItem | null): { icon: IconName; text: string } | null => {
