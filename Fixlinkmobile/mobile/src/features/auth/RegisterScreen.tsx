@@ -1,4 +1,3 @@
-// @ts-nocheck - migrated from .js, preserve working state; types to be refined incrementally
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, ActivityIndicator, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,7 +9,21 @@ import { colors, fonts } from '../../theme';
 // labels, gray-50 inputs, full-width accent button.
 // Backend-mandated extras kept for technicians only: credentials uploads
 // (government ID + certificate files are required by the API).
-export default function RegisterScreen({ switchToLogin, initialRole = 'customer', onTechnicianPending, onRegistered }) {
+type RegisterRole = 'customer' | 'technician';
+
+// A picked credential document (government ID / certificate).
+type CredentialFile = DocumentPicker.DocumentPickerAsset;
+
+type CategoryOption = { id?: string; name?: string };
+
+type RegisterScreenProps = {
+  switchToLogin: () => void;
+  initialRole?: RegisterRole;
+  onTechnicianPending?: () => void;
+  onRegistered?: (user: unknown) => void;
+};
+
+export default function RegisterScreen({ switchToLogin, initialRole = 'customer', onTechnicianPending, onRegistered }: RegisterScreenProps) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -24,28 +37,30 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
   const [skills, setSkills] = useState('');
   const [yearsExperience, setYearsExperience] = useState('');
   const [governmentIdNumber, setGovernmentIdNumber] = useState('');
-  const [governmentIdFile, setGovernmentIdFile] = useState(null);
-  const [certificateFile, setCertificateFile] = useState(null);
-  const [role, setRole] = useState(initialRole); // 'customer' or 'technician'
+  const [governmentIdFile, setGovernmentIdFile] = useState<CredentialFile | null>(null);
+  const [certificateFile, setCertificateFile] = useState<CredentialFile | null>(null);
+  const [role, setRole] = useState<RegisterRole>(initialRole); // 'customer' or 'technician'
   const [loading, setLoading] = useState(false);
-  const [categoryOptions, setCategoryOptions] = useState([]);
-  const [fieldErrors, setFieldErrors] = useState({}); // Record<string,string>
-  const [successMessage, setSuccessMessage] = useState(null);
-  const [submitError, setSubmitError] = useState(null);
+  const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([]);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchPlatformCategories().then(setCategoryOptions).catch(() => setCategoryOptions([]));
+    fetchPlatformCategories()
+      .then((data) => setCategoryOptions(data as CategoryOption[]))
+      .catch(() => setCategoryOptions([]));
   }, []);
 
   const isTechRole = role === 'technician';
   const accent = isTechRole ? colors.tech : colors.customer;
   const accentSoft = isTechRole ? colors.techSoft : colors.customerSoft;
 
-  const clearFieldError = (key) => setFieldErrors((prev) => { if (!prev[key]) return prev; const next = { ...prev }; delete next[key]; return next; });
+  const clearFieldError = (key: string) => setFieldErrors((prev) => { if (!prev[key]) return prev; const next: Record<string, string> = { ...prev }; delete next[key]; return next; });
 
   // Philippine mobile numbers are exactly 11 digits starting with 09.
   // Accepts +63/63 prefix and spaces/dashes, normalizes before checking.
-  const validatePhone = (raw) => {
+  const validatePhone = (raw?: string | null): string | null => {
     const input = String(raw ?? '').trim();
     if (!input) return 'Phone number is required';
     let digits = input.replace(/\D/g, '');
@@ -60,7 +75,7 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
     return null;
   };
 
-  const toggleSkill = (categoryName) => {
+  const toggleSkill = (categoryName: string) => {
     const skillList = skills.split(',').map((s) => s.trim()).filter((s) => s !== '');
     if (skillList.includes(categoryName)) {
       setSkills(skillList.filter((s) => s !== categoryName).join(', '));
@@ -72,7 +87,7 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
 
   const handleRegister = async () => {
     const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
-    const nextErrors = {};
+    const nextErrors: Record<string, string> = {};
     if (!fullName) nextErrors.name = 'Please enter your name';
     if (!email.trim()) nextErrors.email = 'Email is required';
     const phoneError = validatePhone(phone);
@@ -128,7 +143,8 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
         },
       ]);
     } catch (error) {
-      const rawMessage = error?.response?.data?.error || error?.message || 'Registration failed';
+      const failure = error as { response?: { data?: { error?: string } }; message?: string } | null;
+      const rawMessage = failure?.response?.data?.error || failure?.message || 'Registration failed';
       const friendlyMessage = /timeout/i.test(String(rawMessage))
         ? 'The request took too long. Check your connection and try again. If the account was created, just log in.'
         : String(rawMessage);
@@ -140,7 +156,7 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
     }
   };
 
-  const isAcceptedCredentialFile = (asset) => {
+  const isAcceptedCredentialFile = (asset: CredentialFile | null | undefined) => {
     const mime = String(asset?.mimeType || '').toLowerCase();
     if (mime === 'image/jpeg' || mime === 'image/png' || mime === 'application/pdf') return true;
     const fileName = String(asset?.name || '');
@@ -149,10 +165,17 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
     return extension === '.jpg' || extension === '.jpeg' || extension === '.png' || extension === '.pdf';
   };
 
-  const chooseCredential = async (setter, fieldKey, label) => {
+  const chooseCredential = async (
+    setter: (file: CredentialFile) => void,
+    fieldKey: string,
+    label: string
+  ) => {
     const result = await DocumentPicker.getDocumentAsync({ type: ['image/jpeg', 'image/png', 'application/pdf'], copyToCacheDirectory: true });
     if (result.canceled) return;
-    const asset = result.assets[0];
+    // `assets[0]` is `T | undefined` under noUncheckedIndexedAccess; a canceled
+    // picker with no asset has nothing to validate.
+    const asset = result.assets?.[0];
+    if (!asset) return;
     if (!isAcceptedCredentialFile(asset)) {
       setFieldErrors((prev) => ({ ...prev, [fieldKey]: `${label} must be JPG, PNG, or PDF.` }));
       return;
@@ -161,7 +184,14 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
     setter(asset);
   };
 
-  const renderField = (label, value, onChange, fieldKey, placeholder, extraProps = {}) => (
+  const renderField = (
+    label: string,
+    value: string,
+    onChange: (value: string) => void,
+    fieldKey: string,
+    placeholder: string,
+    extraProps: Record<string, unknown> = {}
+  ) => (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
@@ -181,7 +211,14 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
   // what they typed. Applied to both roles since they share this screen.
   // Icon shows the CURRENT state: slashed eye while rendered as dots,
   // plain eye while the password is readable.
-  const renderPasswordField = (label, value, onChange, fieldKey, visible, onToggleVisible) => (
+  const renderPasswordField = (
+    label: string,
+    value: string,
+    onChange: (value: string) => void,
+    fieldKey: string,
+    visible: boolean,
+    onToggleVisible: () => void
+  ) => (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
       <View style={[styles.passwordWrap, fieldErrors[fieldKey] && styles.inputError]}>
