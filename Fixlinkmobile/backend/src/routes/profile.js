@@ -1,8 +1,8 @@
 const express = require('express');
 const multer = require('multer');
 const { supabase, verifyAccessToken, uploadBuffer } = require('../config/supabase');
-const { serializeUser } = require('../utils/serialize');
-const { resolveCoordinates } = require('../utils/geocode');
+const { serializeUser } = require('../domain/userSerializer');
+const { resolveCoordinates } = require('../services/geocodeService');
 
 const router = express.Router();
 const upload = multer({

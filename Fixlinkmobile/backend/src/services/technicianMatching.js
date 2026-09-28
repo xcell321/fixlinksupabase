@@ -3,6 +3,13 @@
 // existing GET /api/requests feed (requests.js) and the score is a transparent
 // weighted blend of real FixLink data. The AI layer (routes/ai.js) re-ranks and
 // explains, but it can only choose from the candidates this service returns.
+//
+// NOTE: the landmark table below is intentionally separate from
+// domain/landmarks.js (which serves the job feed). The two were edited
+// independently and disagree slightly on `dakit`, so they are kept apart until
+// the right value is confirmed.
+
+const { distanceInKm } = require('../domain/geo');
 
 const BOGO_LANDMARKS = {
   'lepiten': { latitude: 11.0278, longitude: 124.0355 },
@@ -20,16 +27,6 @@ const BOGO_LANDMARKS = {
   'cantecson': { latitude: 11.0410, longitude: 123.9890 },
   'sudtongan': { latitude: 11.0720, longitude: 124.0010 },
   'la paz': { latitude: 11.0720, longitude: 124.0010 }
-};
-
-const distanceInKm = (firstLatitude, firstLongitude, secondLatitude, secondLongitude) => {
-  if (![firstLatitude, firstLongitude, secondLatitude, secondLongitude].every(Number.isFinite)) return null;
-  const radians = (value) => value * Math.PI / 180;
-  const latitudeDelta = radians(secondLatitude - firstLatitude);
-  const longitudeDelta = radians(secondLongitude - firstLongitude);
-  const haversine = Math.sin(latitudeDelta / 2) ** 2
-    + Math.cos(radians(firstLatitude)) * Math.cos(radians(secondLatitude)) * Math.sin(longitudeDelta / 2) ** 2;
-  return 6371 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
 };
 
 const resolveJobCoords = (latitude, longitude, locationText) => {

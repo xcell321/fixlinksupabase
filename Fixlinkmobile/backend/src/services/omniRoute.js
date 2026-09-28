@@ -43,7 +43,7 @@ const extractJson = (content) => {
 };
 
 // Minimal OpenAI-compatible chat-completion wrapper around the OmniRoute
-// gateway. Uses native fetch + AbortController, matching geocode.js.
+// gateway. Uses native fetch + AbortController, matching services/geocodeService.js.
 // When `json` is true the request asks for a structured JSON object and the
 // parsed object is returned (throws if the model wraps it differently).
 const chatComplete = async ({ system, user, temperature = 0.2, json = true, maxTokens = 600 }) => {

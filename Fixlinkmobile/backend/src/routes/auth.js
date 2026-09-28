@@ -2,9 +2,9 @@ const express = require('express');
 const multer = require('multer');
 const router = express.Router();
 const { supabase, supabaseAuth, uploadBuffer } = require('../config/supabase');
-const { sendPasswordResetEmail } = require('../utils/emailService');
+const { sendPasswordResetEmail } = require('../services/emailService');
 const { signResetToken, verifyResetToken, hashResetToken, TOKEN_TTL_MS } = require('../utils/resetToken');
-const { resolveCoordinates } = require('../utils/geocode');
+const { resolveCoordinates } = require('../services/geocodeService');
 
 const upload = multer({
   storage: multer.memoryStorage(),

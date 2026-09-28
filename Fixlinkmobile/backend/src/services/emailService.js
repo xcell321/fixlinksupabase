@@ -1,7 +1,7 @@
 const dns = require('dns');
 const { promisify } = require('util');
 const nodemailer = require('nodemailer');
-const { getPublicBaseUrl } = require('./network');
+const { getPublicBaseUrl } = require('../utils/network');
 
 const lookup = promisify(dns.lookup);
 

@@ -2,9 +2,9 @@ const express = require('express');
 const multer = require('multer');
 const router = express.Router();
 const { supabase, uploadBuffer } = require('../config/supabase');
-const { serializeUser } = require('../utils/serialize');
+const { serializeUser } = require('../domain/userSerializer');
 const { requireAuth } = require('../middleware/requireAuth');
-const { getTechnicianSchedule, dayKeyOf, availabilityForDay } = require('../utils/techSchedule');
+const { getTechnicianSchedule, dayKeyOf, availabilityForDay } = require('../services/techScheduleService');
 
 const portfolioUpload = multer({
   storage: multer.memoryStorage(),

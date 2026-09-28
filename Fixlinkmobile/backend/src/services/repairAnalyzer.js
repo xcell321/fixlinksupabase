@@ -1,4 +1,4 @@
-const { chatComplete, isOmniRouteConfigured } = require('../utils/omniRoute');
+const { chatComplete, isOmniRouteConfigured } = require('./omniRoute');
 
 // Requirement 1: the AI genuinely analyzes the customer's natural-language
 // repair description via OmniRoute and extracts the device, category, problem,

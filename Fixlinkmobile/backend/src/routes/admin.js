@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { supabase } = require('../config/supabase');
-const { serializeUser } = require('../utils/serialize');
+const { serializeUser } = require('../domain/userSerializer');
 
 // GET: Fetch all users (so admin can view customers and technicians)
 router.get('/users', async (req, res) => {

@@ -2,15 +2,15 @@ const express = require('express');
 const router = express.Router();
 const { supabase } = require('../config/supabase');
 const { requireAuth } = require('../middleware/requireAuth');
-const { analyzeRepairDescription } = require('../service/repairAnalyzer');
+const { analyzeRepairDescription } = require('../services/repairAnalyzer');
 const {
   getEligibleCandidates,
   rankObjective,
   buildCandidatePayload,
-} = require('../service/technicianMatch');
-const { chatComplete, isOmniRouteConfigured } = require('../utils/omniRoute');
-const { getSchedulesForTechnicians, dayKeyOf, availabilityForDay } = require('../utils/techSchedule');
-const { getActiveJobCountsForTechnicians, getWorkloadStatus } = require('../utils/workload');
+} = require('../services/technicianMatching');
+const { chatComplete, isOmniRouteConfigured } = require('../services/omniRoute');
+const { getSchedulesForTechnicians, dayKeyOf, availabilityForDay } = require('../services/techScheduleService');
+const { getActiveJobCountsForTechnicians, getWorkloadStatus } = require('../services/workloadService');
 
 // Per-customer assistant language preference. Module-level so it survives
 // across requests (resets on backend restart).
