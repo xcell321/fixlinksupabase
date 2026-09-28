@@ -58,7 +58,12 @@ router.get('/:technicianUid/schedule', requireAuth, async (req, res) => {
   }
 });
 
-router.put('/:id/location', async (req, res) => {
+router.put('/:id/location', requireAuth, async (req, res) => {
+  // A technician may only publish their own live location. requireAuth sets
+  // req.authUser.uid, so reject any update that targets a different account.
+  if (String(req.authUser.uid) !== String(req.params.id)) {
+    return res.status(403).json({ error: 'You can only update your own location.' });
+  }
   const latitude = Number(req.body?.latitude);
   const longitude = Number(req.body?.longitude);
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return res.status(400).json({ error: 'Valid coordinates are required.' });

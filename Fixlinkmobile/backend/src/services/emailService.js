@@ -9,7 +9,7 @@ function withTimeout(promise, ms, message) {
   let timer;
   return Promise.race([
     promise,
-    new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(message)), ms); })
+    new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(message)), ms); }),
   ]).finally(() => clearTimeout(timer));
 }
 
@@ -73,19 +73,22 @@ const sendPasswordResetEmail = async (to, link, requestHost, forwardedProto, for
 
   const landingUrlHref = String(landingUrl.toString()).replace(/&/g, '&amp;');
 
+  // Minimal copy: heading, one-time/24h note, the button, a paste fallback, and
+  // a short ignore line. Colors follow the mobile theme (orange #F97316 accent).
   const mailOptions = {
     from: process.env.EMAIL_FROM || '"FixLink Support" <noreply@fixlink.com>',
     to,
-    subject: 'FixLink Password Reset',
+    subject: 'Reset your FixLink password',
     html: `
-      <h1>Password Reset Request</h1>
-      <p>You requested a password reset for your FixLink account.</p>
-      <p style="margin: 20px 0;">
-        <a href="${landingUrlHref}" style="background:#0F766E;color:#ffffff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:8px;display:inline-block;">Reset my FixLink password</a>
-      </p>
-      <p style="font-size:12px;color:#5A7A91;">If the link above does not open the reset page, copy this entire link into your browser (make sure it is not cut off):<br><span style="word-break:break-all;">${landingUrlHref}</span></p>
-      <p>If you did not request this, please ignore this email.</p>
-      <p>Best regards,<br>The FixLink Team</p>
+      <div style="font-family: 'Segoe UI', Roboto, Arial, sans-serif; color: #102A43; max-width: 440px;">
+        <h2 style="margin: 0 0 8px; font-size: 18px;">Reset your FixLink password</h2>
+        <p style="margin: 0 0 16px; color: #6B7280; font-size: 13px;">This one-time link expires in 24 hours.</p>
+        <p style="margin: 0 0 16px;">
+          <a href="${landingUrlHref}" style="background: #F97316; color: #ffffff; text-decoration: none; font-weight: 700; padding: 12px 22px; border-radius: 12px; display: inline-block;">Reset password</a>
+        </p>
+        <p style="margin: 0 0 12px; font-size: 12px; color: #6B7280;">Or paste this link into your browser:<br><span style="word-break: break-all; color: #2563EB;">${landingUrlHref}</span></p>
+        <p style="margin: 0; font-size: 12px; color: #6B7280;">If you did not request this, ignore this email.</p>
+      </div>
     `,
   };
 
@@ -93,4 +96,49 @@ const sendPasswordResetEmail = async (to, link, requestHost, forwardedProto, for
   return withTimeout(transporter.sendMail(mailOptions), 15000, 'Email could not be delivered (SMTP timed out)');
 };
 
-module.exports = { sendPasswordResetEmail };
+// Escape values that came from the database or the admin form before they are
+// interpolated into the email HTML.
+const escapeHtml = (value) => String(value ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;');
+
+// Sent when an admin approves a technician application. This is the email that
+// tells the applicant they are now registered on the FixLink platform and can
+// sign in, so it is only sent on the transition into 'active'.
+const sendTechnicianApprovedEmail = async (to, name) => {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    throw new Error('Email credentials not configured.');
+  }
+
+  const firstName = escapeHtml(String(name || '').trim().split(/\s+/)[0] || 'Technician');
+  const registeredEmail = escapeHtml(to);
+
+  const mailOptions = {
+    from: process.env.EMAIL_FROM || '"FixLink Support" <noreply@fixlink.com>',
+    to,
+    subject: 'Your FixLink technician account is approved',
+    html: `
+      <div style="font-family: 'Segoe UI', Roboto, Arial, sans-serif; color: #102A43; max-width: 440px;">
+        <h2 style="margin: 0 0 8px; font-size: 18px;">You're approved, ${firstName}</h2>
+        <p style="margin: 0 0 16px; color: #6B7280; font-size: 13px;">Your FixLink technician application passed review.</p>
+        <p style="margin: 0 0 14px;">You are now an <strong>active FixLink technician</strong>. Your account is registered and ready to accept repair jobs.</p>
+        <div style="background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 12px; padding: 14px; margin: 0 0 16px;">
+          <p style="margin: 0 0 6px; font-size: 13px; font-weight: 700; color: #1E40AF;">What happens next</p>
+          <p style="margin: 0; font-size: 13px; color: #2563EB; line-height: 22px;">
+            1. Open the FixLink app<br>
+            2. Sign in as Technician with ${registeredEmail}<br>
+            3. Turn on availability to receive repair leads
+          </p>
+        </div>
+        <p style="margin: 0; font-size: 12px; color: #6B7280;">If you did not apply to be a FixLink technician, please ignore this email.</p>
+      </div>
+    `,
+  };
+
+  const transporter = await createTransporter();
+  return withTimeout(transporter.sendMail(mailOptions), 15000, 'Email could not be delivered (SMTP timed out)');
+};
+
+module.exports = { sendPasswordResetEmail, sendTechnicianApprovedEmail };

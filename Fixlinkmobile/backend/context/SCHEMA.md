@@ -267,7 +267,7 @@ Backs **single-use** password-reset links. When a reset link is issued for an ac
 | `id` | `uuid` PK | **Required** | Auto-generated ID. |
 | `user_id` | `uuid` FK | **Required** | References `users.id`; cascade deletes on account removal. |
 | `token_hash` | `text` | **Required** | SHA-256 (`token + RESET_TOKEN_SECRET`) fingerprint; the raw token is never stored. |
-| `expires_at` | `timestamptz` | **Required** | Full link expiry (30 min, matches JWT `exp`). |
+| `expires_at` | `timestamptz` | **Required** | Full link expiry (24 hours, matches JWT `exp`). |
 | `used_at` | `timestamptz` | Optional | Becomes non-null on successful redemption (single-use marker). |
 | `created_at` | `timestamptz` | **Required** | Issuance timestamp. |
 

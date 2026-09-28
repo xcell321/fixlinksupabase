@@ -13,13 +13,31 @@ alignSelf: 'center' },
   // Dark header matching Make file design
   protoHeader: { backgroundColor: colors.dark, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 24, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, marginHorizontal: -16, marginTop: -12, marginBottom: 16 },
   protoHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 10 },
-  protoKicker: { color: colors.muted, fontSize: 12, fontFamily: fonts.regular },
-  protoName: { color: colors.white, fontSize: 21, fontFamily: fonts.extraBold, letterSpacing: -0.3, marginTop: 2 },
+  protoKicker: { color: colors.muted, fontSize: 13, fontFamily: fonts.regular },
+  protoName: { color: colors.white, fontSize: 24, fontFamily: fonts.extraBold, letterSpacing: -0.4, marginTop: 2 },
   protoBell: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.10)', alignItems: 'center', justifyContent: 'center', minHeight: 44, minWidth: 44 },
+  protoIdentity: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  protoHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: 12, flexShrink: 0 },
+  // Service area: label over value, both flush right so the column lines up
+  // with the bell beside it.
+  serviceAreaBlock: { alignItems: 'flex-end', maxWidth: 118, flexShrink: 1 },
+  serviceAreaLabel: { color: colors.muted, fontSize: 12, fontFamily: fonts.regular },
+  serviceAreaValue: { color: colors.white, fontSize: 14, fontFamily: fonts.bold, marginTop: 1 },
+  protoAvatar: { width: 42, height: 42, borderRadius: 21 },
+  protoAvatarFallback: { backgroundColor: colors.tech, alignItems: 'center', justifyContent: 'center' },
+  protoAvatarText: { color: colors.white, fontSize: 14, fontFamily: fonts.bold },
+  // The two cards double as the Available/Assigned feed tabs.
   protoStatsRow: { flexDirection: 'row', gap: 12 },
-  protoStat: { flex: 1, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14, paddingVertical: 12, alignItems: 'center' },
+  protoStat: { flex: 1, flexDirection: 'row', gap: 7, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14, paddingVertical: 12, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  protoStatActive: { backgroundColor: colors.tech },
   protoStatValue: { color: colors.white, fontSize: 22, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
-  protoStatLabel: { color: colors.muted, fontSize: 11, fontFamily: fonts.medium, marginTop: 2 },
+  protoStatLabel: { color: colors.muted, fontSize: 13, fontFamily: fonts.semiBold },
+  protoStatLabelActive: { color: colors.white, fontFamily: fonts.bold },
+  // Count chip next to the label: readable, but still lighter than the label.
+  protoStatBadge: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 6, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },
+  protoStatBadgeActive: { backgroundColor: colors.white },
+  protoStatBadgeText: { color: '#D1D5DB', fontSize: 11, fontFamily: fonts.bold, fontVariant: ['tabular-nums'] },
+  protoStatBadgeTextActive: { color: colors.tech },
 
   topBar: {
     flexDirection: 'row',
@@ -213,54 +231,6 @@ alignSelf: 'center' },
   workloadStripAtCapacity: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
   workloadTitle: { fontSize: 13, fontFamily: fonts.bold, marginBottom: 2 },
   workloadSub: { fontSize: 12, fontFamily: fonts.regular, color: colors.muted, lineHeight: 16 },
-
-  feedTabBar: {
-    flexDirection: 'row',
-    backgroundColor: colors.white,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.line,
-    padding: 4,
-    marginBottom: 12,
-    ...shadows.subtle
-  },
-  feedTabItem: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    height: 44,
-    borderRadius: 12,
-    minHeight: 44
-  },
-  feedTabItemActive: { backgroundColor: colors.tech },
-  feedTabLabel: {
-    fontSize: 13,
-    fontFamily: fonts.semiBold,
-    color: colors.muted
-  },
-  feedTabLabelActive: {
-    fontFamily: fonts.bold,
-    color: colors.white
-  },
-  tabBadge: {
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: colors.canvas,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 5
-  },
-  tabBadgeActive: { backgroundColor: colors.white },
-  tabBadgeText: {
-    fontSize: 11,
-    fontFamily: fonts.bold,
-    color: colors.muted,
-    fontVariant: ['tabular-nums']
-  },
-  tabBadgeTextActive: { color: colors.tech },
 
   queueControlSection: { marginBottom: 12 },
   searchBarContainer: {

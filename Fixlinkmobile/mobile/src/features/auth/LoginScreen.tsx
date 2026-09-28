@@ -20,7 +20,11 @@ type FieldErrors = { email?: string; password?: string };
 
 // Shape of the rejection the API client produces on a failed login.
 type RequestFailure = {
-  response?: { status?: number; data?: { error?: string } };
+  // axios sets `code` for transport failures (for example ECONNABORTED on a
+  // timeout). `data` is JSON on a normal API error, but an HTML error page when
+  // a proxy or Cloudflare tunnel answers because the app behind it is down.
+  code?: string;
+  response?: { status?: number; data?: { error?: string } | string };
 };
 
 export default function LoginScreen({ onLoginSuccess, switchToRegister, switchToForgotPassword }: LoginScreenProps) {
@@ -42,7 +46,7 @@ export default function LoginScreen({ onLoginSuccess, switchToRegister, switchTo
     const normalizedEmail = email.trim().toLowerCase();
      const errors: FieldErrors = {};
     if (!normalizedEmail) errors.email = 'Email is required.'; else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) errors.email = 'Enter a valid email.';
-    if (!password) errors.password = 'Password is required.'; else if (password.length < 6) errors.password = 'Password must be at least 6 characters.';
+    if (!password) errors.password = 'Password is required.'; else if (password.length < 8) errors.password = 'Password must be at least 8 characters.';
     setFieldErrors(errors); setLoginError(''); if (Object.keys(errors).length) return; setLoading(true);
     try { const response = await api.post('/auth/login', { email: normalizedEmail, password, expectedRole: role });
     setAuthToken(response.data.idToken);
@@ -50,11 +54,25 @@ export default function LoginScreen({ onLoginSuccess, switchToRegister, switchTo
      } catch (error)
      { const failure = error as RequestFailure;
        const status = failure.response?.status;
-       const errorMessage = failure.response?.data?.error;
-          const messageByStatus: Record<number, string> = { 401: 'Incorrect email or password.',
+       const payload = failure.response?.data;
+       const errorMessage = payload && typeof payload === 'object' ? payload.error : undefined;
+       // No HTTP response at all: the request never reached the API (backend
+       // down, tunnel closed, wrong host, or a network/timeout failure). Say so
+       // plainly instead of showing the misleading generic message.
+       if (status == null) {
+         const timedOut = failure.code === 'ECONNABORTED' || failure.code === 'ETIMEDOUT';
+         setLoginError(timedOut
+           ? 'The server took too long to respond. Check your connection and try again.'
+           : 'Cannot reach the server. Check your connection and try again.');
+       } else if (status === 502 || status === 503 || status === 504) {
+         // The proxy or tunnel answered, but the API behind it is unreachable.
+         setLoginError(errorMessage || 'Cannot reach the server. Check your connection and try again.');
+       } else {
+         const messageByStatus: Record<number, string> = { 401: 'Incorrect email or password.',
              403: errorMessage || 'Technician account pending approval.',
-         404: 'Profile not found.' };
-             setLoginError((status != null ? messageByStatus[status] : undefined) || errorMessage || 'Unable to log in.');
+             404: 'Profile not found.' };
+         setLoginError(messageByStatus[status] || errorMessage || 'Unable to log in.');
+       }
           } finally { setLoading(false); }
   };
   return <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}><ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
@@ -81,22 +99,28 @@ export default function LoginScreen({ onLoginSuccess, switchToRegister, switchTo
         /><TextInput style={styles.input} placeholder="••••••••" placeholderTextColor="#9CA3AF" secureTextEntry={!showPassword}
          value={password} onChangeText={(value) => { setPassword(value);
           setFieldErrors(e => ({ ...e, password: '' }));
-           }} /><TouchableOpacity onPress={() => setShowPassword(!showPassword)}
-           ><Ionicons name={showPassword ? 'eye-outline' : 'eye-off-outline'} size={18} color={colors.muted} /></TouchableOpacity></View>{fieldErrors.password ? <Text style={styles.fieldError}>{fieldErrors.password}</Text> : null}
+           }} />{password ? (<TouchableOpacity onPress={() => setShowPassword(!showPassword)}
+           accessibilityRole="button"
+           accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+           ><Ionicons name={showPassword ? 'eye-outline' : 'eye-off-outline'} size={18} color={colors.muted} /></TouchableOpacity>) : null}</View>{fieldErrors.password ? <Text style={styles.fieldError}>{fieldErrors.password}</Text> : null}
       <TouchableOpacity style={styles.forgotWrap} onPress={() => switchToForgotPassword(role)}><Text style={[styles.forgot, { color: accent }]}>Forgot password?</Text></TouchableOpacity>
       {loginError ? <Text style={styles.errorText}>{loginError}</Text>
        : null}<TouchableOpacity style={[styles.button, { backgroundColor: accent }]} onPress={handleLogin} disabled={loading} activeOpacity={0.88}>{loading ?
         <ActivityIndicator color={colors.white} /> : <Text style={styles.buttonText}>Sign In</Text>}</TouchableOpacity>
       <View style={styles.registerRow}><Text style={styles.registerText}>{role === 'technician' ? 'New technician? ' : "Don't have an account? "}</Text><TouchableOpacity onPress={() => switchToRegister(role)}><Text style={[styles.registerLink, { color: accent }]}>{role === 'technician' ? 'Apply Now' : 'Register'}</Text></TouchableOpacity></View>
-      {role === 'customer' ? (
-        <TouchableOpacity onPress={() => setRole('technician')} style={styles.techLoginRow} activeOpacity={0.7}>
-          <Text style={styles.techLoginText}>Log in as <Text style={styles.techLoginBlue}>technician</Text></Text>
+      <View style={styles.techLoginRow}>
+        <Text style={styles.techLoginText}>Log in as </Text>
+        <TouchableOpacity
+          onPress={() => setRole(role === 'customer' ? 'technician' : 'customer')}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel={role === 'customer' ? 'Log in as technician' : 'Log in as customer'}
+        >
+          <Text style={[role === 'customer' ? styles.techLoginBlue : styles.techLoginOrange, styles.techLoginLink]}>
+            {role === 'customer' ? 'Technician' : 'Customer'}
+          </Text>
         </TouchableOpacity>
-      ) : (
-        <TouchableOpacity onPress={() => setRole('customer')} style={styles.techLoginRow} activeOpacity={0.7}>
-          <Text style={styles.techLoginText}>Log in as <Text style={styles.techLoginOrange}>customer</Text></Text>
-        </TouchableOpacity>
-      )}
+      </View>
     </View>
   </ScrollView></KeyboardAvoidingView>;
 }
@@ -119,15 +143,16 @@ const styles = StyleSheet.create({ container: { flex: 1, backgroundColor: '#FFFF
    label: { color: '#6B7280', fontSize: 11, fontFamily: fonts.bold, letterSpacing: 0.8, marginTop: 16, marginBottom: 6 },
    inputWrap: { minHeight: 52, borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, backgroundColor: '#F9FAFB', gap: 10 },
    input: { flex: 1, color: colors.ink, fontSize: 15, fontFamily: fonts.medium, paddingVertical: 12 },
-   inputError: { borderColor: '#FC8181' }, fieldError: { color: colors.danger, fontSize: 12, marginTop: 6, fontFamily: fonts.medium },
-   forgotWrap: { alignItems: 'flex-end', marginTop: 10 },
+   inputError: { borderColor: '#DC2626' }, fieldError: { color: colors.danger, fontSize: 12, marginTop: 6, fontFamily: fonts.medium },
+   forgotWrap: { alignSelf: 'flex-end', marginTop: 10 },
    forgot: { color: ORANGE, fontSize: 13, fontFamily: fonts.semiBold },
     errorText: { color: colors.danger, fontSize: 11, marginTop: 10, textAlign: 'center', fontFamily: fonts.medium, lineHeight: 15 },
    button: { minHeight: 52, borderRadius: 12, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center', marginTop: 20 },
    buttonText: { color: '#FFFFFF', fontSize: 15, fontFamily: fonts.bold },
     registerRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 20 },
     registerText: { color: '#6B7280', fontSize: 13, fontFamily: fonts.regular }, registerLink: { color: ORANGE, fontSize: 13, fontFamily: fonts.bold },
-    techLoginRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 12 },
+    techLoginRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 12, flexWrap: 'wrap' },
     techLoginText: { color: '#6B7280', fontSize: 13, fontFamily: fonts.regular },
+    techLoginLink: { fontSize: 13 },
     techLoginBlue: { color: colors.tech, fontFamily: fonts.bold },
     techLoginOrange: { color: colors.customer, fontFamily: fonts.bold } });

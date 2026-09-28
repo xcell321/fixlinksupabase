@@ -5,6 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { PhotoThumb } from '../../components/RequestPhoto';
 import TechnicianLocationMap from '../../components/TechnicianLocationMap';
 import { colors, fonts, shadows } from '../../theme';
+import { getApplianceIcon } from '../../utils/applianceIcons';
+import { splitJobDescription } from '../../utils/jobDescription';
 import { formatJobSchedule, canMarkArrival, canStartRepair, type JobItem } from './availableJobsHelpers';
 
 const BLUE = '#2563EB';
@@ -38,6 +40,10 @@ export default function TechJobDetailScreen({
   const startEligible = canStartRepair(job);
   const isInProgress = job.status === 'In Progress';
   const busy = actionLoadingId === job.id || acceptingJobId === job.id;
+  // The description is stored as "[Brand] words", so the brand becomes a chip
+  // and the words are shown once, instead of the raw bracketed string twice.
+  const { brand, text: problemText } = splitJobDescription(job.description);
+  const jobCode = String(job.id || '').slice(0, 6).toUpperCase();
 
   return (
     <View style={styles.screen}>
@@ -49,15 +55,27 @@ export default function TechJobDetailScreen({
       </View>
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
         <View style={styles.card}>
-          <View style={styles.payRow}>
+          <View style={styles.jobHeader}>
+            <View style={styles.jobIconTile}>
+              <Ionicons name={getApplianceIcon(job.applianceType)} size={20} color={BLUE} />
+            </View>
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={styles.jobTitle} numberOfLines={1}>{job.applianceType || 'Repair Request'}</Text>
-              <Text style={styles.jobIssue} numberOfLines={2}>{job.description ? job.description.split('.')[0] : (job.applianceType || 'Repair request')}</Text>
+              <Text style={styles.jobTitle} numberOfLines={2}>{job.applianceType || 'Repair Request'}</Text>
+              <View style={styles.jobMetaRow}>
+                {brand ? (
+                  <View style={styles.brandChip}>
+                    <Ionicons name="pricetag-outline" size={11} color={BLUE} />
+                    <Text style={styles.brandChipText} numberOfLines={1}>{brand}</Text>
+                  </View>
+                ) : null}
+                {jobCode ? <Text style={styles.jobCode}>Job #{jobCode}</Text> : null}
+              </View>
             </View>
           </View>
-          {job.description ? (
+          {problemText ? (
             <View style={styles.descBox}>
-              <Text style={styles.descText}>{job.description}</Text>
+              <Text style={styles.descLabel}>PROBLEM DESCRIBED BY CUSTOMER</Text>
+              <Text style={styles.descText}>{problemText}</Text>
             </View>
           ) : null}
           {job.photoUrl ? (
@@ -162,11 +180,16 @@ const styles = StyleSheet.create({
   body: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 32, gap: 16 },
   card: { backgroundColor: colors.white, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: colors.line, ...shadows.card },
   cardTitle: { color: colors.ink, fontSize: 14, fontFamily: fonts.bold, marginBottom: 12 },
-  payRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 4 },
+  jobHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  jobIconTile: { width: 44, height: 44, borderRadius: 14, backgroundColor: colors.techSoft, borderWidth: 1, borderColor: colors.hudBorder, alignItems: 'center', justifyContent: 'center' },
   jobTitle: { color: colors.ink, fontSize: 16, fontFamily: fonts.bold, letterSpacing: -0.2 },
-  jobIssue: { color: colors.muted, fontSize: 13, fontFamily: fonts.regular, marginTop: 2 },
-  descBox: { backgroundColor: colors.surfaceSunken, borderWidth: 1, borderColor: colors.lineSoft, borderRadius: 12, padding: 12, marginTop: 12 },
-  descText: { color: colors.ink, fontSize: 13, fontFamily: fonts.regular, lineHeight: 19 },
+  jobMetaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 6 },
+  brandChip: { flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: '100%', backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
+  brandChipText: { color: BLUE, fontSize: 11, fontFamily: fonts.bold, flexShrink: 1 },
+  jobCode: { color: colors.muted, fontSize: 11, fontFamily: fonts.medium, fontVariant: ['tabular-nums'] },
+  descBox: { backgroundColor: colors.surfaceSunken, borderWidth: 1, borderColor: colors.lineSoft, borderRadius: 14, padding: 14, marginTop: 14 },
+  descLabel: { color: colors.muted, fontSize: 10, fontFamily: fonts.bold, letterSpacing: 1, marginBottom: 5 },
+  descText: { color: colors.ink, fontSize: 13, fontFamily: fonts.regular, lineHeight: 20 },
   customerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
   avatar: { width: 44, height: 44, borderRadius: 14, backgroundColor: colors.techSoft, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.hudBorder },
   avatarText: { color: colors.techDark, fontSize: 18, fontFamily: fonts.bold },

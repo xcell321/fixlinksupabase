@@ -31,8 +31,8 @@ export default function PasswordResetScreen({ params, switchToLogin }: PasswordR
       Alert.alert('Error', 'Please enter a new password.');
       return;
     }
-    if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters.');
+    if (password.length < 8) {
+      Alert.alert('Error', 'Password must be at least 8 characters.');
       return;
     }
     if (password !== confirmPassword) {
@@ -75,7 +75,6 @@ export default function PasswordResetScreen({ params, switchToLogin }: PasswordR
           <Ionicons name="lock-closed-outline" size={28} color={ORANGE} />
         </View>
         <Text style={styles.title}>Choose a new password</Text>
-        <Text style={styles.copy}>Enter and confirm your new password below.</Text>
         <Text style={styles.label}>NEW PASSWORD</Text>
         <View style={styles.inputWrap}>
           <TextInput
@@ -116,7 +115,6 @@ const styles = StyleSheet.create({
   body: { flex: 1, paddingHorizontal: 24, paddingTop: 40, gap: 4 },
   iconTile: { width: 64, height: 64, borderRadius: 16, backgroundColor: '#FFF7ED', alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
   title: { color: '#111827', fontSize: 20, fontFamily: fonts.extraBold, marginBottom: 8 },
-  copy: { color: '#6B7280', fontSize: 14, fontFamily: fonts.regular, lineHeight: 20, marginBottom: 20 },
   label: { color: '#6B7280', fontSize: 11, fontFamily: fonts.bold, letterSpacing: 0.8, marginBottom: 6, marginTop: 12 },
   inputWrap: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 14, backgroundColor: '#F9FAFB', minHeight: 52, justifyContent: 'center', marginBottom: 4 },
   input: { flex: 1, color: colors.ink, fontSize: 15, fontFamily: fonts.medium, paddingVertical: 12 },

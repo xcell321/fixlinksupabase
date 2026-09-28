@@ -127,12 +127,15 @@ const getInbox = async ({ uid, role, authUid }) => {
     await messageRepository.findReadsForMessages(allMessages.map((message) => message.id))
   );
 
-  // Peer phone lookup: technician sees the customer's phone and vice versa.
+  // Peer contact card lookup: technician sees the customer's phone and photo,
+  // and vice versa, so a chat shows a real face instead of only initials.
   const peerUidField = field === 'technician_uid' ? 'customer_uid' : 'technician_uid';
   const peerUids = [...new Set(jobs.map((job) => job[peerUidField]).filter(Boolean).map(String))];
   const phoneByUid = {};
-  (await userRepository.findPhonesByIds(peerUids)).forEach((row) => {
+  const imageByUid = {};
+  (await userRepository.findContactsByIds(peerUids)).forEach((row) => {
     phoneByUid[String(row.id)] = row.phone || null;
+    imageByUid[String(row.id)] = row.profile_image || null;
   });
 
   const inbox = jobs.map((job) => {
@@ -151,6 +154,7 @@ const getInbox = async ({ uid, role, authUid }) => {
       jobCode: String(job.id || '').slice(0, 6).toUpperCase(),
       peerUid,
       peerPhone: peerUid ? phoneByUid[peerUid] || null : null,
+      peerImage: peerUid ? imageByUid[peerUid] || null : null,
       peerName: peerName || (field === 'technician_uid' ? 'Customer' : 'Technician'),
       peerInitial: String(peerName || (field === 'technician_uid' ? 'C' : 'T')).charAt(0).toUpperCase(),
       applianceType: job.appliance_type || 'Repair Job',

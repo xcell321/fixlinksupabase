@@ -19,7 +19,8 @@ type CategoryOption = { id?: string; name?: string };
 type RegisterScreenProps = {
   switchToLogin: () => void;
   initialRole?: RegisterRole;
-  onTechnicianPending?: () => void;
+  // Receives the registered email so the pending screen can check the status.
+  onTechnicianPending?: (email: string) => void;
   onRegistered?: (user: unknown) => void;
 };
 
@@ -58,20 +59,25 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
 
   const clearFieldError = (key: string) => setFieldErrors((prev) => { if (!prev[key]) return prev; const next: Record<string, string> = { ...prev }; delete next[key]; return next; });
 
-  // Philippine mobile numbers are exactly 11 digits starting with 09.
-  // Accepts +63/63 prefix and spaces/dashes, normalizes before checking.
+  // The phone field shows a fixed "+63" prefix, so the user only types the
+  // 10-digit local number (917 123 4567). Values that already carry a country
+  // code (pasted "+63 ..." or a full "09...") are normalized to 09XXXXXXXXX.
+  const normalizePhone = (raw?: string | null): string => {
+    let digits = String(raw ?? '').replace(/\D/g, '');
+    if (!digits) return '';
+    if (digits.startsWith('63') && digits.length >= 12) digits = `0${digits.slice(2)}`;
+    else if (digits.length === 10 && digits.startsWith('9')) digits = `0${digits}`;
+    return digits;
+  };
+
+  // Philippine mobile numbers are exactly 11 digits starting with 09. With the
+  // visible +63 prefix the 10-digit local form is accepted as well.
   const validatePhone = (raw?: string | null): string | null => {
-    const input = String(raw ?? '').trim();
-    if (!input) return 'Phone number is required';
-    let digits = input.replace(/\D/g, '');
-    if (input.startsWith('+')) {
-      if (digits.startsWith('63')) digits = `0${digits.slice(2)}`;
-    } else if (digits.startsWith('63') && digits.length === 12) {
-      digits = `0${digits.slice(2)}`;
-    }
-    if (digits.length < 11) return 'Phone number is incomplete. Enter 11 digits.';
+    if (!String(raw ?? '').trim()) return 'Phone number is required';
+    const digits = normalizePhone(raw);
+    if (digits.length < 11) return 'Phone number is incomplete. Enter 10 digits.';
     if (digits.length > 11) return 'Phone number must be 11 digits only.';
-    if (!/^09\d{9}$/.test(digits)) return 'Enter a valid 11-digit mobile number (09XX XXX XXXX).';
+    if (!/^09\d{9}$/.test(digits)) return 'Enter a valid mobile number (e.g. 917 123 4567).';
     return null;
   };
 
@@ -88,13 +94,14 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
   const handleRegister = async () => {
     const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
     const nextErrors: Record<string, string> = {};
-    if (!fullName) nextErrors.name = 'Please enter your name';
+    if (!firstName.trim()) nextErrors.firstName = 'First name is required';
+    if (!lastName.trim()) nextErrors.lastName = 'Last name is required';
     if (!email.trim()) nextErrors.email = 'Email is required';
     const phoneError = validatePhone(phone);
     if (phoneError) nextErrors.phone = phoneError;
     if (role === 'customer' && !address.trim()) nextErrors.address = 'Address is required';
     if (!password) nextErrors.password = 'Password is required';
-    else if (password.length < 6) nextErrors.password = 'Password must be at least 6 characters';
+    else if (password.length < 8) nextErrors.password = 'Password must be at least 8 characters';
     if (!confirmPassword) nextErrors.confirmPassword = 'Please confirm your password';
     else if (password !== confirmPassword) nextErrors.confirmPassword = 'Passwords do not match';
     if (role === 'technician') {
@@ -120,7 +127,7 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
         email: email.trim().toLowerCase(),
         password,
         role,
-        phone: phone.trim(),
+        phone: normalizePhone(phone) || phone.trim(),
         address: role === 'technician' ? serviceArea.trim() : address.trim(),
         skills: role === 'technician' ? skills.trim() : undefined,
         yearsExperience: role === 'technician' ? yearsExperience.trim() : undefined,
@@ -133,15 +140,16 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
         ? 'Your technician application is pending admin review. You can log in after it is approved.'
         : 'Account created successfully! You can now log in.';
       setSuccessMessage(message);
-      Alert.alert('Account created', message, [
-        {
-          text: 'OK',
-          onPress: () => {
-            if (role === 'technician' && onTechnicianPending) onTechnicianPending();
-            else switchToLogin();
-          },
-        },
-      ]);
+
+      // A technician has nothing to do on the register form after submitting, so
+      // go straight to the verification-pending screen instead of an alert they
+      // would have to dismiss first.
+      if (role === 'technician' && onTechnicianPending) {
+        onTechnicianPending(email.trim().toLowerCase());
+        return;
+      }
+
+      Alert.alert('Account created', message, [{ text: 'OK', onPress: () => switchToLogin() }]);
     } catch (error) {
       const failure = error as { response?: { data?: { error?: string } }; message?: string } | null;
       const rawMessage = failure?.response?.data?.error || failure?.message || 'Registration failed';
@@ -184,28 +192,49 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
     setter(asset);
   };
 
+  // `prefix` renders a fixed, non-editable leading label inside the field box
+  // (used for the +63 country code on the phone number).
   const renderField = (
     label: string,
     value: string,
     onChange: (value: string) => void,
     fieldKey: string,
     placeholder: string,
-    extraProps: Record<string, unknown> = {}
-  ) => (
-    <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
-      <TextInput
-        style={[styles.input, fieldErrors[fieldKey] && styles.inputError]}
-        placeholder={placeholder}
-        placeholderTextColor="#9CA3AF"
-        value={value}
-        onChangeText={(t) => { onChange(t); clearFieldError(fieldKey); }}
-        accessibilityLabel={label}
-        {...extraProps}
-      />
-      {fieldErrors[fieldKey] ? <Text style={styles.errorText}>{fieldErrors[fieldKey]}</Text> : null}
-    </View>
-  );
+    extraProps: Record<string, unknown> = {},
+    prefix?: string
+  ) => {
+    const errored = Boolean(fieldErrors[fieldKey]);
+    return (
+      <View style={styles.field}>
+        <Text style={styles.label}>{label}</Text>
+        {prefix ? (
+          <View style={[styles.prefixWrap, errored && styles.inputError]}>
+            <Text style={styles.prefixText}>{prefix}</Text>
+            <TextInput
+              style={styles.prefixInput}
+              placeholder={placeholder}
+              placeholderTextColor="#9CA3AF"
+              value={value}
+              onChangeText={(t) => { onChange(t); clearFieldError(fieldKey); }}
+              accessibilityLabel={label}
+              {...extraProps}
+            />
+          </View>
+        ) : (
+          <TextInput
+            style={[styles.input, errored && styles.inputError]}
+            placeholder={placeholder}
+            placeholderTextColor="#9CA3AF"
+            value={value}
+            onChangeText={(t) => { onChange(t); clearFieldError(fieldKey); }}
+            accessibilityLabel={label}
+            {...extraProps}
+          />
+        )}
+        {errored ? <Text style={styles.errorText}>{fieldErrors[fieldKey]}</Text> : null}
+      </View>
+    );
+  };
 
   // Password inputs with a visibility toggle (eye icon) so users can verify
   // what they typed. Applied to both roles since they share this screen.
@@ -232,14 +261,16 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
           autoCapitalize="none"
           accessibilityLabel={label}
         />
-        <TouchableOpacity
-          onPress={onToggleVisible}
-          style={styles.eyeButton}
-          accessibilityRole="button"
-          accessibilityLabel={visible ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
-        >
-          <Ionicons name={visible ? 'eye-outline' : 'eye-off-outline'} size={20} color="#9CA3AF" />
-        </TouchableOpacity>
+        {value ? (
+          <TouchableOpacity
+            onPress={onToggleVisible}
+            style={styles.eyeButton}
+            accessibilityRole="button"
+            accessibilityLabel={visible ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
+          >
+            <Ionicons name={visible ? 'eye-outline' : 'eye-off-outline'} size={20} color="#9CA3AF" />
+          </TouchableOpacity>
+        ) : null}
       </View>
       {fieldErrors[fieldKey] ? <Text style={styles.errorText}>{fieldErrors[fieldKey]}</Text> : null}
     </View>
@@ -279,16 +310,15 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
 
         <View style={styles.nameGrid}>
           <View style={styles.nameCell}>
-            {renderField('First Name', firstName, setFirstName, 'name', isTechRole ? 'Marcus' : 'Alex')}
+            {renderField('First Name', firstName, setFirstName, 'firstName', isTechRole ? 'Marcus' : 'Alex')}
           </View>
           <View style={styles.nameCell}>
-            {renderField('Last Name', lastName, setLastName, 'lastname', isTechRole ? 'Rivera' : 'Morgan')}
+            {renderField('Last Name', lastName, setLastName, 'lastName', isTechRole ? 'Rivera' : 'Morgan')}
           </View>
         </View>
-        {fieldErrors.name && !firstName.trim() && !lastName.trim() ? <Text style={styles.errorText}>{fieldErrors.name}</Text> : null}
 
         {renderField('Email', email, setEmail, 'email', isTechRole ? 'tech@email.com' : 'you@email.com', { autoCapitalize: 'none', keyboardType: 'email-address' })}
-        {renderField('Phone Number', phone, setPhone, 'phone', '09XX XXX XXXX', { keyboardType: 'phone-pad' })}
+        {renderField('Phone Number', phone, setPhone, 'phone', '917 123 4567', { keyboardType: 'number-pad' }, '+63')}
         {!isTechRole && renderField('Address', address, setAddress, 'address', 'Street, Barangay, City')}
         {isTechRole && renderField('Service Area', serviceArea, setServiceArea, 'serviceArea', 'Bogo City, Cebu')}
 
@@ -324,9 +354,12 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
 
         {renderPasswordField('Password', password, setPassword, 'password', showPassword, () => setShowPassword((v) => !v))}
         {!fieldErrors.password && (
-          <Text style={styles.hintText}>Use at least 6 characters.</Text>
+          <Text style={styles.hintText}>Use at least 8 characters.</Text>
         )}
         {renderPasswordField('Confirm Password', confirmPassword, setConfirmPassword, 'confirmPassword', showConfirmPassword, () => setShowConfirmPassword((v) => !v))}
+        {!fieldErrors.confirmPassword && (
+          <Text style={styles.hintText}>Use at least 8 characters.</Text>
+        )}
 
         {isTechRole && (
           <>
@@ -349,6 +382,13 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
             </View>
           </>
         )}
+
+        {Object.keys(fieldErrors).length > 0 ? (
+          <View style={styles.formErrorBox} accessibilityRole="alert">
+            <Ionicons name="alert-circle-outline" size={16} color="#B91C1C" />
+            <Text style={styles.formErrorText}>Please check the highlighted fields.</Text>
+          </View>
+        ) : null}
 
         {submitError ? (
           <View style={styles.submitErrorBox} accessibilityRole="alert">
@@ -397,7 +437,10 @@ const styles = StyleSheet.create({
   field: { marginBottom: 16 },
   label: { color: '#6B7280', fontSize: 12, fontFamily: fonts.semiBold, letterSpacing: 0.4, marginBottom: 6, textTransform: 'uppercase' },
   input: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 16, minHeight: 52, fontSize: 14, fontFamily: fonts.medium, color: colors.ink, backgroundColor: '#F9FAFB' },
-  inputError: { borderColor: '#FCA5A5' },
+  inputError: { borderColor: '#DC2626' },
+  prefixWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingLeft: 16, minHeight: 52, backgroundColor: '#F9FAFB' },
+  prefixText: { color: '#6B7280', fontSize: 14, fontFamily: fonts.semiBold },
+  prefixInput: { flex: 1, paddingHorizontal: 8, paddingVertical: 14, fontSize: 14, fontFamily: fonts.medium, color: colors.ink },
   passwordWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 16, minHeight: 52, backgroundColor: '#F9FAFB' },
   passwordInput: { flex: 1, fontSize: 14, fontFamily: fonts.medium, color: colors.ink, paddingVertical: 14 },
   eyeButton: { paddingLeft: 12, paddingVertical: 8, marginLeft: 8 },
@@ -405,6 +448,8 @@ const styles = StyleSheet.create({
   hintText: { color: '#9CA3AF', fontSize: 12, fontFamily: fonts.medium, marginTop: -10, marginBottom: 16 },
   successBox: { backgroundColor: '#E6F6F3', borderWidth: 1, borderColor: '#B5E7DE', borderRadius: 12, padding: 14, marginBottom: 16 },
   successText: { color: '#0F766E', fontSize: 13, fontFamily: fonts.semiBold, lineHeight: 18 },
+  formErrorBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', borderRadius: 12, padding: 12, marginBottom: 16 },
+  formErrorText: { flex: 1, color: '#B91C1C', fontSize: 13, fontFamily: fonts.semiBold },
   submitErrorBox: { backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', borderRadius: 12, padding: 14, marginBottom: 16 },
   submitErrorText: { color: '#B91C1C', fontSize: 13, fontFamily: fonts.semiBold, lineHeight: 18 },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

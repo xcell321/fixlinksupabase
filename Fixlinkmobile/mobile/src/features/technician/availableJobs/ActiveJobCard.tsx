@@ -5,6 +5,7 @@ import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../../theme';
 import { getApplianceIcon, getStatusColor, getStatusIcon } from '../../../utils/applianceIcons';
+import { splitJobDescription } from '../../../utils/jobDescription';
 import { PhotoThumb } from '../../../components/RequestPhoto';
 import { canMarkArrival, canStartRepair, formatJobSchedule, type JobItem } from '../availableJobsHelpers';
 import { styles } from './availableJobsStyles';
@@ -38,6 +39,9 @@ export const ActiveJobCard = ({
   const isInProgress = job.status === 'In Progress';
   const hasArrived = Boolean(job.technicianArrivalAt);
   const isArrivalEligible = canMarkArrival(job);
+  // "[Brand] words" -> show the words, and the brand only when it is all there is.
+  const { brand: jobBrand, text: problemText } = splitJobDescription(job.description);
+  const problemPreview = problemText || jobBrand || '';
   const isStartRepairEligible = canStartRepair(job);
 
   return (
@@ -144,14 +148,14 @@ export const ActiveJobCard = ({
             {formatJobSchedule(job)}
           </Text>
         </View>
-        {job.description && (
+        {problemPreview ? (
           <View style={styles.problemSnippetBox}>
             <Ionicons name="construct-outline" size={13} color={colors.muted} />
             <Text style={styles.problemSnippetText} numberOfLines={2}>
-              {job.description}
+              {problemPreview}
             </Text>
           </View>
-        )}
+        ) : null}
       </View>
 
       {/* Customer Photo preview */}

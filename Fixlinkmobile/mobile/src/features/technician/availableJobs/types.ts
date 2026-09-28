@@ -14,6 +14,8 @@ export interface Coords {
 export interface TechnicianRef {
   uid: string;
   name?: string;
+  // Saved profile address; the header derives the service area from it.
+  address?: string | null;
   latitude?: number | string;
   longitude?: number | string;
   verified?: boolean;

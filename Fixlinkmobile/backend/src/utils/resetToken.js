@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 
-// How long a password-reset token stays valid (30 minutes).
-const TOKEN_TTL_MS = 30 * 60 * 1000;
+// How long a password-reset token stays valid (24 hours).
+const TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 
 const toB64Url = (value) =>
   Buffer.from(value).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');

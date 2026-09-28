@@ -8,6 +8,7 @@ const router = express.Router();
 const { supabase } = require('../../config/supabase');
 const { chatComplete, isOmniRouteConfigured } = require('../../services/omniRoute');
 const { resolveAssistantLanguage } = require('../../services/ai/assistantLanguage');
+const { retrieveKnowledge } = require('../../services/ai/knowledgeRetriever');
 
 router.post('/assistant', async (req, res) => {
   try {
@@ -50,21 +51,26 @@ router.post('/assistant', async (req, res) => {
       completedCount: c.completedCount ?? null,
       topTechnicians,
     };
+    // Ground the reply in the most relevant FixLink knowledge sections instead of
+    // one fixed paragraph, so the assistant stays accurate as the system grows.
+    const role = String(c.role || '').trim().toLowerCase() === 'technician' ? 'technician' : 'customer';
+    const knowledge = retrieveKnowledge(text, { role, limit: 4, maxChars: 3500 });
     const system = [
-      "You are FixLink Assistant, the friendly in-app helper for FixLink customers (repair request + technician dispatch, Philippines).",
+      'You are FixLink Assistant, the friendly in-app helper for FixLink (repair request + technician dispatch, Philippines).',
       'Reply ONLY in the detected customer language. Never mix languages: English messages get English-only replies, Bisaya gets Bisaya-only, Tagalog gets Tagalog-only.',
       'If the customer just asked to switch languages, confirm briefly in the NEW language (e.g. "Sure! Let us continue in English.") and then answer their question in that language.',
       'Reply warmly and directly, at most 4 short sentences, plain text, no markdown.',
       'Greet by first name only when the customer greets you.',
-      'You know the FixLink mobile system: customer submits a repair in 4 steps (Appliance, Problem, Schedule, Location with GPS + map), tracks it under Repairs with live map, chats via Messages, verifies completion with a 4-digit OTP code, and rates the technician. Technicians see Available/Assigned jobs within 20km, accept jobs, navigate on the in-app map, and complete via OTP. Customer login and technician login are separate; a customer account cannot log in as technician and vice versa.',
-      'For questions about the system or how to use the app, explain using the real screen and button names above.',
+      'For anything about FixLink (how to use it, screens, technicians, requests, tracking, chat, completion codes, reviews), answer using the FixLink knowledge below and never contradict it. Use the real screen and button names.',
+      'You may also answer general-knowledge questions that are NOT about FixLink (for example science, math, definitions, general how-to). Answer those from your own general knowledge. If you genuinely do not know, say so plainly instead of guessing.',
       'For ranking or recommendation questions, rank using ONLY topTechnicians (rating, then reviews). Name names with rating and review count, e.g. "1. Dustine Villaruz - 4.9 (12 reviews)".',
       'For status or time questions, use ONLY activeJob (status, technicianName, preferredTime). Never invent names, statuses, times, or prices.',
       'Do NOT provide price estimates. FixLink matching itself is free.',
       'If the data does not answer the question, say what the customer should tap (Book service, Repairs, Messages).',
+      `FixLink knowledge base:\n${knowledge.text}`,
     ].join(' ');
     const user = `Detected language: ${lang}.${switched ? ' The customer just requested this language; confirm briefly, then answer.' : ''} You MUST reply ONLY in ${lang}. Any other language is a wrong answer.\nCustomer message: ${text}\nLive FixLink data: ${JSON.stringify(live).slice(0, 2000)}`;
-    console.log(`AI assistant lang: ${lang}${switched ? ' (switched)' : ''} | msg: ${text.slice(0, 60)}`);
+    console.log(`AI assistant lang: ${lang}${switched ? ' (switched)' : ''} | role: ${role} | knowledge: ${knowledge.sections.join(',')} | msg: ${text.slice(0, 60)}`);
     const { content } = await chatComplete({ system, user, json: false, temperature: 0.4, maxTokens: 260 });
     return res.status(200).json({ reply: String(content).trim().slice(0, 900), ai: 'ai' });
   } catch (error) {

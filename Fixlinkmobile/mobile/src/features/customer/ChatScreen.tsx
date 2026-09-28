@@ -13,6 +13,7 @@ import {
   Platform,
   Linking,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +21,7 @@ import * as Clipboard from 'expo-clipboard';
 import Skeleton from '../../components/Skeleton';
 import { fetchJobMessages, fetchMessageInbox, markJobMessagesRead, sendJobMessage } from '../../services/api';
 import { subscribeTyping, setTyping, type TypingPeer } from '../../utils/typingPresence';
+import { subscribeOnlineUids } from '../../utils/onlinePresence';
 import { colors, fonts } from '../../theme';
 import { getStatusColor, getStatusIcon } from '../../utils/applianceIcons';
 import type { ChatMessage, Conversation } from '../../types/message';
@@ -93,10 +95,12 @@ interface ConversationRowProps {
   item: Conversation;
   currentUid: string;
   accent: string;
+  // True only while the peer is actually using the app (live presence).
+  online: boolean;
   onOpen: () => void;
 }
 
-const ConversationRow = memo(function ConversationRow({ item, currentUid, accent, onOpen }: ConversationRowProps): React.JSX.Element {
+const ConversationRow = memo(function ConversationRow({ item, currentUid, accent, online, onOpen }: ConversationRowProps): React.JSX.Element {
   const isUnread = (item.unreadCount ?? 0) > 0;
   const preview = item.lastMessage
     ? `${String(item.lastMessage.senderUid ?? '') === String(currentUid) ? 'You: ' : ''}${item.lastMessage.text}`
@@ -107,15 +111,19 @@ const ConversationRow = memo(function ConversationRow({ item, currentUid, accent
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`Open conversation with ${item.peerName}`}
-      accessibilityHint={isUnread ? `${item.unreadCount} unread messages` : 'Open chat history'}
+      accessibilityHint={`${item.peerName} is ${online ? 'online' : 'offline'}${isUnread ? `. ${item.unreadCount} unread messages` : ''}`}
       onPress={onOpen}
       style={({ pressed }) => [styles.rowCard, pressed && styles.rowPressed]}
     >
       <View style={styles.rowAvatarWrap}>
-        <View style={[styles.rowAvatar, { backgroundColor: accent }]}>
-          <Text style={styles.rowAvatarText}>{item.peerInitial}</Text>
-        </View>
-        <View style={styles.rowOnlineDot} />
+        {item.peerImage ? (
+          <Image source={{ uri: item.peerImage }} style={styles.rowAvatarImage} />
+        ) : (
+          <View style={[styles.rowAvatar, { backgroundColor: accent }]}>
+            <Text style={styles.rowAvatarText}>{item.peerInitial}</Text>
+          </View>
+        )}
+        <View style={[styles.rowOnlineDot, !online && styles.rowDotOffline]} />
       </View>
       <View style={styles.rowCenter}>
         <View style={styles.rowNameRow}>
@@ -147,6 +155,9 @@ ChatScreenProps): React.JSX.Element {
   const accentSoft = isTechnician ? colors.techSoft : colors.customerSoft;
   const insets = useSafeAreaInsets();
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  // Live presence: the uids of everyone currently using the app. The session
+  // itself joins this channel in AppNavigator, so it stays accurate on other tabs.
+  const [onlineUids, setOnlineUids] = useState<Set<string>>(new Set());
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [messagesByConv, setMessagesByConv] = useState<Record<string, ChatMessage[]>>({});
   const [inputText, setInputText] = useState<string>('');
@@ -194,6 +205,9 @@ ChatScreenProps): React.JSX.Element {
     }
   }, [currentUser?.uid, currentUser?.role]);
 
+  // Re-render the rows when somebody comes online or goes away.
+  useEffect(() => subscribeOnlineUids(setOnlineUids), []);
+
   useEffect(() => {
     loadInbox(true);
     const interval = setInterval(() => loadInbox(false), 30000);
@@ -213,6 +227,7 @@ ChatScreenProps): React.JSX.Element {
         jobCode: String(targetId).slice(0, 6).toUpperCase(),
         peerUid: null,
         peerPhone: initialTarget.peerPhone ?? null,
+        peerImage: null,
         peerName: isTechnician ? (initialTarget.customerName || 'Customer') : (initialTarget.technicianName || 'Technician'),
         peerInitial: String(isTechnician ? initialTarget.customerName : (initialTarget.technicianName || 'U')).charAt(0).toUpperCase(),
         applianceType: initialTarget.applianceType || 'Repair Job',
@@ -448,6 +463,9 @@ ChatScreenProps): React.JSX.Element {
     const peerPhone = s.peerPhone ?? null;
     const canSend = inputText.trim().length > 0 && !sending;
     const stripColor = getStatusColor(s.status);
+    // Read presence from the live uid set rather than a snapshot, so the header
+    // follows the 30s inbox poll instead of freezing on the value at open time.
+    const peerOnline = onlineUids.has(String(s.peerUid || ''));
 
     return (
       <SafeAreaView style={styles.threadContainer} edges={['top', 'bottom']}>
@@ -469,14 +487,20 @@ ChatScreenProps): React.JSX.Element {
             onPress={() => peerPhone && handleCopyPhone(peerPhone)}
             style={styles.headerAvatarWrap}
           >
-            <View style={[styles.headerAvatar, { backgroundColor: accent }]}>
-              <Text style={styles.headerAvatarText}>{s.peerInitial}</Text>
-            </View>
+            {s.peerImage ? (
+              <Image source={{ uri: s.peerImage }} style={styles.headerAvatarImage} />
+            ) : (
+              <View style={[styles.headerAvatar, { backgroundColor: accent }]}>
+                <Text style={styles.headerAvatarText}>{s.peerInitial}</Text>
+              </View>
+            )}
           </Pressable>
 
           <Pressable style={styles.headerCenter} onPress={() => peerPhone && handleCopyPhone(peerPhone)}>
             <Text style={styles.headerName} numberOfLines={1}>{s.peerName}</Text>
-            <Text style={styles.headerOnline} numberOfLines={1}>Online</Text>
+            <Text style={[styles.headerOnline, !peerOnline && styles.headerOffline]} numberOfLines={1}>
+              {peerOnline ? 'Online' : 'Offline'}
+            </Text>
           </Pressable>
 
           <Pressable
@@ -510,7 +534,11 @@ ChatScreenProps): React.JSX.Element {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             onContentSizeChange={() => {
-              if (currentMessages.length > 0 && inputText.length === 0) {
+              // Always keep the newest message in view: when the thread opens,
+              // when a message arrives, and after the keyboard resizes the list.
+              // This is what stops the latest text from being hidden once a
+              // conversation gets long.
+              if (currentMessages.length > 0) {
                 chatScrollRef.current?.scrollToEnd({ animated: false });
               }
             }}
@@ -642,6 +670,7 @@ ChatScreenProps): React.JSX.Element {
                 maxLength={1000}
                 returnKeyType="send"
                 onSubmitEditing={handleSendMessage}
+                onFocus={() => setTimeout(() => chatScrollRef.current?.scrollToEnd({ animated: false }), 180)}
                 accessibilityLabel="Type your message"
                 accessibilityHint="Write a message to your contact"
               />
@@ -729,7 +758,7 @@ ChatScreenProps): React.JSX.Element {
           data={sortedConversations}
           keyExtractor={(item) => String(item.jobId)}
           renderItem={({ item }) => (
-            <ConversationRow item={item} currentUid={currentUser?.uid} accent={accent} onOpen={() => handleOpenConversation(item)} />
+            <ConversationRow item={item} currentUid={currentUser?.uid} accent={accent} online={onlineUids.has(String(item.peerUid || ''))} onOpen={() => handleOpenConversation(item)} />
           )}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContent}
@@ -860,7 +889,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   rowOnlineDot: { position: 'absolute', right: -1, bottom: -1, width: 12, height: 12, borderRadius: 6, backgroundColor: '#10B981', borderWidth: 2, borderColor: '#FFFFFF' },
+  // Grey = not using the app right now.
+  rowDotOffline: { backgroundColor: '#C7CDD6' },
   rowAvatarText: { color: colors.white, fontFamily: fonts.extraBold, fontSize: 15 },
+  rowAvatarImage: { width: 40, height: 40, borderRadius: 20 },
   rowCenter: { flex: 1, gap: 1, minWidth: 0 },
   rowNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   rowName: { flex: 1, fontSize: 14, fontFamily: fonts.bold, color: '#111827', lineHeight: 18 },
@@ -921,9 +953,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerAvatarText: { color: colors.white, fontFamily: fonts.extraBold, fontSize: 15 },
+  headerAvatarImage: { width: 40, height: 40, borderRadius: 20 },
   headerCenter: { flex: 1, gap: 2, paddingRight: 4 },
   headerName: { fontSize: 15, fontFamily: fonts.bold, color: colors.ink, lineHeight: 18 },
   headerOnline: { fontSize: 12, fontFamily: fonts.semiBold, color: '#10B981' },
+  headerOffline: { color: '#9CA3AF' },
   headerSubRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   headerSub: { fontSize: 12, fontFamily: fonts.semiBold, color: colors.green, flexShrink: 1 },
   headerCall: {

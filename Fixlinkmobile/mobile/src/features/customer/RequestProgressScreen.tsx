@@ -6,6 +6,7 @@ import ConfirmDialog from '../../components/ConfirmDialog';
 import { cancelRepairRequest, confirmRepairRequest, fetchCompletedJobs, fetchCustomerRequests, fetchTechnicianRecommendations, markCustomerReady, submitTechnicianReview } from '../../services/api';
 import { colors, fonts, shadows } from '../../theme';
 import { getApplianceIcon, getStatusColor, getStatusGuidance, getStatusIcon } from '../../utils/applianceIcons';
+import { splitJobDescription } from '../../utils/jobDescription';
 import type { ScheduleAvailability, TechnicianScheduleItem } from '../../types/schedule';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -373,6 +374,9 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
   };
 
   const renderRequestCard = (req: ServiceRequest): React.JSX.Element => {
+    // The stored description is "[Brand] words"; show the words (or the brand
+    // alone) so the raw brackets never reach the screen.
+    const { brand, text: issueText } = splitJobDescription(req.description);
     const statusKey = String(req.status || '').toLowerCase();
     const isPending = statusKey === 'pending';
     const progress = STATUS_PROGRESS[statusKey] ?? 15;
@@ -388,7 +392,7 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
         <View style={styles.refHeaderRow}>
           <View style={styles.refTitleWrap}>
             <Text style={styles.refDevice} numberOfLines={1}>{req.applianceType || 'Repair request'}</Text>
-            <Text style={styles.refIssue} numberOfLines={1}>{req.description || 'Tap to view details'}</Text>
+            <Text style={styles.refIssue} numberOfLines={1}>{issueText || brand || 'Tap to view details'}</Text>
           </View>
           {renderStatusPill(req.status)}
         </View>

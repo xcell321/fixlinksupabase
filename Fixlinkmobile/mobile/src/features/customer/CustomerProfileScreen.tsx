@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { colors, fonts } from '../../theme';
 import HelpSheet from '../../components/HelpSheet';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import { fetchCompletedJobs, fetchCustomerRequests } from '../../services/api';
 
 // Prototype CustomerProfile: dark header + stats + menu list + red sign out.
@@ -51,6 +52,7 @@ export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile,
   const [activeCount, setActiveCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
   const [statsLoading, setStatsLoading] = useState(true);
+  const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -71,6 +73,18 @@ export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile,
     });
     return () => { active = false; };
   }, [user?.name, user?.uid]);
+
+  // Keep the form in sync with the session user. After a save (or a fresh
+  // login) the navigator merges the server user row, so the avatar and fields
+  // must follow it instead of holding a stale local copy (which is how a
+  // picture could look saved briefly and then vanish on the next login).
+  useEffect(() => {
+    if (isEditing) return;
+    setName(user?.name || '');
+    setPhone(user?.phone || '');
+    setAddress(user?.address || '');
+    setProfileImage(user?.profileImage || null);
+  }, [user?.name, user?.phone, user?.address, user?.profileImage, isEditing]);
 
   const initials = String(name || user?.name || 'C').trim().charAt(0).toUpperCase();
 
@@ -189,11 +203,21 @@ export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile,
             <Ionicons name="chevron-forward" size={16} color="#D1D5DB" />
           </Pressable>
         ))}
-        <TouchableOpacity style={styles.logoutRow} onPress={onLogout} activeOpacity={0.88} accessibilityRole="button" accessibilityLabel="Sign out">
+        <TouchableOpacity style={styles.logoutRow} onPress={() => setLogoutConfirmVisible(true)} activeOpacity={0.88} accessibilityRole="button" accessibilityLabel="Sign out">
           <View style={styles.logoutIcon}><Ionicons name="close" size={18} color="#EF4444" /></View>
           <Text style={styles.logoutText}>Sign Out</Text>
         </TouchableOpacity>
       </View>
+      <ConfirmDialog
+        visible={logoutConfirmVisible}
+        title="Log out?"
+        message="Are you sure you want to log out?"
+        confirmLabel="Log Out"
+        danger
+        accentColor={colors.customer}
+        onCancel={() => setLogoutConfirmVisible(false)}
+        onConfirm={() => { setLogoutConfirmVisible(false); onLogout?.(); }}
+      />
       <HelpSheet visible={helpVisible} role="customer" onClose={() => setHelpVisible(false)} />
     </ScrollView>
   );

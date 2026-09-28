@@ -15,6 +15,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { fetchTechnicianProfile, fetchTechnicianSchedule, updateTechnicianProfile, uploadPortfolioPhotos } from '../../services/api';
 import { geocodeAddressStrict } from '../../services/locationIq';
 import Skeleton from '../../components/Skeleton';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import HelpSheet from '../../components/HelpSheet';
 import { PhotoLightbox } from '../../components/RequestPhoto';
 import { colors, fonts } from '../../theme';
@@ -51,6 +52,9 @@ interface Review {
 
 interface PortfolioPhoto {
   url: string;
+  // Stored with the upload: original file name + when it was added.
+  name?: string;
+  uploadedAt?: string;
 }
 
 interface TechnicianProfile {
@@ -93,6 +97,28 @@ interface TechnicianProfileScreenProps {
   onLogout?: () => void;
   readOnly?: boolean;
   onBack?: () => void;
+  // Lets the navigator merge the saved profile into the session, so screens
+  // that read it (for example the Jobs header's service area) stay current.
+  onProfileUpdate?: (user: unknown) => void;
+}
+
+// Portfolio photos are stored under their original file name, so a meaningful
+// name becomes the card title while a camera default (IMG_1234, Screenshot...)
+// falls back to a plain label instead of leaking the raw file name into the UI.
+const PORTFOLIO_FALLBACK_TITLE = 'Completed Repair';
+const PHOTO_NAME_NOISE = /^(img|image|photo|picture|screenshot|screen shot|dsc|pxl|untitled|received|download|whatsapp|signal|telegram|copy|edited)\b/i;
+
+function portfolioTitle(name?: string): string {
+  const base = String(name || '')
+    .replace(/\.[a-z0-9]{2,5}$/i, '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!base || base.length > 60 || PHOTO_NAME_NOISE.test(base)) return PORTFOLIO_FALLBACK_TITLE;
+  return base
+    .split(' ')
+    .map((word) => (/^[a-z]/.test(word) ? word.charAt(0).toUpperCase() + word.slice(1) : word))
+    .join(' ');
 }
 
 function StarRow({ value, size = 14 }: { value: number; size?: number }): React.JSX.Element {
@@ -103,9 +129,11 @@ function StarRow({ value, size = 14 }: { value: number; size?: number }): React.
   return <View style={styles.starRow}>{stars}</View>;
 }
 
-export default function TechnicianProfileScreen({ technician, onLogout, readOnly = false, onBack }: TechnicianProfileScreenProps): React.JSX.Element {
+export default function TechnicianProfileScreen({ technician, onLogout, readOnly = false, onBack, onProfileUpdate }: TechnicianProfileScreenProps): React.JSX.Element {
   const [profile, setProfile] = useState<TechnicianProfile | null>(null);
   const [selectedPhotos, setSelectedPhotos] = useState<SelectedPhoto[]>([]);
+  // Avatar picked in the edit form, still to be uploaded on save.
+  const [avatarAsset, setAvatarAsset] = useState<SelectedPhoto | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState<boolean>(false);
@@ -119,6 +147,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
   const [helpVisible, setHelpVisible] = useState<boolean>(false);
   const [showAllReviews, setShowAllReviews] = useState<boolean>(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [logoutConfirmVisible, setLogoutConfirmVisible] = useState<boolean>(false);
   const [ptab, setPtab] = useState<'info' | 'skills' | 'reviews' | 'portfolio'>('info');
   const profileBusyRef = useRef<boolean>(false);
 
@@ -181,10 +210,13 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
       const updated = await updateTechnicianProfile(technician.uid, {
         ...draft,
         ...(detectedCoords ? { latitude: detectedCoords.latitude, longitude: detectedCoords.longitude } : {}),
+        ...(avatarAsset ? { profileImage: avatarAsset } : {}),
       }) as TechnicianProfile;
       setProfile((current) => ({ ...(current ?? {}), ...updated }));
       setDraft(draftFromProfile(updated));
+      setAvatarAsset(null);
       setEditing(false);
+      onProfileUpdate?.(updated);
       Alert.alert('Success', 'Technician profile updated.');
     } catch (error) {
       Alert.alert(
@@ -222,6 +254,30 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
       .finally(() => { if (!cancelled) setScheduleLoading(false); });
     return () => { cancelled = true; };
   }, [readOnly, technician.uid]);
+
+  const chooseAvatar = async (): Promise<void> => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (permission.status !== 'granted') {
+      Alert.alert('Photo permission needed', 'Allow photo access to add a profile picture.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (!result.canceled) {
+      const asset = result.assets?.[0];
+      if (asset) {
+        setAvatarAsset({
+          uri: asset.uri,
+          fileName: asset.fileName ?? undefined,
+          mimeType: asset.mimeType ?? undefined,
+        });
+      }
+    }
+  };
 
   const choosePortfolioPhotos = async (): Promise<void> => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -328,6 +384,8 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
     setDraft((current) => ({ ...current, [key]: value }));
   const visibleReviews = showAllReviews ? reviews : reviews.slice(0, 2);
   const hasMoreReviews = reviews.length > 2;
+  // While editing, preview the freshly picked photo before it is uploaded.
+  const avatarPreview = avatarAsset?.uri || profile.profileImage || null;
   const verification = getVerificationBadge(profile.verified, profile.createdAt ?? null);
   const verifiedSince = verification.isVerified
     ? (formatMonthYear(verification.verifiedSince ?? null) ?? 'Verified')
@@ -355,8 +413,8 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
         {/* 1. HEADER - Centered to match Make reference (image) - no Earned */}
         <View style={styles.coverCardDarkCentered}>
           <View style={styles.headerAvatarWrap}>
-            {profile.profileImage ? (
-              <Image source={{ uri: profile.profileImage }} style={styles.avatarImageLarge} />
+            {avatarPreview ? (
+              <Image source={{ uri: avatarPreview }} style={styles.avatarImageLarge} />
             ) : (
               <View style={styles.avatarTechLarge}>
                 <Text style={styles.avatarTextLarge}>{(profile.name || 'T').charAt(0).toUpperCase()}</Text>
@@ -420,6 +478,32 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
             <View style={styles.editHeader}>
               <Text style={styles.editKicker}>EDIT PROFILE</Text>
               <Text style={styles.editTitle}>Update professional details</Text>
+            </View>
+
+            <View style={styles.avatarEditRow}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Change profile photo"
+                onPress={chooseAvatar}
+                style={({ pressed }) => [pressed && styles.pressedSoft]}
+              >
+                {avatarPreview ? (
+                  <Image source={{ uri: avatarPreview }} style={styles.avatarEditImage} />
+                ) : (
+                  <View style={styles.avatarEditPlaceholder}>
+                    <Text style={styles.avatarEditInitial}>{(draft.name || profile.name || 'T').charAt(0).toUpperCase()}</Text>
+                  </View>
+                )}
+                <View style={styles.avatarEditBadge}>
+                  <Ionicons name="camera" size={12} color="#FFFFFF" />
+                </View>
+              </Pressable>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.avatarEditTitle}>Profile photo</Text>
+                <Text style={styles.avatarEditHint}>
+                  {avatarAsset ? 'New photo ready. Tap Save Changes to upload it.' : 'Tap the photo to pick one from your gallery.'}
+                </Text>
+              </View>
             </View>
 
             <Text style={styles.groupLabel}>Contact Information</Text>
@@ -797,17 +881,27 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
             )}
             {portfolio.length > 0 ? (
               <View style={{ gap: 12 }}>
-                {portfolio.map((photo) => (
-                  <Pressable key={photo.url} onPress={() => setPreviewUrl(photo.url)} style={({ pressed }) => [pressed && { opacity: 0.85 }]}>
-                    <View style={styles.portfolioCardWhite}>
-                      <Image source={{ uri: photo.url }} style={styles.portfolioImage} />
-                      <View style={styles.portfolioCardBody}>
-                        <Text style={styles.portfolioCardTitle}>Completed Repair</Text>
-                        <Text style={styles.portfolioCardDesc}>Portfolio photo</Text>
+                {portfolio.map((photo) => {
+                  const title = portfolioTitle(photo.name);
+                  const uploaded = formatReviewDate(photo.uploadedAt);
+                  return (
+                    <Pressable
+                      key={photo.url}
+                      accessibilityRole="button"
+                      accessibilityLabel={`View ${title} photo`}
+                      onPress={() => setPreviewUrl(photo.url)}
+                      style={({ pressed }) => [styles.portfolioCard, pressed && styles.pressedSoft]}
+                    >
+                      <Image source={{ uri: photo.url }} style={styles.portfolioThumb} resizeMode="cover" />
+                      <View style={styles.portfolioBody}>
+                        <Text style={styles.portfolioTitle} numberOfLines={2}>{title}</Text>
+                        <Text style={styles.portfolioSubtitle} numberOfLines={2}>
+                          {uploaded ? `Uploaded ${uploaded}` : 'Completed repair photo'}
+                        </Text>
                       </View>
-                    </View>
-                  </Pressable>
-                ))}
+                    </Pressable>
+                  );
+                })}
               </View>
             ) : (
               <View style={styles.emptyTabBox}>
@@ -826,7 +920,7 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
               accessibilityRole="button"
               accessibilityLabel="Sign out"
               hitSlop={6}
-              onPress={onLogout}
+              onPress={() => setLogoutConfirmVisible(true)}
               style={({ pressed }) => [styles.logoutButton, pressed && styles.pressedSoft]}
             >
               <View style={styles.logoutIcon}>
@@ -837,6 +931,16 @@ export default function TechnicianProfileScreen({ technician, onLogout, readOnly
           )}
         </View>
 
+        <ConfirmDialog
+          visible={logoutConfirmVisible}
+          title="Log out?"
+          message="Are you sure you want to log out?"
+          confirmLabel="Log Out"
+          danger
+          accentColor={colors.tech}
+          onCancel={() => setLogoutConfirmVisible(false)}
+          onConfirm={() => { setLogoutConfirmVisible(false); onLogout?.(); }}
+        />
         <HelpSheet visible={helpVisible} role="technician" onClose={() => setHelpVisible(false)} />
         <PhotoLightbox visible={!!previewUrl} photoUrl={previewUrl} title="Portfolio photo" subtitle="Completed work showcase" onClose={() => setPreviewUrl(null)} />
       </View>
@@ -875,7 +979,9 @@ elevation: 0 },
   coverContactMetaDark: { color: colors.muted, fontSize: 10, fontFamily: fonts.bold, letterSpacing: 1 },
   coverContactTextDark: { color: colors.white, fontSize: 13, fontFamily: fonts.semiBold, marginTop: 2 },
   // Prototype tab bar: info / skills / reviews / portfolio
-  protoTabs: { flexDirection: 'row', backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.line, paddingHorizontal: 20, paddingTop: 8, gap: 8, marginBottom: 16, marginHorizontal: -20, paddingBottom: 0 },
+  // -16 / 16 matches the screen's 16px gutter: a -20 bleed used to push the
+  // strip 4px past the viewport on phones, clipping the last tab.
+  protoTabs: { flexDirection: 'row', backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.line, paddingHorizontal: 16, paddingTop: 8, gap: 8, marginBottom: 16, marginHorizontal: -16, paddingBottom: 0 },
   protoTab: { paddingBottom: 10, paddingHorizontal: 8, alignItems: 'center', minHeight: 44 },
   protoTabText: { color: colors.muted, fontSize: 12, fontFamily: fonts.semiBold },
   protoTabTextActive: { color: colors.tech },
@@ -940,6 +1046,13 @@ elevation: 0 },
   // 3. EDIT PROFILE CARD
   editCard: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.hudBorder, borderRadius: 22, padding: 18, marginBottom: 24, elevation: 0 },
   editHeader: { marginBottom: 16, gap: 3 },
+  avatarEditRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 18 },
+  avatarEditImage: { width: 64, height: 64, borderRadius: 32 },
+  avatarEditPlaceholder: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center' },
+  avatarEditInitial: { color: '#FFFFFF', fontSize: 24, fontFamily: fonts.extraBold },
+  avatarEditBadge: { position: 'absolute', right: -2, bottom: -2, width: 22, height: 22, borderRadius: 11, backgroundColor: '#2563EB', borderWidth: 2, borderColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  avatarEditTitle: { color: colors.ink, fontSize: 13, fontFamily: fonts.semiBold },
+  avatarEditHint: { color: colors.muted, fontSize: 11, fontFamily: fonts.regular, marginTop: 2, lineHeight: 15 },
   editKicker: { color: colors.tech, fontSize: 10, letterSpacing: 1.4, fontFamily: fonts.bold },
   editTitle: { color: colors.ink, fontSize: 17, fontFamily: fonts.bold },
   groupLabel: { color: colors.ink, fontSize: 11, fontFamily: fonts.extraBold, letterSpacing: 0.8, marginBottom: 12, marginTop: 8, textTransform: 'uppercase' },
@@ -1010,11 +1123,13 @@ elevation: 0 },
   emptyTabBox: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#F3F4F6', borderRadius: 16, padding: 18, alignItems: 'center', gap: 4 },
   emptyTabText: { color: '#111827', fontSize: 13, fontFamily: fonts.semiBold, textAlign: 'center' },
   emptyTabSub: { color: '#6B7280', fontSize: 12, fontFamily: fonts.regular, textAlign: 'center' },
-  portfolioCardWhite: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#F3F4F6', borderRadius: 16, overflow: 'hidden' },
-  portfolioImage: { width: '100%', height: 112, backgroundColor: '#F3F4F6' },
-  portfolioCardBody: { padding: 12, gap: 2 },
-  portfolioCardTitle: { color: '#111827', fontSize: 13, fontFamily: fonts.semiBold },
-  portfolioCardDesc: { color: '#6B7280', fontSize: 11, fontFamily: fonts.regular },
+  // Photo left, copy right: the image fills the card's full height and the
+  // left corners come from the card's own rounding + overflow hidden.
+  portfolioCard: { flexDirection: 'row', alignItems: 'stretch', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#F3F4F6', borderRadius: 16, overflow: 'hidden', minHeight: 108 },
+  portfolioThumb: { width: 112, backgroundColor: '#F3F4F6' },
+  portfolioBody: { flex: 1, minWidth: 0, justifyContent: 'center', paddingHorizontal: 14, paddingVertical: 12, gap: 3 },
+  portfolioTitle: { color: '#111827', fontSize: 14, fontFamily: fonts.bold, lineHeight: 19 },
+  portfolioSubtitle: { color: '#6B7280', fontSize: 12, fontFamily: fonts.regular, lineHeight: 17 },
   addPhotosButtonFull: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#2563EB', borderRadius: 12, paddingVertical: 12, marginBottom: 12 },
 
   // Service Area

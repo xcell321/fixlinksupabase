@@ -20,6 +20,12 @@ const registerUser = async ({ body, files }) => {
     throw new HttpError(400, { error: 'Missing required fields (email, password, role, name)' });
   }
 
+  // Supabase only enforces a 6-character minimum, so the 8-character policy for
+  // FixLink accounts is enforced here before any auth user is created.
+  if (String(password).length < 8) {
+    throw new HttpError(400, { error: 'Password must be at least 8 characters.' });
+  }
+
   const sanitizedEmail = email.trim().toLowerCase();
 
   const verificationFiles = files || {};

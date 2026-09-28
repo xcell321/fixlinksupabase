@@ -3,6 +3,7 @@ import { StyleSheet, Text, View, TouchableOpacity, ScrollView, ActivityIndicator
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fetchCompletedJobs, fetchCustomerRequests, fetchPlatformCategories, askAssistant } from '../../services/api';
+import Skeleton from '../../components/Skeleton';
 import { colors, fonts } from '../../theme';
 import { getApplianceIcon, getStatusColor, getStatusIcon } from '../../utils/applianceIcons';
 
@@ -29,7 +30,7 @@ type CategoryItem = { id?: string; name?: string };
 type AiMessage = { id: string; from: 'ai' | 'me'; text: string };
 
 type DashboardScreenProps = {
-  user?: { name?: string; uid?: string } | null;
+  user?: { name?: string; uid?: string; profileImage?: string | null } | null;
   notificationCount?: number;
   onOpenNotifications?: () => void;
   onNavigateToSubmit?: () => void;
@@ -96,6 +97,22 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
   const [aiMessages, setAiMessages] = useState<AiMessage[]>([
     { id: 'ai-hello', from: 'ai', text: 'Hi! I am your FixLink Assistant. Ask me about repairs, technicians, or tracking.' },
   ]);
+  // Keep the assistant thread pinned to the newest bubble: when the sheet opens,
+  // when a bubble is added, and after the keyboard resizes the sheet.
+  const aiScrollRef = useRef<ScrollView | null>(null);
+  const scrollAiToEnd = (animated = false, delay = 0) => {
+    const run = () => aiScrollRef.current?.scrollToEnd({ animated });
+    if (delay > 0) setTimeout(run, delay); else run();
+  };
+  useEffect(() => {
+    if (!aiVisible) return undefined;
+    scrollAiToEnd(false, 80);
+    const timer = setTimeout(() => scrollAiToEnd(false), 420);
+    return () => clearTimeout(timer);
+  }, [aiVisible]);
+  useEffect(() => {
+    if (aiVisible) scrollAiToEnd(true, 60);
+  }, [aiMessages.length, aiTyping]);
   // Persisted conversation: survives reload/restart, per customer.
   // NOTE: uses user?.uid directly (uid const is declared further below).
   const aiChatKey = `fixlink_ai_chat_${user?.uid || 'guest'}`;
@@ -215,20 +232,43 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
             <Text style={styles.kicker}>Good afternoon,</Text>
             <Text style={styles.greeting} numberOfLines={1}>{fullName}</Text>
           </View>
-          <TouchableOpacity
-            style={styles.bell}
-            onPress={onOpenNotifications}
-            accessibilityRole="button"
-            accessibilityLabel={notificationCount > 0 ? `Notifications, ${notificationCount} unread` : 'Notifications, no unread'}
-            hitSlop={8}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="notifications-outline" size={18} color="#FFFFFF" />
-            {notificationCount > 0 ? <View style={styles.bellDot} /> : <View style={styles.bellDotDim} />}
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            {user?.profileImage ? (
+              <Image source={{ uri: user.profileImage }} style={styles.headerAvatar} />
+            ) : (
+              <View style={[styles.headerAvatar, styles.headerAvatarFallback]}>
+                <Text style={styles.headerAvatarText}>{String(fullName || 'C').trim().charAt(0).toUpperCase()}</Text>
+              </View>
+            )}
+            <TouchableOpacity
+              style={styles.bell}
+              onPress={onOpenNotifications}
+              accessibilityRole="button"
+              accessibilityLabel={notificationCount > 0 ? `Notifications, ${notificationCount} unread` : 'Notifications, no unread'}
+              hitSlop={8}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="notifications-outline" size={18} color="#FFFFFF" />
+              {notificationCount > 0 ? <View style={styles.bellDot} /> : <View style={styles.bellDotDim} />}
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {heroJob ? (
+        {loading && !heroJob ? (
+          // Placeholder first, real card after, so the home never flashes
+          // "No active repair" while the request is still in flight.
+          <View style={styles.activeCard} accessibilityLabel="Loading active repair">
+            <Skeleton pulse style={styles.skelKicker} />
+            <View style={styles.activeRow}>
+              <View style={{ flex: 1, gap: 8 }}>
+                <Skeleton pulse style={styles.skelTitle} />
+                <Skeleton pulse style={styles.skelSub} />
+              </View>
+              <Skeleton pulse style={styles.skelButton} />
+            </View>
+            <Skeleton pulse style={styles.skelTrack} />
+          </View>
+        ) : heroJob ? (
           <View style={styles.activeCard}>
             <Text style={styles.activeKicker}>Active Repair</Text>
             <View style={styles.activeRow}>
@@ -284,7 +324,9 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
         <View style={styles.statsRow}>
           {stats.map((s) => (
             <View key={s.key} style={styles.statCard}>
-              <Text style={styles.statValue}>{s.value}</Text>
+              {loading && recentRequests.length === 0
+                ? <Skeleton pulse style={styles.skelStat} />
+                : <Text style={styles.statValue}>{s.value}</Text>}
               <Text style={styles.statLabel}>{s.key}</Text>
             </View>
           ))}
@@ -380,7 +422,13 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.aiMessages} contentContainerStyle={{ gap: 8, paddingBottom: 4 }} showsVerticalScrollIndicator={false}>
+            <ScrollView
+              ref={aiScrollRef}
+              style={styles.aiMessages}
+              contentContainerStyle={{ gap: 8, paddingBottom: 4 }}
+              showsVerticalScrollIndicator={false}
+              onContentSizeChange={() => scrollAiToEnd(false)}
+            >
               {aiMessages.map((m) => (
                 <View key={m.id} style={[styles.aiBubbleRow, m.from === 'me' ? styles.aiBubbleRowMe : styles.aiBubbleRowAi]}>
                   {m.from === 'ai' ? (
@@ -416,6 +464,7 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
                 onChangeText={setAiInput}
                 placeholder="Ask FixLink AI..."
                 placeholderTextColor="#9CA3AF"
+                onFocus={() => scrollAiToEnd(false, 180)}
                 onSubmitEditing={() => aiSend()}
                 returnKeyType="send"
                 accessibilityLabel="Ask FixLink AI"
@@ -439,6 +488,10 @@ const styles = StyleSheet.create({
   kicker: { color: '#9CA3AF', fontSize: 12, fontFamily: fonts.regular },
   greeting: { color: '#FFFFFF', fontSize: 21, fontFamily: fonts.extraBold, letterSpacing: -0.3, marginTop: 2 },
   bell: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.10)', alignItems: 'center', justifyContent: 'center' },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  headerAvatar: { width: 36, height: 36, borderRadius: 18 },
+  headerAvatarFallback: { backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center' },
+  headerAvatarText: { color: '#FFFFFF', fontSize: 14, fontFamily: fonts.bold },
   bellDot: { position: 'absolute', top: 8, right: 9, width: 8, height: 8, borderRadius: 4, backgroundColor: ORANGE, borderWidth: 2, borderColor: DARK },
   bellDotDim: { position: 'absolute', top: 8, right: 9, width: 8, height: 8, borderRadius: 4, backgroundColor: 'transparent' },
   activeCard: { backgroundColor: 'rgba(255,255,255,0.10)', borderRadius: 16, padding: 16 },
@@ -449,6 +502,12 @@ const styles = StyleSheet.create({
   trackBtn: { backgroundColor: ORANGE, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 },
   trackBtnText: { color: '#FFFFFF', fontSize: 12, fontFamily: fonts.bold },
   progressTrack: { marginTop: 12, height: 6, backgroundColor: 'rgba(255,255,255,0.20)', borderRadius: 999, overflow: 'hidden' },
+  skelKicker: { width: 86, height: 12, borderRadius: 6, marginBottom: 6, backgroundColor: 'rgba(255,255,255,0.18)' },
+  skelTitle: { width: '88%', height: 14, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.18)' },
+  skelSub: { width: '55%', height: 12, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.12)' },
+  skelButton: { width: 62, height: 30, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.18)' },
+  skelTrack: { marginTop: 12, height: 6, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.12)' },
+  skelStat: { width: 40, height: 24, borderRadius: 8 },
   progressFill: { height: '100%', backgroundColor: ORANGE, borderRadius: 999 },
   body: { paddingHorizontal: 20, paddingTop: 20, gap: 12 },
   sectionKicker: { color: '#6B7280', fontSize: 11, fontFamily: fonts.bold, letterSpacing: 1.2 },

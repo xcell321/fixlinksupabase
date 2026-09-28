@@ -7,6 +7,7 @@ import { PhotoLightbox } from '../../components/RequestPhoto';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { colors, fonts } from '../../theme';
 import { getStatusColor } from '../../utils/applianceIcons';
+import { splitJobDescription } from '../../utils/jobDescription';
 
 // Reference RequestDetail layout: device card + progress, Status Timeline
 // checkmark rail, Technician card with Message/Call. Steps derive done-ness
@@ -110,6 +111,9 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
   const isTerminal = isCancelled || isNoShow;
   const isCompleted = statusKey === 'completed';
   const progress = STATUS_PROGRESS[statusKey] ?? 10;
+  // The stored description is "[Brand] words"; show the words, or the brand
+  // alone, so the raw brackets never reach the screen.
+  const { brand: deviceBrand, text: issueText } = splitJobDescription(request.description);
 
   const stepIndex = isCompleted ? 6 : isInProgress ? 4 : isReady ? 3 : isConfirmed ? 2 : isAccepted ? 1 : 0;
   const timelineSteps = [
@@ -213,7 +217,7 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
           <View style={styles.deviceRow}>
             <View style={styles.deviceCopy}>
               <Text style={styles.deviceTitle} numberOfLines={1}>{request.applianceType || 'Repair request'}</Text>
-              <Text style={styles.deviceIssue} numberOfLines={2}>{request.description || 'No description provided'}</Text>
+              <Text style={styles.deviceIssue} numberOfLines={2}>{issueText || deviceBrand || 'No description provided'}</Text>
             </View>
             <View style={[styles.statusBadge, { backgroundColor: statusColor + '15', borderColor: statusColor + '40' }]}>
               <Text style={[styles.statusBadgeText, { color: statusColor }]} numberOfLines={1}>{status}</Text>

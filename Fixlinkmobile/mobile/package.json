@@ -8,7 +8,8 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "check:imports": "node scripts/checkImports.js",
-    "verify": "npm run typecheck && npm run check:imports"
+    "verify": "npm run typecheck && npm run check:imports",
+    "audit:responsive": "node scripts/responsiveAudit.js"
   },
   "dependencies": {
     "@expo-google-fonts/inter": "^0.4.2",

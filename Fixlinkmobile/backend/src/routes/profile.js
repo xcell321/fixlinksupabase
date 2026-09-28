@@ -8,7 +8,15 @@ const router = express.Router();
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (req, file, callback) => callback(null, ['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype))
+  // Accept any image type (jpeg, png, webp, heic, and so forth). A strict
+  // allowlist silently dropped phone photos (for example HEIC) because multer
+  // discards them with no error, which is how a picture could appear saved in
+  // the app yet never reach the database.
+  fileFilter: (req, file, callback) => {
+    const isImage = !file.mimetype || String(file.mimetype).startsWith('image/');
+    if (!isImage) req.fileRejected = true;
+    callback(null, isImage);
+  },
 });
 
 const requireAuthenticatedUser = async (req, res, next) => {
@@ -28,6 +36,7 @@ const requireAuthenticatedUser = async (req, res, next) => {
 router.put('/:id/profile', requireAuthenticatedUser, upload.single('profileImage'), async (req, res) => {
   try {
     const { data: existing } = await supabase.from('users').select('*').eq('id', req.params.id).maybeSingle();
+    if (req.fileRejected) return res.status(400).json({ error: 'Your photo must be an image file.' });
     const { name, phone, address } = req.body || {};
     if (!name || !name.trim()) return res.status(400).json({ error: 'Name is required.' });
 
@@ -49,6 +58,9 @@ router.put('/:id/profile', requireAuthenticatedUser, upload.single('profileImage
         updates.profile_image = await uploadBuffer({ folder: 'profiles', file: req.file, buffer: req.file.buffer, contentType: req.file.mimetype });
       } catch (uploadError) {
         console.error('Profile image upload failed:', uploadError.message);
+        // Do not report success when the attached photo was not stored, or the
+        // customer would lose it on the next login with no explanation.
+        return res.status(502).json({ error: 'Your photo could not be saved. Please try again.' });
       }
     }
 
@@ -59,10 +71,11 @@ router.put('/:id/profile', requireAuthenticatedUser, upload.single('profileImage
   }
 });
 
-router.put('/:id/technician', requireAuthenticatedUser, async (req, res) => {
+router.put('/:id/technician', requireAuthenticatedUser, upload.single('profileImage'), async (req, res) => {
   try {
     const { data: profile } = await supabase.from('users').select('*').eq('id', req.params.id).maybeSingle();
     if (!profile || profile.role !== 'technician') return res.status(404).json({ error: 'Technician profile not found.' });
+    if (req.fileRejected) return res.status(400).json({ error: 'Your photo must be an image file.' });
 
     const { name, phone, address, bio, skills, yearsExperience, latitude, longitude } = req.body || {};
     if (!name || !name.trim()) return res.status(400).json({ error: 'Name is required.' });
@@ -97,6 +110,16 @@ router.put('/:id/technician', requireAuthenticatedUser, async (req, res) => {
         }
       } catch (error) {
         console.error('Geocoding failed for technician address:', error.message);
+      }
+    }
+    // Optional avatar, same storage path as the customer profile photo. A
+    // failed upload is reported instead of silently dropping the picture.
+    if (req.file) {
+      try {
+        updates.profile_image = await uploadBuffer({ folder: 'profiles', file: req.file, buffer: req.file.buffer, contentType: req.file.mimetype });
+      } catch (uploadError) {
+        console.error('Technician profile image upload failed:', uploadError.message);
+        return res.status(502).json({ error: 'Your photo could not be saved. Please try again.' });
       }
     }
     const { data: updated } = await supabase.from('users').update(updates).eq('id', req.params.id).select('*').single();

@@ -15,9 +15,10 @@ const findRoleById = async (uid) => {
   return String(data?.role || '').toLowerCase();
 };
 
-const findPhonesByIds = async (uids) => {
+// Contact card for chat peers: phone plus the avatar shown next to their name.
+const findContactsByIds = async (uids) => {
   if (!uids || uids.length === 0) return [];
-  const { data } = await supabase.from(TABLE).select('id, phone').in('id', uids);
+  const { data } = await supabase.from(TABLE).select('id, phone, profile_image').in('id', uids);
   return data || [];
 };
 
@@ -31,4 +32,4 @@ const findByNameLike = async (name, role) => {
   return data || [];
 };
 
-module.exports = { findById, findRoleById, findPhonesByIds, findByNameLike };
+module.exports = { findById, findRoleById, findContactsByIds, findByNameLike };

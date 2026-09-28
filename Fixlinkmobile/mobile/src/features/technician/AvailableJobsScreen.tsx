@@ -35,6 +35,7 @@ import { QueueJobCard } from './availableJobs/QueueJobCard';
 import { OtpModal } from './availableJobs/OtpModal';
 import { AcceptConfirmModal } from './availableJobs/AcceptConfirmModal';
 import { styles } from './availableJobs/availableJobsStyles';
+import { serviceAreaOf } from '../../utils/serviceArea';
 import { NEARBY_QUEUE_RADIUS_KM, type AvailableJobsScreenProps } from './availableJobs/types';
 
 export default function AvailableJobsScreen({
@@ -110,6 +111,8 @@ export default function AvailableJobsScreen({
   } = actions;
 
   const technicianName = technician?.name || 'Technician';
+  // Real value from the technician's saved address, not a fixed label.
+  const serviceArea = serviceAreaOf(technician?.address);
 
   // Filtered jobs in queue based on category, search text, and radius
   const filteredQueueJobs = useMemo(() => {
@@ -216,6 +219,8 @@ export default function AvailableJobsScreen({
       <View style={styles.centerWrap}>
         <QueueHeader
           technicianName={technicianName}
+          technicianImage={technician?.profileImage ?? null}
+          serviceArea={serviceArea}
           notificationCount={notificationCount}
           onOpenNotifications={onOpenNotifications}
           pendingCount={pendingCount}

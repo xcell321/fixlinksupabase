@@ -13,7 +13,7 @@
 export { API_BASE_URL, getApiBaseUrl } from './api/apiUrls';
 export { setAuthToken, default } from './api/client';
 export type { Coords, PickedFile } from './api/upload';
-export { registerUser, forgotPassword, resetPassword } from './api/authApi';
+export { registerUser, checkTechnicianStatus, forgotPassword, resetPassword } from './api/authApi';
 export {
   submitRepairRequest,
   fetchRepairRequests,

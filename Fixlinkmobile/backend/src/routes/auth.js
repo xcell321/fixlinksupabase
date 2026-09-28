@@ -3,6 +3,7 @@
 //   loginRoutes.js          POST /login
 //   registerRoutes.js       POST /register (+ technician document upload)
 //   passwordResetRoutes.js  POST /forgot-password, POST /reset-password
+//   technicianStatusRoutes.js  POST /technician-status
 
 const express = require('express');
 
@@ -11,5 +12,6 @@ const router = express.Router();
 router.use('/', require('./auth/loginRoutes'));
 router.use('/', require('./auth/registerRoutes'));
 router.use('/', require('./auth/passwordResetRoutes'));
+router.use('/', require('./auth/technicianStatusRoutes'));
 
 module.exports = router;

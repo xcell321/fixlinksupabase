@@ -28,5 +28,10 @@ export const registerUser = async (userData: Record<string, unknown>): Promise<u
   return response.data;
 };
 
+// Public lookup behind the "Check Status" action on the pending screen. A
+// technician who is still waiting for admin approval cannot log in yet.
+export const checkTechnicianStatus = async (email: string): Promise<unknown> =>
+  (await api.post('/auth/technician-status', { email })).data;
+
 export const forgotPassword = async (data: unknown): Promise<unknown> => (await api.post('/auth/forgot-password', data)).data;
 export const resetPassword = async (data: unknown): Promise<unknown> => (await api.post('/auth/reset-password', data)).data;

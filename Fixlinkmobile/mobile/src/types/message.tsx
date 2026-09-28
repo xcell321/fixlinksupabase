@@ -15,6 +15,7 @@ export interface Conversation {
   jobCode?: string;
   peerUid?: string | null;
   peerPhone?: string | null;
+  peerImage?: string | null;
   peerName: string;
   peerInitial: string;
   applianceType: string;

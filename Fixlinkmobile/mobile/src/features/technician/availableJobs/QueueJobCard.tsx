@@ -5,6 +5,7 @@ import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../../theme';
 import { getApplianceIcon } from '../../../utils/applianceIcons';
+import { splitJobDescription } from '../../../utils/jobDescription';
 import { PhotoThumb } from '../../../components/RequestPhoto';
 import { formatJobSchedule, type JobItem } from '../availableJobsHelpers';
 import { styles } from './availableJobsStyles';
@@ -26,7 +27,12 @@ export const QueueJobCard = ({
   onDecline,
   onOpenDetails,
   onPreviewPhoto,
-}: QueueJobCardProps): React.JSX.Element => (
+}: QueueJobCardProps): React.JSX.Element => {
+  // "[Brand] words" -> show the words, and the brand only when it is all there is.
+  const { brand, text } = splitJobDescription(job.description);
+  const problemPreview = text || brand || '';
+
+  return (
   <View key={job.id} style={styles.jobCard}>
     {/* Card Header */}
     <View style={styles.cardHeader}>
@@ -79,14 +85,15 @@ export const QueueJobCard = ({
       </View>
     </View>
 
-    {/* Issue Description Box */}
-    {job.description && (
+    {/* Issue Description Box. The stored value is "[Brand] words", so only the
+        customer's own words are shown — the brand chip already carries the rest. */}
+    {problemPreview ? (
       <View style={styles.issueBox}>
         <Text style={styles.issueText} numberOfLines={3}>
-          {job.description}
+          {problemPreview}
         </Text>
       </View>
-    )}
+    ) : null}
 
     {/* Customer Photo */}
     {job.photoUrl && (
@@ -139,4 +146,5 @@ export const QueueJobCard = ({
       </Pressable>
     </View>
   </View>
-);
+  );
+};

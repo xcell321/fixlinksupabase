@@ -76,8 +76,8 @@ const requestPasswordReset = async ({ email, reqMeta }) => {
 };
 
 const completePasswordReset = async ({ uid, email, token, newPassword }) => {
-  if (!newPassword || String(newPassword).length < 6) {
-    throw new HttpError(400, { error: 'New password must be at least 6 characters.' });
+  if (!newPassword || String(newPassword).length < 8) {
+    throw new HttpError(400, { error: 'New password must be at least 8 characters.' });
   }
 
   const payload = verifyResetToken(token);

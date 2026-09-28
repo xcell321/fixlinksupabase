@@ -51,8 +51,8 @@ export default function ForgotPasswordScreen({ switchToLogin, role = 'customer' 
         <Text style={styles.title}>{isSent ? 'Check your email' : 'Reset your password'}</Text>
         <Text style={styles.copy}>
           {isSent
-            ? `We sent recovery instructions to ${email}. Open the link in the email to set a new password.`
-            : `Enter your registered email and we'll send a reset link`}
+            ? `We sent a reset link to ${email}. It expires in 24 hours.`
+            : `Enter your email to get a reset link.`}
         </Text>
         {!isSent && (
           <>
