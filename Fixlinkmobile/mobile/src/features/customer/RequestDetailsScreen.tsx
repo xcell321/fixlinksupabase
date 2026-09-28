@@ -1,4 +1,3 @@
-// @ts-nocheck - migrated from .js, preserve working state; types to be refined incrementally
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, SafeAreaView, StatusBar, Alert, ActivityIndicator, Image, Pressable, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,16 +12,63 @@ import { getStatusColor } from '../../utils/applianceIcons';
 // checkmark rail, Technician card with Message/Call. Steps derive done-ness
 // from the real status; the sub-line is a real timestamp when one exists,
 // otherwise Done/Pending. No invented times.
-const STATUS_PROGRESS = { pending: 10, accepted: 25, confirmed: 40, 'customer ready': 60, 'in progress': 80, completed: 100 };
+const STATUS_PROGRESS: Record<string, number> = { pending: 10, accepted: 25, confirmed: 40, 'customer ready': 60, 'in progress': 80, completed: 100 };
 
-const formatDateTime = (iso) => {
+// The subset of a job the detail view renders. Every field is optional because
+// it is fed straight from the API payload.
+type RequestDetails = {
+  // Always present: a job without an id cannot be acted on or rendered.
+  id: string;
+  status?: string;
+  applianceType?: string;
+  description?: string;
+  location?: string;
+  photoUrl?: string;
+  verificationCode?: string;
+  createdAt?: string;
+  acceptedAt?: string;
+  startedAt?: string;
+  completedAt?: string;
+  technicianUid?: string;
+  technicianName?: string;
+  technicianRating?: number | string | null;
+  technicianTotalReviews?: number | string | null;
+};
+
+type TechnicianProfile = {
+  reviews?: unknown[];
+  totalReviews?: number | string | null;
+  averageRating?: number | string | null;
+  phone?: string | null;
+  name?: string;
+};
+
+// A workflow action awaiting confirmation in the ConfirmDialog.
+type PendingAction = {
+  key: string;
+  title: string;
+  message: string;
+  confirmLabel: string;
+  cancelLabel: string;
+  run: () => Promise<unknown>;
+};
+
+type RequestDetailsScreenProps = {
+  request?: RequestDetails | null;
+  onBack?: () => void;
+  onMessageTechnician?: () => void;
+  onTrackMap?: (job: RequestDetails) => void;
+  onViewTechnicianProfile?: (technician: { uid?: string; name?: string }) => void;
+};
+
+const formatDateTime = (iso?: string | null): string | null => {
   if (!iso) return null;
   const date = new Date(String(iso));
   if (Number.isNaN(date.getTime())) return null;
   return `${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} at ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
 };
 
-function StarRating({ rating }) {
+function StarRating({ rating }: { rating: number }) {
   return (
     <View style={styles.starsRow}>
       {[1, 2, 3, 4, 5].map((i) => (
@@ -32,18 +78,18 @@ function StarRating({ rating }) {
   );
 }
 
-export default function RequestDetailsScreen({ request, onBack, onMessageTechnician, onTrackMap, onViewTechnicianProfile }) {
-  const [techProfile, setTechProfile] = useState(null);
-  const [workflowLoading, setWorkflowLoading] = useState(null);
+export default function RequestDetailsScreen({ request, onBack, onMessageTechnician, onTrackMap, onViewTechnicianProfile }: RequestDetailsScreenProps) {
+  const [techProfile, setTechProfile] = useState<TechnicianProfile | null>(null);
+  const [workflowLoading, setWorkflowLoading] = useState<string | null>(null);
   const [photoViewerVisible, setPhotoViewerVisible] = useState(false);
-  const [pendingAction, setPendingAction] = useState(null);
-  const [workflowError, setWorkflowError] = useState(null);
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+  const [workflowError, setWorkflowError] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
     if (request?.technicianUid) {
       fetchTechnicianProfile(request.technicianUid)
-        .then((profile) => { if (isMounted && profile) setTechProfile(profile); })
+        .then((profile) => { if (isMounted && profile) setTechProfile(profile as TechnicianProfile); })
         .catch(() => {});
     }
     return () => { isMounted = false; };
@@ -96,7 +142,7 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
       setWorkflowError(null);
       setPendingAction(null);
     } catch (error) {
-      setWorkflowError(error?.error || 'Please try again.');
+      setWorkflowError((error as { error?: string } | null)?.error || 'Please try again.');
     } finally {
       setWorkflowLoading(null);
     }
