@@ -1,4 +1,3 @@
-// @ts-nocheck - migrated from .js, preserve working state; types to be refined incrementally
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,7 +7,21 @@ import { colors, fonts } from '../../theme';
 // Same prototype header family as ForgotPassword (not in prototype, deep-link only).
 const ORANGE = colors.customer;
 
-export default function PasswordResetScreen({ params, switchToLogin }) {
+// Recovery parameters parsed by AppNavigator out of the emailed deep link.
+// `null` is the initial state before a link has been opened, so it is allowed.
+type RecoveryParams = {
+  uid?: string;
+  email?: string;
+  token?: string;
+  token_hash?: string;
+};
+
+type PasswordResetScreenProps = {
+  params?: RecoveryParams | null;
+  switchToLogin: () => void;
+};
+
+export default function PasswordResetScreen({ params, switchToLogin }: PasswordResetScreenProps) {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -40,7 +53,10 @@ export default function PasswordResetScreen({ params, switchToLogin }) {
         { text: 'OK', onPress: switchToLogin },
       ]);
     } catch (e) {
-      Alert.alert('Error', e.error || 'Unable to reset password. Please try again.');
+      // The API rejects with `{ error }`; anything else falls back to a generic
+      // message so the user never sees an empty alert.
+      const message = (e as { error?: string } | null | undefined)?.error;
+      Alert.alert('Error', message || 'Unable to reset password. Please try again.');
     } finally {
       setLoading(false);
     }

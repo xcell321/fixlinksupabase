@@ -1,4 +1,3 @@
-﻿// @ts-nocheck - migrated from .js, preserve working state; types to be refined incrementally
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,14 +8,29 @@ import { colors, fonts } from '../../theme';
 const ORANGE = colors.customer;
 const DARK = colors.dark;
 
-export default function LoginScreen({ onLoginSuccess, switchToRegister, switchToForgotPassword }) {
+type LoginRole = 'customer' | 'technician';
+
+type LoginScreenProps = {
+  onLoginSuccess: (session: unknown) => void;
+  switchToRegister: (role?: LoginRole) => void;
+  switchToForgotPassword: (role?: LoginRole) => void;
+};
+
+type FieldErrors = { email?: string; password?: string };
+
+// Shape of the rejection the API client produces on a failed login.
+type RequestFailure = {
+  response?: { status?: number; data?: { error?: string } };
+};
+
+export default function LoginScreen({ onLoginSuccess, switchToRegister, switchToForgotPassword }: LoginScreenProps) {
   const [email, setEmail] = useState('');
    const [password, setPassword] = useState('');
    const [loading, setLoading] = useState(false);
     const [loginError, setLoginError] = useState('');
-     const [fieldErrors, setFieldErrors] = useState({});
+     const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
     const [showPassword, setShowPassword] = useState(false);
-    const [role, setRole] = useState('customer');
+    const [role, setRole] = useState<LoginRole>('customer');
     useEffect(() => {
       if (loginError) {
         const t = setTimeout(() => setLoginError(''), 3500);
@@ -26,7 +40,7 @@ export default function LoginScreen({ onLoginSuccess, switchToRegister, switchTo
    const accent = role === 'technician' ? colors.tech : colors.customer;
    const handleLogin = async () => {
     const normalizedEmail = email.trim().toLowerCase();
-     const errors = {};
+     const errors: FieldErrors = {};
     if (!normalizedEmail) errors.email = 'Email is required.'; else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) errors.email = 'Enter a valid email.';
     if (!password) errors.password = 'Password is required.'; else if (password.length < 6) errors.password = 'Password must be at least 6 characters.';
     setFieldErrors(errors); setLoginError(''); if (Object.keys(errors).length) return; setLoading(true);
@@ -34,12 +48,13 @@ export default function LoginScreen({ onLoginSuccess, switchToRegister, switchTo
     setAuthToken(response.data.idToken);
      onLoginSuccess(response.data);
      } catch (error)
-     { const status = error.response?.status;
-       const errorMessage = error.response?.data?.error;
-          const messageByStatus = { 401: 'Incorrect email or password.',
+     { const failure = error as RequestFailure;
+       const status = failure.response?.status;
+       const errorMessage = failure.response?.data?.error;
+          const messageByStatus: Record<number, string> = { 401: 'Incorrect email or password.',
              403: errorMessage || 'Technician account pending approval.',
          404: 'Profile not found.' };
-             setLoginError(messageByStatus[status] || errorMessage || 'Unable to log in.');
+             setLoginError((status != null ? messageByStatus[status] : undefined) || errorMessage || 'Unable to log in.');
           } finally { setLoading(false); }
   };
   return <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}><ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">

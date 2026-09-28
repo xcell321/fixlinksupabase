@@ -1,12 +1,19 @@
-// @ts-nocheck - migrated from .js, preserve working state; types to be refined incrementally
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { forgotPassword } from '../../services/api';
 import { colors, fonts } from '../../theme';
 
+type ForgotPasswordScreenProps = {
+  // Returns to the login screen (also used for the "Back to Login" button once
+  // the email has been sent).
+  switchToLogin: () => void;
+  // Drives the accent colour only: orange for customers, blue for technicians.
+  role?: 'customer' | 'technician';
+};
+
 // Prototype ForgotPassword: white BackHeader + role-aware (orange customer / blue technician). Logic unchanged.
-export default function ForgotPasswordScreen({ switchToLogin, role = 'customer' }) {
+export default function ForgotPasswordScreen({ switchToLogin, role = 'customer' }: ForgotPasswordScreenProps) {
   const accent = role === 'technician' ? colors.tech : colors.customer;
   const softBg = role === 'technician' ? colors.techSoft : '#FFF7ED';
   const [email, setEmail] = useState('');

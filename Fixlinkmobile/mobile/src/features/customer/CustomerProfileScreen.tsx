@@ -1,4 +1,3 @@
-// @ts-nocheck - migrated from .js, preserve working state; types to be refined incrementally
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView, TextInput, Alert, ActivityIndicator, Image, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,12 +12,39 @@ const ORANGE = colors.customer;
 const DARK = colors.dark;
 const ACTIVE_STATUSES = ['accepted', 'confirmed', 'customer ready', 'in progress'];
 
-export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile, onNavigateToProgress, onOpenNotifications }) {
+type IconName = React.ComponentProps<typeof Ionicons>['name'];
+
+// Either an already-uploaded URL or a freshly picked asset still to upload.
+type ProfileImage = string | ImagePicker.ImagePickerAsset | null;
+
+type ProfileUser = {
+  name?: string;
+  uid?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  profileImage?: string | null;
+};
+
+type CustomerProfileScreenProps = {
+  user?: ProfileUser | null;
+  onLogout?: () => void;
+  onUpdateProfile?: (updates: {
+    name: string;
+    phone: string;
+    address: string;
+    profileImage: ProfileImage;
+  }) => Promise<unknown> | unknown;
+  onNavigateToProgress?: () => void;
+  onOpenNotifications?: () => void;
+};
+
+export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile, onNavigateToProgress, onOpenNotifications }: CustomerProfileScreenProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(user?.name || '');
   const [phone, setPhone] = useState(user?.phone || '');
   const [address, setAddress] = useState(user?.address || '');
-  const [profileImage, setProfileImage] = useState(user?.profileImage || null);
+  const [profileImage, setProfileImage] = useState<ProfileImage>(user?.profileImage || null);
   const [loading, setLoading] = useState(false);
   const [helpVisible, setHelpVisible] = useState(false);
   const [completedCount, setCompletedCount] = useState(0);
@@ -30,8 +56,10 @@ export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile,
     let active = true;
     setStatsLoading(true);
     Promise.all([
-      fetchCompletedJobs(user?.name, user?.uid).catch(() => []),
-      fetchCustomerRequests(user?.name, user?.uid).catch(() => []),
+      // `user` may be briefly undefined before the session resolves; the API
+      // call shape is unchanged from before the types were added.
+      fetchCompletedJobs(user?.name as string, user?.uid).catch(() => []),
+      fetchCustomerRequests(user?.name as string, user?.uid).catch(() => []),
     ]).then(([completed, tracked]) => {
       if (!active) return;
       const c = Array.isArray(completed) ? completed : [];
@@ -58,8 +86,11 @@ export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile,
       aspect: [1, 1],
       quality: 0.8,
     });
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      setProfileImage(result.assets[0]);
+    if (!result.canceled) {
+      // `assets[0]` is `T | undefined` under noUncheckedIndexedAccess; the
+      // guard already covers the empty-array case.
+      const picked = result.assets?.[0];
+      if (picked) setProfileImage(picked);
     }
   };
 
@@ -76,7 +107,8 @@ export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile,
       setIsEditing(false);
       Alert.alert('Success', 'Profile updated successfully!');
     } catch (error) {
-      const message = error.response?.data?.error || error.message || 'Failed to update profile.';
+      const failure = error as { response?: { data?: { error?: string } }; message?: string };
+      const message = failure.response?.data?.error || failure.message || 'Failed to update profile.';
       Alert.alert('Error', message);
     } finally {
       setLoading(false);
@@ -117,7 +149,7 @@ export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile,
     );
   }
 
-  const menu = [
+  const menu: Array<{ key: string; label: string; icon: IconName; onPress: () => void }> = [
     { key: 'account', label: 'Account Information', icon: 'person-outline', onPress: () => setIsEditing(true) },
     { key: 'history', label: 'Repair History', icon: 'construct-outline', onPress: () => onNavigateToProgress && onNavigateToProgress() },
     { key: 'notifications', label: 'Notifications', icon: 'notifications-outline', onPress: () => onOpenNotifications && onOpenNotifications() },
