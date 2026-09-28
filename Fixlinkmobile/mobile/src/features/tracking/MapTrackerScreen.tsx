@@ -20,41 +20,25 @@ import {
 } from '../../services/api';
 import { geocodeAddressPrecise, getDrivingRoute } from '../../services/locationIq';
 import { colors, fonts } from '../../theme';
+import { customerPinFromJob, distanceInKm } from './trackingGeometry';
 
 // Derive the customer/destination marker strictly from the selected job.
-// Never fabricates coordinates: if the job has no real lat/lng yet, the pin is
-// null and is only filled by geocoding, the live-tracking poll, or the GPS
-// watcher. Fabricated defaults made every coordinate-less job pile up on the
-// same fake point, which made customer names/popups look shuffled and routes
-// point at the wrong place.
-const deriveCustomerCoords = (job, isTechnician, currentUser) => {
-  const lat = Number(job?.latitude);
-  const lon = Number(job?.longitude);
-  const hasValidCoords = Number.isFinite(lat) && Number.isFinite(lon) && lat !== 0;
-  return {
-    latitude: hasValidCoords ? lat : null,
-    longitude: hasValidCoords ? lon : null,
-    name: isTechnician ? (job?.customerName || 'Customer') : (currentUser?.name || 'Customer'),
-    address: job?.location || 'Customer location',
-  };
-};
+// The pin is `null` when the job has no real lat/lng yet and is only filled by
+// geocoding, the live-tracking poll, or the GPS watcher -- see
+// ./trackingGeometry for why fabricating a default broke the map.
+// A technician viewing someone else's job sees that customer's name; the
+// customer sees their own.
+const deriveCustomerCoords = (job, isTechnician, currentUser) =>
+  customerPinFromJob(
+    job,
+    isTechnician ? (job?.customerName || 'Customer') : (currentUser?.name || 'Customer')
+  );
 
 const resetJobScopedRouteState = (setters) => {
   setters.setRouteCoordinates([]);
   setters.setDistanceKm(null);
   setters.setTravelMinutes(null);
   setters.setIsRouting(false);
-};
-
-const distanceInKm = (first, second) => {
-  if (![first?.latitude, first?.longitude, second?.latitude, second?.longitude].every(Number.isFinite)) return null;
-  const toRadians = (value) => value * Math.PI / 180;
-  const latitudeDelta = toRadians(second.latitude - first.latitude);
-  const longitudeDelta = toRadians(second.longitude - first.longitude);
-  const value =
-    Math.sin(latitudeDelta / 2) ** 2 +
-    Math.cos(toRadians(first.latitude)) * Math.cos(toRadians(second.latitude)) * Math.sin(longitudeDelta / 2) ** 2;
-  return 6371 * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
 };
 
 export default function MapTrackerScreen({ currentUser, selectedJob: initialJob, onBack, onNavigateToJobs }) {

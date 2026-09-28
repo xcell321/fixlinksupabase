@@ -22,32 +22,14 @@ import {
 import { geocodeAddressPrecise, getDrivingRoute } from '../../services/locationIq';
 import { colors, fonts } from '../../theme';
 import { getApplianceIcon } from '../../utils/applianceIcons';
+import { customerPinFromJob, distanceInKm } from './trackingGeometry';
 
 // The customer/destination pin comes ONLY from the selected job (or the
 // live-tracking customer field). It never falls back to the technician's own
 // coordinates, so the two pins can never be swapped on the technician screen.
-const deriveCustomerCoords = (job) => {
-  const lat = Number(job?.latitude);
-  const lon = Number(job?.longitude);
-  const hasValidCoords = Number.isFinite(lat) && Number.isFinite(lon) && lat !== 0;
-  return {
-    latitude: hasValidCoords ? lat : null,
-    longitude: hasValidCoords ? lon : null,
-    name: job?.customerName || 'Customer',
-    address: job?.location || 'Customer location',
-  };
-};
-
-const distanceInKm = (first, second) => {
-  if (![first?.latitude, first?.longitude, second?.latitude, second?.longitude].every(Number.isFinite)) return null;
-  const toRadians = (value) => value * Math.PI / 180;
-  const latitudeDelta = toRadians(second.latitude - first.latitude);
-  const longitudeDelta = toRadians(second.longitude - first.longitude);
-  const value =
-    Math.sin(latitudeDelta / 2) ** 2 +
-    Math.cos(toRadians(first.latitude)) * Math.cos(toRadians(second.latitude)) * Math.sin(longitudeDelta / 2) ** 2;
-  return 6371 * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
-};
+// This screen always labels the pin with the job's own customer name.
+const deriveCustomerCoords = (job) =>
+  customerPinFromJob(job, job?.customerName || 'Customer');
 
 /**
  * Dedicated technician-side tracker.
