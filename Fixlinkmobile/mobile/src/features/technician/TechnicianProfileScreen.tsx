@@ -30,7 +30,7 @@ import {
   getVerificationBadge,
   EMPTY_DRAFT,
   type TechnicianDraft,
-} from '../../utils/technicianProfileHelpers';
+} from './technicianProfileHelpers';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 type GeoStatus = 'idle' | 'detecting' | 'found' | 'not-found';

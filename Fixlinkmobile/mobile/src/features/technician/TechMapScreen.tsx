@@ -6,7 +6,7 @@ import * as Location from 'expo-location';
 import TechnicianLocationMap from '../../components/TechnicianLocationMap';
 import { fetchRepairRequests } from '../../services/api';
 import { colors, fonts } from '../../theme';
-import { type JobItem } from '../../utils/availableJobsHelpers';
+import { type JobItem } from './availableJobsHelpers';
 import { getApplianceIcon } from '../../utils/applianceIcons';
 
 const DARK = '#0D1B2A';

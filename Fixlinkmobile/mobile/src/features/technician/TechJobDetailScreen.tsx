@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { PhotoThumb } from '../../components/RequestPhoto';
 import TechnicianLocationMap from '../../components/TechnicianLocationMap';
 import { colors, fonts, shadows } from '../../theme';
-import { formatJobSchedule, canMarkArrival, canStartRepair, type JobItem } from '../../utils/availableJobsHelpers';
+import { formatJobSchedule, canMarkArrival, canStartRepair, type JobItem } from './availableJobsHelpers';
 
 const BLUE = '#2563EB';
 

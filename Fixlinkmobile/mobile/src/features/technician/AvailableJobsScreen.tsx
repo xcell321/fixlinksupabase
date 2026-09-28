@@ -40,7 +40,7 @@ import {
   canStartRepair,
   getTechnicianCredentialBadgeInfo,
   type JobItem
-} from '../../utils/availableJobsHelpers';
+} from './availableJobsHelpers';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
