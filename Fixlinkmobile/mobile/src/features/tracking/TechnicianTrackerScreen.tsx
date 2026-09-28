@@ -1,4 +1,3 @@
-// @ts-nocheck - migrated from .js, preserve working state; types to be refined incrementally
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -24,11 +23,67 @@ import { colors, fonts } from '../../theme';
 import { getApplianceIcon } from '../../utils/applianceIcons';
 import { customerPinFromJob, distanceInKm } from './trackingGeometry';
 
+// The subset of a job this screen reads.
+type JobItem = {
+  id?: string;
+  status?: string;
+  applianceType?: string;
+  technicianName?: string;
+  customerName?: string;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+  location?: string;
+  preferredDate?: string | null;
+  preferredTime?: string | null;
+  scheduledDate?: string | null;
+};
+
+type MapCoord = {
+  latitude: number | null;
+  longitude: number | null;
+  name: string;
+  // Only the customer/destination pin carries an address.
+  address?: string;
+};
+
+// Shape of the `{ technician, customer }` payload from live tracking.
+type LiveTracking = {
+  technician?: { latitude?: number | string | null; longitude?: number | string | null; name?: string } | null;
+  customer?: {
+    latitude?: number | string | null;
+    longitude?: number | string | null;
+    name?: string;
+    address?: string | null;
+  } | null;
+};
+
+type DrivingRoute = {
+  // [lng, lat] pairs exactly as LocationIQ returns them.
+  geometry?: { coordinates?: Array<[number, number]> } | null;
+  distance?: number | null;
+  duration?: number | null;
+};
+
+type UserRef = {
+  uid?: string;
+  name?: string;
+  role?: string;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+} | null | undefined;
+
+type TechnicianTrackerScreenProps = {
+  currentUser?: UserRef;
+  selectedJob?: JobItem | null;
+  onBack?: () => void;
+  onNavigateToJobs?: () => void;
+};
+
 // The customer/destination pin comes ONLY from the selected job (or the
 // live-tracking customer field). It never falls back to the technician's own
 // coordinates, so the two pins can never be swapped on the technician screen.
 // This screen always labels the pin with the job's own customer name.
-const deriveCustomerCoords = (job) =>
+const deriveCustomerCoords = (job: JobItem | null | undefined) =>
   customerPinFromJob(job, job?.customerName || 'Customer');
 
 /**
@@ -41,9 +96,9 @@ const deriveCustomerCoords = (job) =>
  *  - a driving route that STAYS drawn and connected to the customer's location
  *    until the technician arrives - rail-GPS updates never re-center or clear it.
  */
-export default function TechnicianTrackerScreen({ currentUser, selectedJob: initialJob, onBack, onNavigateToJobs }) {
-  const [activeJob, setActiveJob] = useState(initialJob);
-  const [acceptedJobsList, setAcceptedJobsList] = useState([]);
+export default function TechnicianTrackerScreen({ currentUser, selectedJob: initialJob, onBack, onNavigateToJobs }: TechnicianTrackerScreenProps) {
+  const [activeJob, setActiveJob] = useState<JobItem | null>(initialJob ?? null);
+  const [acceptedJobsList, setAcceptedJobsList] = useState<JobItem[]>([]);
   const [loadingActiveJob, setLoadingActiveJob] = useState(false);
   const [jobsExpanded, setJobsExpanded] = useState(false);
 
@@ -53,13 +108,14 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
     setLoadingActiveJob(true);
     fetchTechnicianJobs(currentUser.uid)
       .then((jobs) => {
-        const activeList = Array.isArray(jobs)
+        const activeList: JobItem[] = Array.isArray(jobs)
           ? jobs.filter((j) => ['Accepted', 'Confirmed', 'Customer Ready', 'In Progress'].includes(j.status))
           : [];
         setAcceptedJobsList(activeList);
-        if (!initialJob && activeList.length > 0) {
-          setActiveJob(activeList[0]);
-          setCustomerCoords(deriveCustomerCoords(activeList[0]));
+        const first = activeList[0];
+        if (!initialJob && first) {
+          setActiveJob(first);
+          setCustomerCoords(deriveCustomerCoords(first));
         }
       })
       .catch((err) => console.warn('Could not load active jobs:', err))
@@ -74,7 +130,7 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
     }
   }, [initialJob, currentUser]);
 
-  const isAccepted = ['Accepted', 'Confirmed', 'Customer Ready', 'In Progress'].includes(activeJob?.status);
+  const isAccepted = ['Accepted', 'Confirmed', 'Customer Ready', 'In Progress'].includes(activeJob?.status ?? '');
 
   // Discard any stale response from a previously selected job.
   const activeJobIdRef = useRef(activeJob?.id);
@@ -93,7 +149,7 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
 
   // Own location: the technician's account position (their real GPS on native;
   // on web the live-tracking poll reflects the stored/driven location).
-  const initialOwnCoords = useMemo(() => {
+  const initialOwnCoords = useMemo<MapCoord>(() => {
     const lat = Number(currentUser?.latitude);
     const lon = Number(currentUser?.longitude);
     return {
@@ -105,11 +161,11 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
 
   const initialCustomerCoords = useMemo(() => deriveCustomerCoords(activeJob), [activeJob]);
 
-  const [ownCoords, setOwnCoords] = useState(initialOwnCoords);
-  const [customerCoords, setCustomerCoords] = useState(initialCustomerCoords);
-  const [routeCoordinates, setRouteCoordinates] = useState([]);
-  const [distanceKm, setDistanceKm] = useState(null);
-  const [travelMinutes, setTravelMinutes] = useState(null);
+  const [ownCoords, setOwnCoords] = useState<MapCoord>(initialOwnCoords);
+  const [customerCoords, setCustomerCoords] = useState<MapCoord>(initialCustomerCoords);
+  const [routeCoordinates, setRouteCoordinates] = useState<number[][]>([]);
+  const [distanceKm, setDistanceKm] = useState<number | null>(null);
+  const [travelMinutes, setTravelMinutes] = useState<number | null>(null);
   const [isRouting, setIsRouting] = useState(false);
 
   // Sync state when initial coords change (e.g. an updated account row).
@@ -126,6 +182,9 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
     const lon = Number(activeJob.longitude);
     const hasValidCoords = Number.isFinite(lat) && Number.isFinite(lon) && lat !== 0;
     if (hasValidCoords) return;
+    // Captured before the async callback: property narrowing does not survive
+    // into a nested closure.
+    const jobLocation = activeJob.location;
     // API-only precise geocode: the tracking destination must never snap to a
     // coarse barangay-center fallback, or the technician navigates ~1km off.
     geocodeAddressPrecise(activeJob.location).then((res) => {
@@ -135,7 +194,7 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
           ...prev,
           latitude: res.latitude,
           longitude: res.longitude,
-          address: activeJob.location,
+          address: jobLocation,
         }));
       }
     }).catch((err) => console.warn('Geocoding job location failed:', err));
@@ -148,7 +207,10 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
     if (!isAccepted || !activeJob?.id) return undefined;
     if (Platform.OS === 'web') return undefined;
     let active = true;
-    let watcher;
+    let watcher: Location.LocationSubscription | null = null;
+    // Captured for the watcher callback; narrowing does not cross the closure.
+    const uid = currentUser?.uid;
+    if (!uid) return undefined;
     const syncLocation = async () => {
       try {
         const permission = await Location.requestForegroundPermissionsAsync();
@@ -158,11 +220,11 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
           async (pos) => {
             const next = {
               latitude: pos.coords.latitude,
-              longitude: pos.coords.longitude,
-              name: currentUser.name || 'Technician',
+              longitude: pos.coords.longitude,              name: currentUser?.name || 'Technician',
             };
+
             if (active) setOwnCoords(next);
-            try { await updateTechnicianLocation(currentUser.uid, next); } catch (e) {}
+            try { await updateTechnicianLocation(uid, next); } catch (e) {}
           }
         );
       } catch (err) {
@@ -179,9 +241,10 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
   useEffect(() => {
     if (!isAccepted || !activeJob?.id) return undefined;
     let active = true;
+    const jobId = activeJob.id;
     const refresh = async () => {
       try {
-        const tracking = await fetchJobLiveTracking(activeJob.id);
+        const tracking = (await fetchJobLiveTracking(jobId)) as LiveTracking | null;
         if (!active || !tracking) return;
 
         const ownLat = Number(tracking.technician?.latitude);
@@ -219,10 +282,12 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
   // recomputed only when the CUSTOMER's destination actually changes (or on a
   // job switch), never on the technician's own GPS ticks - so the line remains
   // connected to the customer until the technician arrives.
-  const routeDestinationRef = useRef(null);
-  const destinationMoved = (destination) => {
+  const routeDestinationRef = useRef<{ lat: number | null; lng: number | null } | null>(null);
+  const destinationMoved = (destination: MapCoord) => {
     const prev = routeDestinationRef.current;
-    if (!prev) return true;
+    // No previous destination, or either side unresolved: always recompute.
+    if (!prev || prev.lat == null || prev.lng == null) return true;
+    if (destination.latitude == null || destination.longitude == null) return true;
     return (
       Math.abs(destination.latitude - prev.lat) >= 0.001 ||
       Math.abs(destination.longitude - prev.lng) >= 0.001
@@ -239,8 +304,8 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
 
     const compute = async () => {
       try {
-        const route = await getDrivingRoute(origin, destination);
-        if (!isMounted || jobId !== activeJobIdRef.current || !route?.geometry?.coordinates) return;
+        const route = (await getDrivingRoute(origin, destination)) as DrivingRoute | null;
+        if (!isMounted || jobId !== activeJobIdRef.current || !route || !route.geometry?.coordinates) return;
         setRouteCoordinates(route.geometry.coordinates.map(([lon, lat]) => [lat, lon]));
         if (route.distance) setDistanceKm(Number((route.distance / 1000).toFixed(1)));
         if (route.duration) setTravelMinutes(Math.max(1, Math.round(route.duration / 60)));
@@ -292,8 +357,11 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
     });
     const webUrl = `https://www.google.com/maps/dir/?api=1&destination=${destLat},${destLng}&travelmode=driving`;
     try {
-      const canOpen = await Linking.canOpenURL(appUrl);
-      if (canOpen) await Linking.openURL(appUrl);
+      // Platform.select returns undefined off-platform, so fall back to the web
+      // link up front rather than letting canOpenURL throw on undefined.
+      const target = appUrl ?? webUrl;
+      const canOpen = await Linking.canOpenURL(target);
+      if (canOpen) await Linking.openURL(target);
       else await Linking.openURL(webUrl);
     } catch (err) {
       await Linking.openURL(webUrl);
@@ -305,14 +373,16 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
     const jobId = activeJob?.id;
     setIsRouting(true);
     try {
-      const route = await getDrivingRoute(ownCoords, customerCoords);
+      const route = (await getDrivingRoute(ownCoords, customerCoords)) as DrivingRoute | null;
       if (jobId !== activeJobIdRef.current) return;
-      if (route?.geometry?.coordinates) {
+      if (route && route.geometry?.coordinates) {
         setRouteCoordinates(route.geometry.coordinates.map(([lon, lat]) => [lat, lon]));
         routeDrawnRef.current = true;
         if (customerCoords) routeDestinationRef.current = { lat: customerCoords.latitude, lng: customerCoords.longitude };
-        const dist = (route.distance / 1000).toFixed(1);
-        const mins = Math.max(1, Math.round(route.duration / 60));
+        // distance/duration always accompany a real geometry; defaulting keeps
+        // the display deterministic instead of rendering "NaN km".
+        const dist = (Number(route.distance ?? 0) / 1000).toFixed(1);
+        const mins = Math.max(1, Math.round(Number(route.duration ?? 0) / 60));
         setDistanceKm(Number(dist));
         setTravelMinutes(mins);
         Alert.alert('Route Centered', `Driving distance: ${dist} km\nEstimated travel time: ~${mins} minutes.`);
@@ -327,14 +397,14 @@ export default function TechnicianTrackerScreen({ currentUser, selectedJob: init
   };
 
   // Switch between accepted customers instantly.
-  const handleSwitchJob = (job) => {
+  const handleSwitchJob = (job: JobItem) => {
     setActiveJob(job);
     setCustomerCoords(deriveCustomerCoords(job));
     routeDrawnRef.current = false;
     setJobsExpanded(false);
   };
 
-  const formatSchedule = (job) => {
+  const formatSchedule = (job: JobItem | null | undefined) => {
     if (job?.scheduledDate) return job.scheduledDate;
     if (job?.preferredDate && job?.preferredTime) return `${job.preferredDate} - ${job.preferredTime}`;
     if (job?.preferredDate) return job.preferredDate;
