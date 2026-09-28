@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useMemo } from 'react';
 import { StyleSheet, View, Platform, ActivityIndicator, type StyleProp, type ViewStyle } from 'react-native';
-import { getLocationIqTileUrl } from '../screens/services/locationIq';
+import { getLocationIqTileUrl } from '../services/locationIq';
 
 type LatLng = { latitude: number; longitude: number; name?: string; address?: string };
 

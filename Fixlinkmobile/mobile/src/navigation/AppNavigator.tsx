@@ -22,7 +22,7 @@ import TechnicianTrackerScreen from '../screens/shared/TechnicianTrackerScreen';
 import TechMapScreen from '../screens/technician/TechMapScreen';
 import AvailableJobsScreen from '../screens/technician/AvailableJobsScreen';
 import TechnicianProfileScreen from '../screens/technician/TechnicianProfileScreen';
-import { fetchNotifications, fetchUnreadMessageNotifications, setAuthToken, updateCustomerProfile, markJobMessagesRead, markNotificationRead, fetchJobById } from '../screens/services/api';
+import { fetchNotifications, fetchUnreadMessageNotifications, setAuthToken, updateCustomerProfile, markJobMessagesRead, markNotificationRead, fetchJobById } from '../services/api';
 import { colors, fonts } from '../theme';
 import MessageBanner from '../components/MessageBanner';
 

@@ -12,8 +12,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { fetchTechnicianProfile, fetchTechnicianSchedule, updateTechnicianProfile, uploadPortfolioPhotos } from '../services/api';
-import { geocodeAddressStrict } from '../services/locationIq';
+import { fetchTechnicianProfile, fetchTechnicianSchedule, updateTechnicianProfile, uploadPortfolioPhotos } from '../../services/api';
+import { geocodeAddressStrict } from '../../services/locationIq';
 import Skeleton from '../../components/Skeleton';
 import HelpSheet from '../../components/HelpSheet';
 import { PhotoLightbox } from '../../components/RequestPhoto';

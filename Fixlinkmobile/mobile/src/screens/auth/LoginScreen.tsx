@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import api, { setAuthToken } from '../services/api';
+import api, { setAuthToken } from '../../services/api';
 import { colors, fonts } from '../../theme';
 
 // Prototype: CustomerLogin — dark #0D1B2A header, orange #F97316 primary. Logic unchanged.

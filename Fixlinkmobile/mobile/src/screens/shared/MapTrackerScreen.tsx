@@ -17,8 +17,8 @@ import LocationIQMap from '../../components/LocationIQMap';
 import {
   fetchJobLiveTracking,
   updateCustomerLocation
-} from '../services/api';
-import { geocodeAddressPrecise, getDrivingRoute } from '../services/locationIq';
+} from '../../services/api';
+import { geocodeAddressPrecise, getDrivingRoute } from '../../services/locationIq';
 import { colors, fonts } from '../../theme';
 
 // Derive the customer/destination marker strictly from the selected job.

@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, TextInput, ActivityIndicator, Alert, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { submitTechnicianReview } from '../services/api';
+import { submitTechnicianReview } from '../../services/api';
 import { colors, fonts } from '../../theme';
 
 const ORANGE = colors.customer;

@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { colors, fonts } from '../../theme';
 import HelpSheet from '../../components/HelpSheet';
-import { fetchCompletedJobs, fetchCustomerRequests } from '../services/api';
+import { fetchCompletedJobs, fetchCustomerRequests } from '../../services/api';
 
 // Prototype CustomerProfile: dark header + stats + menu list + red sign out.
 // Edit Profile kept as sub-view (prototype EditProfile). Stats are real counts.

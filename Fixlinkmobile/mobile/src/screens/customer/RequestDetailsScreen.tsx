@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, SafeAreaView, StatusBar, Alert, ActivityIndicator, Image, Pressable, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-import { confirmRepairRequest, fetchTechnicianProfile, markCustomerReady } from '../services/api';
+import { confirmRepairRequest, fetchTechnicianProfile, markCustomerReady } from '../../services/api';
 import { PhotoLightbox } from '../../components/RequestPhoto';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { colors, fonts } from '../../theme';

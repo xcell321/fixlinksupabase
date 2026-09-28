@@ -5,7 +5,10 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit",
+    "check:imports": "node scripts/checkImports.js",
+    "verify": "npm run typecheck && npm run check:imports"
   },
   "dependencies": {
     "@expo-google-fonts/inter": "^0.4.2",

@@ -3,7 +3,7 @@ import { StyleSheet, Text, View, Alert, ScrollView, Pressable, TextInput, Activi
 import { Ionicons } from '@expo/vector-icons';
 import Skeleton from '../../components/Skeleton';
 import ConfirmDialog from '../../components/ConfirmDialog';
-import { cancelRepairRequest, confirmRepairRequest, fetchCompletedJobs, fetchCustomerRequests, fetchTechnicianRecommendations, markCustomerReady, submitTechnicianReview } from '../services/api';
+import { cancelRepairRequest, confirmRepairRequest, fetchCompletedJobs, fetchCustomerRequests, fetchTechnicianRecommendations, markCustomerReady, submitTechnicianReview } from '../../services/api';
 import { colors, fonts, shadows } from '../../theme';
 import { getApplianceIcon, getStatusColor, getStatusGuidance, getStatusIcon } from '../../utils/applianceIcons';
 import type { ScheduleAvailability, TechnicianScheduleItem } from '../../types/schedule';

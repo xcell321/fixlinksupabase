@@ -27,7 +27,7 @@ import {
   updateJobStatus,
   updateTechnicianLocation,
   verifyCompletionCode
-} from '../services/api';
+} from '../../services/api';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { colors, fonts, shadows } from '../../theme';
 import { getApplianceIcon, getStatusColor, getStatusIcon } from '../../utils/applianceIcons';

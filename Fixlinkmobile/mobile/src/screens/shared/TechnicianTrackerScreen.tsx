@@ -18,8 +18,8 @@ import {
   fetchJobLiveTracking,
   fetchTechnicianJobs,
   updateTechnicianLocation
-} from '../services/api';
-import { geocodeAddressPrecise, getDrivingRoute } from '../services/locationIq';
+} from '../../services/api';
+import { geocodeAddressPrecise, getDrivingRoute } from '../../services/locationIq';
 import { colors, fonts } from '../../theme';
 import { getApplianceIcon } from '../../utils/applianceIcons';
 

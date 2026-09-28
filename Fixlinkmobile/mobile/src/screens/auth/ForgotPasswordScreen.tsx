@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { forgotPassword } from '../services/api';
+import { forgotPassword } from '../../services/api';
 import { colors, fonts } from '../../theme';
 
 // Prototype ForgotPassword: white BackHeader + role-aware (orange customer / blue technician). Logic unchanged.

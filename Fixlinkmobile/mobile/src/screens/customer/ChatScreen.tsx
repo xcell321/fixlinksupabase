@@ -18,7 +18,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import Skeleton from '../../components/Skeleton';
-import { fetchJobMessages, fetchMessageInbox, markJobMessagesRead, sendJobMessage } from '../services/api';
+import { fetchJobMessages, fetchMessageInbox, markJobMessagesRead, sendJobMessage } from '../../services/api';
 import { subscribeTyping, setTyping, type TypingPeer } from '../../utils/typingPresence';
 import { colors, fonts } from '../../theme';
 import { getStatusColor, getStatusIcon } from '../../utils/applianceIcons';

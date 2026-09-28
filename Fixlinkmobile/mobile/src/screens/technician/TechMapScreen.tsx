@@ -4,7 +4,7 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, T
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import TechnicianLocationMap from '../../components/TechnicianLocationMap';
-import { fetchRepairRequests } from '../services/api';
+import { fetchRepairRequests } from '../../services/api';
 import { colors, fonts } from '../../theme';
 import { type JobItem } from '../../utils/availableJobsHelpers';
 import { getApplianceIcon } from '../../utils/applianceIcons';

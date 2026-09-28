@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { resetPassword } from '../services/api';
+import { resetPassword } from '../../services/api';
 import { colors, fonts } from '../../theme';
 
 // Same prototype header family as ForgotPassword (not in prototype, deep-link only).

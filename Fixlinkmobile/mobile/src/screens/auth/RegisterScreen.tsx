@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, ActivityIndicator, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
-import { fetchPlatformCategories, registerUser } from '../services/api';
+import { fetchPlatformCategories, registerUser } from '../../services/api';
 import { colors, fonts } from '../../theme';
 
 // Reference Register layout for both roles: dark rounded header, uppercase
