@@ -143,6 +143,9 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
       setActionError((error as { error?: string; message?: string })?.error
         || (error as Error)?.message
         || 'The request could not be completed. Please try again.');
+      // Close the dialog on failure: its full-screen scrim otherwise stays on top
+      // of the screen and hides the error box rendered above the list.
+      setPendingAction(null);
     } finally {
       setActionBusy(false);
     }

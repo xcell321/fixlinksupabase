@@ -662,7 +662,6 @@ const styles = themedStyles({
     maxWidth: 240,
     // subtle shadow, not excessive
     boxShadow: '0 2px 8px rgba(16,42,67,0.08)',
-    elevation: 4,
     gap: 12,
   },
   activeJobsControlLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
@@ -694,7 +693,6 @@ const styles = themedStyles({
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
     boxShadow: '0 -4px 16px rgba(16,42,67,0.08)',
-    elevation: 6,
     gap: 14,
   },
 

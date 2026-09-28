@@ -401,6 +401,6 @@ const styles = themedStyles({
   tipDismiss: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   homeWrap: { flex: 1 },
   aiFabWrap: { position: 'absolute', right: 20, bottom: 90 },
-  aiFab: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', elevation: 6, boxShadow: '0 6px 14px rgba(16,42,67,0.25)', overflow: 'hidden' },
+  aiFab: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 14px rgba(16,42,67,0.25)', overflow: 'hidden' },
   aiFabImage: { width: 56, height: 56, borderRadius: 28 },
 });

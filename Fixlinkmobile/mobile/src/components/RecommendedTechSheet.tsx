@@ -354,7 +354,7 @@ const styles = themedStyles({
   name: { color: colors.ink, fontSize: 15, fontFamily: fonts.bold },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
   ratingText: { color: colors.ink, fontSize: 12, fontFamily: fonts.bold, fontVariant: ['tabular-nums'] },
-  dot: { color: colors.line, fontSize: 12 },
+  dot: { color: colors.line, fontSize: 12, fontFamily: fonts.regular },
   ratingMeta: { color: colors.muted, fontSize: 12, fontFamily: fonts.regular, flexShrink: 1 },
   matchPill: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.customerSoft, borderWidth: 1, borderColor: colors.customerMist, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7, minWidth: 56 },
   matchPillBest: { backgroundColor: colors.customer, borderColor: colors.customerDark },

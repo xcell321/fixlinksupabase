@@ -43,7 +43,7 @@ const styles = themedStyles({
   blobTop: { position: 'absolute', top: -80, right: -80, width: 288, height: 288, borderRadius: 144, backgroundColor: ORANGE, opacity: 0.10 },
   blobBottom: { position: 'absolute', bottom: 40, left: -64, width: 192, height: 192, borderRadius: 96, backgroundColor: ORANGE, opacity: 0.10 },
   center: { alignItems: 'center', paddingHorizontal: 32, width: '100%', maxWidth: 360 },
-  logo: { width: 80, height: 80, borderRadius: 20, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center', marginBottom: 24, boxShadow: '0 8px 24px rgba(249,115,22,0.35)', elevation: 6 },
+  logo: { width: 80, height: 80, borderRadius: 20, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center', marginBottom: 24, boxShadow: '0 8px 24px rgba(249,115,22,0.35)' },
   brand: { color: colors.onAccent, fontSize: 40, fontFamily: fonts.extraBold, letterSpacing: -0.5 },
   brandAccent: { color: ORANGE, fontFamily: fonts.extraBold },
   tagline: { color: '#9CA3AF', fontSize: 14, fontFamily: fonts.regular, textAlign: 'center', marginTop: 8 },

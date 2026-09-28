@@ -5,6 +5,7 @@ import {
   Inter_700Bold,
   Inter_800ExtraBold,
 } from '@expo-google-fonts/inter';
+import { Platform } from 'react-native';
 import type { ImageStyle, TextStyle, ViewStyle } from 'react-native';
 
 // -----------------------------------------------------------------------------
@@ -116,22 +117,23 @@ export const spacing = {
   '2xl': 36,
 } as const;
 
+// Shadows use the single cross-platform `boxShadow` primitive (supported on
+// web, iOS, and Android through the New Architecture). Android's `elevation`
+// is deliberately NOT set next to boxShadow: the two stack, so Android drew a
+// second, wider Material shadow that made every card look hazier and softer
+// than the same card on web and iOS. One primitive keeps all three identical.
 export const shadows = {
   subtle: {
     boxShadow: '0 2px 8px rgba(16,42,67,0.06)',
-    elevation: 2,
   },
   card: {
     boxShadow: '0 6px 14px rgba(16,42,67,0.06)',
-    elevation: 3,
   },
   cardStrong: {
     boxShadow: '0 8px 16px rgba(16,42,67,0.08)',
-    elevation: 4,
   },
   hud: {
     boxShadow: '0 12px 32px rgba(16,42,67,0.08)',
-    elevation: 6,
   },
 } as const;
 
@@ -143,6 +145,19 @@ type NamedStyles<T> = { [P in keyof T]: ViewStyle | TextStyle | ImageStyle };
 export function themedStyles<T extends NamedStyles<T> | NamedStyles<unknown>>(
   raw: T & NamedStyles<unknown>,
 ): T {
+  // Android pads every text block with extra leading (`includeFontPadding`),
+  // which shifts baselines so the same label sits lower and looser on Android
+  // than on web and iOS. Clearing it in this one place keeps text metrics
+  // identical on all three platforms. Only text styles are touched.
+  if (Platform.OS === 'android') {
+    const stylesRecord = raw as unknown as Record<string, TextStyle | undefined>;
+    for (const key of Object.keys(stylesRecord)) {
+      const style = stylesRecord[key];
+      if (style && (style.fontSize != null || style.fontFamily != null)) {
+        style.includeFontPadding = false;
+      }
+    }
+  }
   return raw;
 }
 

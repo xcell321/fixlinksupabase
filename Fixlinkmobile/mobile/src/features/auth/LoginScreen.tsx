@@ -153,6 +153,6 @@ const styles = themedStyles({ container: { flex: 1, backgroundColor: '#FFFFFF' }
     registerText: { color: '#6B7280', fontSize: 13, fontFamily: fonts.regular }, registerLink: { color: ORANGE, fontSize: 13, fontFamily: fonts.bold },
     techLoginRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 12, flexWrap: 'wrap' },
     techLoginText: { color: '#6B7280', fontSize: 13, fontFamily: fonts.regular },
-    techLoginLink: { fontSize: 13 },
+    techLoginLink: { fontSize: 13, fontFamily: fonts.bold },
     techLoginBlue: { color: colors.tech, fontFamily: fonts.bold },
     techLoginOrange: { color: colors.customer, fontFamily: fonts.bold } });

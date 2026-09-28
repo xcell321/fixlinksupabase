@@ -133,9 +133,11 @@ export default function LocationIQMap({
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
         <style>
           * { box-sizing: border-box; margin: 0; padding: 0; }
-          html, body, #map { width: 100%; height: 100%; overflow: hidden; background: #eef2f5; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+          html, body, #map { width: 100%; height: 100%; overflow: hidden; background: #eef2f5; font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+          .leaflet-container, .leaflet-popup-content, .leaflet-control-attribution, .job-pin-badge { font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
           .pulse-wrapper { position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
           .pulse-ring { position: absolute; width: 44px; height: 44px; border-radius: 50%; background: rgba(37, 99, 235, 0.30); animation: pulse-animation 1.8s infinite ease-out; }
           .pulse-dot { position: relative; z-index: 2; width: 32px; height: 32px; border-radius: 50%; background: #2563EB; border: 3px solid #ffffff; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; }

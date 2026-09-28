@@ -103,7 +103,6 @@ const styles = themedStyles({
     paddingLeft: 12,
     paddingRight: 10,
     boxShadow: '0 8px 16px rgba(16,42,67,0.25)',
-    elevation: 8,
   },
   bannerBody: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
   avatarWrap: { width: 40, height: 40, flexShrink: 0 },

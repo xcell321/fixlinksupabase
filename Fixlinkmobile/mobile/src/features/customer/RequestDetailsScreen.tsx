@@ -150,6 +150,9 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
       setPendingAction(null);
     } catch (error) {
       setWorkflowError((error as { error?: string } | null)?.error || 'Please try again.');
+      // Close the dialog on failure: its full-screen scrim otherwise stays on top
+      // of the screen and hides the error box rendered above the actions.
+      setPendingAction(null);
     } finally {
       setWorkflowLoading(null);
     }
@@ -428,7 +431,7 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
 const styles = themedStyles({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
   // Same floating robot as the Home tab, so the AI entry point feels like one system.
-  aiFab: { position: 'absolute', right: 20, bottom: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', elevation: 6, boxShadow: '0 6px 14px rgba(16,42,67,0.25)', overflow: 'hidden' },
+  aiFab: { position: 'absolute', right: 20, bottom: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 14px rgba(16,42,67,0.25)', overflow: 'hidden' },
   aiFabImage: { width: 56, height: 56, borderRadius: 28 },
   backHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 16, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
   backBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
