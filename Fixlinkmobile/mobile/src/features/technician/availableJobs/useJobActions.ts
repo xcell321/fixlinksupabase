@@ -1,0 +1,291 @@
+// Job action handlers for the Available Jobs screen.
+// Moved verbatim from AvailableJobsScreen.tsx: accept/decline with confirm
+// modals, arrival/start, no-show reporting, and the OTP verify handshake.
+// All Alert copy, optimistic updates and error mapping are unchanged.
+import { useState } from 'react';
+import { Alert } from 'react-native';
+import {
+  acceptRepairRequest,
+  declineRepairRequest,
+  recordTechnicianArrival,
+  reportNoShow,
+  updateJobStatus,
+  verifyCompletionCode,
+} from '../../../services/api';
+import { validateOtpCode, type JobItem } from '../availableJobsHelpers';
+import type { TechnicianRef } from './types';
+
+interface UseJobActionsArgs {
+  technician: TechnicianRef;
+  workloadStatus: string;
+  setJobs: React.Dispatch<React.SetStateAction<JobItem[]>>;
+  setAcceptedJobs: React.Dispatch<React.SetStateAction<JobItem[]>>;
+  loadJobs: (opts?: { background?: boolean }) => Promise<void>;
+  setSelectedJobForDetails: React.Dispatch<React.SetStateAction<JobItem | null>>;
+  selectedJobForDetails: JobItem | null;
+  setFeedTab: React.Dispatch<React.SetStateAction<'queue' | 'active'>>;
+}
+
+export const useJobActions = ({
+  technician,
+  workloadStatus,
+  setJobs,
+  setAcceptedJobs,
+  loadJobs,
+  setSelectedJobForDetails,
+  selectedJobForDetails,
+  setFeedTab,
+}: UseJobActionsArgs) => {
+  const [acceptingJobId, setAcceptingJobId] = useState<string | null>(null);
+  const [confirmJob, setConfirmJob] = useState<JobItem | null>(null);
+  const [dismissJob, setDismissJob] = useState<JobItem | null>(null);
+  const [dismissing, setDismissing] = useState<boolean>(false);
+  const [acceptError, setAcceptError] = useState<string | null>(null);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+
+  // OTP Verification Modal State
+  const [otpModalVisible, setOtpModalVisible] = useState<boolean>(false);
+  const [selectedJobForOtp, setSelectedJobForOtp] = useState<JobItem | null>(null);
+  const [otpCode, setOtpCode] = useState<string>('');
+  const [verifyingOtp, setVerifyingOtp] = useState<boolean>(false);
+
+  const [noShowJob, setNoShowJob] = useState<JobItem | null>(null);
+
+  const handleAcceptJob = (job: JobItem): void => {
+    if (!technician?.uid) {
+      setAcceptError('Please sign in with a verified technician account.');
+      return;
+    }
+    if (acceptingJobId) return;
+
+    if (workloadStatus === 'at_capacity') {
+      setAcceptError('You currently have 6 active jobs. Please complete an ongoing repair before accepting more requests.');
+      return;
+    }
+
+    // In-app confirm modal. Alert buttons do not fire reliably on web,
+    // which left taps doing nothing with no message shown.
+    setAcceptError(null);
+    setConfirmJob(job);
+  };
+
+  const doAcceptJob = async (): Promise<void> => {
+    const job = confirmJob;
+    if (!job || !technician?.uid || acceptingJobId) return;
+    setConfirmJob(null);
+    setAcceptingJobId(job.id);
+    try {
+      const response = (await acceptRepairRequest(
+        job.id,
+        technician.uid,
+        technician.name || 'Technician'
+      )) as { jobId?: string; message?: string };
+
+      const acceptedJobId = response?.jobId || job.id;
+
+      setJobs((currentJobs) => currentJobs.filter((currentJob) => currentJob.id !== job.id));
+      setAcceptedJobs((currentJobs) => [
+        {
+          ...job,
+          id: acceptedJobId,
+          status: 'Accepted',
+          technicianUid: technician.uid,
+          technicianName: technician.name
+        },
+        ...currentJobs
+      ]);
+      setSelectedJobForDetails(null);
+      setFeedTab('active');
+      setAcceptError(null);
+      loadJobs({ background: true });
+    } catch (error) {
+      const err = error as { code?: string; message?: string; error?: string };
+      if (err?.code === 'TECHNICIAN_AT_CAPACITY') {
+        setAcceptError(err?.message || 'Complete an active job to accept new work.');
+      } else {
+        setAcceptError(
+          err?.error || err?.message || 'This job may already have been claimed by another technician.'
+        );
+      }
+    } finally {
+      setAcceptingJobId(null);
+    }
+  };
+
+  const handleDeclineJob = (job: JobItem): void => {
+    if (!technician?.uid) return;
+    setAcceptError(null);
+    setDismissJob(job);
+  };
+
+  const doDismissJob = async (): Promise<void> => {
+    const job = dismissJob;
+    if (!job || !technician?.uid || dismissing) return;
+    setDismissJob(null);
+    setDismissing(true);
+    try {
+      await declineRepairRequest(job.id, technician.uid);
+      setJobs((currentJobs) => currentJobs.filter((currentJob) => currentJob.id !== job.id));
+      if (selectedJobForDetails?.id === job.id) {
+        setSelectedJobForDetails(null);
+      }
+      setAcceptError(null);
+    } catch (error) {
+      const err = error as { error?: string; message?: string };
+      setAcceptError(err?.error || err?.message || 'Failed to dismiss job.');
+    } finally {
+      setDismissing(false);
+    }
+  };
+
+  const handleArrival = async (job: JobItem): Promise<void> => {
+    if (!technician?.uid) return;
+    setActionLoadingId(job.id);
+    try {
+      await recordTechnicianArrival(job.id, technician.uid);
+      setAcceptedJobs((currentJobs) =>
+        currentJobs.map((j) =>
+          j.id === job.id
+            ? { ...j, technicianArrivalAt: new Date().toISOString() }
+            : j
+        )
+      );
+      Alert.alert('Arrival Confirmed', 'The customer has been notified of your physical arrival.');
+      loadJobs({ background: true });
+    } catch (error) {
+      const err = error as {
+        response?: { data?: { error?: string; message?: string } };
+        error?: string;
+        message?: string;
+      };
+      const errorMessage =
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        err?.error ||
+        err?.message ||
+        'Please try again.';
+      Alert.alert('Unable to record arrival', errorMessage);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleStartJob = async (job: JobItem): Promise<void> => {
+    if (!technician?.uid) return;
+    setActionLoadingId(job.id);
+    try {
+      await updateJobStatus(job.id, 'In Progress', technician.uid);
+      setAcceptedJobs((currentJobs) =>
+        currentJobs.map((j) => (j.id === job.id ? { ...j, status: 'In Progress' } : j))
+      );
+      Alert.alert('Job In Progress', 'Repair started. Collect the 4-digit code from the customer when finished.');
+      loadJobs({ background: true });
+    } catch (error) {
+      const err = error as {
+        response?: { data?: { error?: string; message?: string } };
+        error?: string;
+        message?: string;
+      };
+      const errorMessage =
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        err?.error ||
+        err?.message ||
+        'Failed to update job status.';
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleNoShow = (job: JobItem): void => {
+    if (!technician?.uid) return;
+    setAcceptError(null);
+    setNoShowJob(job);
+  };
+
+  const doNoShow = async (): Promise<void> => {
+    const job = noShowJob;
+    if (!job || !technician?.uid || actionLoadingId) return;
+    setNoShowJob(null);
+    setActionLoadingId(job.id);
+    try {
+      await reportNoShow(job.id, technician.uid, 'No one available at service location');
+      setAcceptedJobs((currentJobs) => currentJobs.filter((j) => j.id !== job.id));
+      setAcceptError(null);
+      loadJobs();
+    } catch (error) {
+      const err = error as {
+        response?: { data?: { error?: string; message?: string } };
+        error?: string;
+        message?: string;
+      };
+      setAcceptError(
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        err?.error ||
+        err?.message ||
+        'Please try again.'
+      );
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const openOtpModal = (job: JobItem): void => {
+    setSelectedJobForOtp(job);
+    setOtpCode('');
+    setOtpModalVisible(true);
+  };
+
+  const handleVerifyOtp = async (): Promise<void> => {
+    const cleanCode = otpCode.trim();
+    if (!validateOtpCode(cleanCode)) {
+      Alert.alert('Invalid Code', 'Please enter the complete 4-digit numeric code provided by the customer.');
+      return;
+    }
+    if (!selectedJobForOtp) return;
+
+    setVerifyingOtp(true);
+    try {
+      await verifyCompletionCode(selectedJobForOtp.id, cleanCode);
+      setOtpModalVisible(false);
+      setAcceptedJobs((currentJobs) => currentJobs.filter((j) => j.id !== selectedJobForOtp.id));
+      Alert.alert('Job Completed', 'Repair verified and finalized successfully.');
+      loadJobs();
+    } catch (error) {
+      const err = error as { error?: string; message?: string };
+      Alert.alert('Verification Failed', err?.error || err?.message || 'Incorrect code entered.');
+    } finally {
+      setVerifyingOtp(false);
+    }
+  };
+
+  return {
+    acceptingJobId,
+    confirmJob,
+    setConfirmJob,
+    dismissJob,
+    setDismissJob,
+    dismissing,
+    acceptError,
+    actionLoadingId,
+    noShowJob,
+    setNoShowJob,
+    otpModalVisible,
+    setOtpModalVisible,
+    otpCode,
+    setOtpCode,
+    verifyingOtp,
+    handleAcceptJob,
+    doAcceptJob,
+    handleDeclineJob,
+    doDismissJob,
+    handleArrival,
+    handleStartJob,
+    handleNoShow,
+    doNoShow,
+    openOtpModal,
+    handleVerifyOtp,
+  };
+};
