@@ -45,8 +45,9 @@ Confirmed functionality (Chapter 1 compliant):
 - Matching: verified/active gate, normalized category match (exact/substring, Computer umbrella, `General Repair` wildcard, `Others` bespoke), Haversine `distanceKm`, 20 km radius, privacy shield (town/city + approximate distance only until accept), decline hides only for that technician.
 - Dispatch: atomic `accept_job()` RPC sets `technicianUid` + 4-digit OTP; workload gating — `0–2 available`, `3–5 busy` (−0.06 rank dip, confirm-accept), `6+ at_capacity` (excluded from recommend, `409 TECHNICIAN_AT_CAPACITY` on accept, auto-recovers at ≤5).
 - Tracking: mutual live GPS only after accept; LocationIQ route + km + ETA; external Google/Apple Maps fallback; streaming ceases on `Completed`/`Cancelled`.
-- Communication: per-job chat thread + timestamps, direct dialer, `Accepted` → `In Progress` on arrival.
-- Completion: customer-side OTP display, technician entry, server validation → `Completed`; 1–5 star + text review to `reviews` recalculating cumulative rating; portfolio photo upload.
+- Communication: per-job chat thread with text plus optional photo and timestamps, direct dialer, `Accepted` → `In Progress` on arrival. Header info opens safety sheet.
+- Assistant: shared AI `AssistantSheet` owned by `AppNavigator`, per-user history, opened from Dashboard and Help. AI match results open in `RecommendedTechSheet` backed by `GET /api/ai/recommend`.
+- Completion: customer-side OTP display, technician entry, server validation → `Completed`; 1–5 star + text review to `reviews` with `customerUid` recalculating cumulative rating; single portfolio photo upload with required `repairType` and `model`.
 - Admin: credential verification, status toggles, category list, announcements; notification two-step deep-link with optimistic `read=true` + fire-and-forget `PUT`, 10 s poll, 100-item feed.
 
 Hard constraints / out of scope:

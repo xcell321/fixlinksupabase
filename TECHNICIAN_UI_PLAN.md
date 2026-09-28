@@ -57,6 +57,12 @@ Following Make file design specifications strictly. No system crashes.
 - Proper button styling
 - Location accuracy feedback
 
+### 5. Shared Sheets
+- `PortfolioPhotoSheet` for single photo plus `repairType` and `model`
+- `RecommendedTechSheet` for AI matches with workload and skills
+- `AssistantSheet` for AI help with per-user history
+- `ConversationInfoSheet` for chat safety and OTP notes
+
 ## Implementation Approach
 
 1. Update styles incrementally

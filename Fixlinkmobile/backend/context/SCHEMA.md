@@ -50,7 +50,7 @@ erDiagram
         text location
         double precision latitude
         double precision longitude
-        text status "Pending/Accepted/In Progress/Completed/Cancelled"
+        text status "Pending, Accepted, Confirmed, Customer Ready, In Progress, Completed, Cancelled, No-Show"
         text verification_code "4-digit OTP"
         uuid review_id FK
         timestamptz created_at
@@ -61,8 +61,9 @@ erDiagram
         uuid job_id FK
         uuid sender_uid FK
         text sender_name
-        text sender_role
-        text text
+        text sender_role "customer, technician, admin"
+        text text "NOT NULL, empty string allowed for image-only messages"
+        text image_url "optional chat photo"
         timestamptz timestamp
     }
 
@@ -76,6 +77,7 @@ erDiagram
         uuid id PK
         uuid technician_uid FK
         text technician_name
+        uuid customer_uid FK
         text customer_name
         int rating
         text comment
@@ -127,7 +129,7 @@ Stores credential, profile, verification, and live location data for both Custom
 | `latitude` / `longitude` | `double precision` | Optional | Last reported GPS coordinate. |
 | `location_updated_at` | `timestamptz` | Optional | Timestamp of the most recent location ping. |
 | `fcm_token` | `text` | Optional | Reserved for push notifications. |
-| `portfolio` | `jsonb` | Technicians | Proof-of-work repairs: `[{ title, description, imageUrl, completedAt }]` or `[{ name, url, uploadedAt }]`. |
+| `portfolio` | `jsonb` | Technicians | Proof-of-work repairs: single photo per request as `{ name, url, uploadedAt, repairType, model }`. Upload requires trimmed `repairType` and `model` (80 chars max) and stores only `files[0]`. |
 | `rating` | `double precision` | Optional | Aggregated average rating (1.0–5.0). |
 | `total_reviews` | `int` | Optional | Count of submitted reviews. |
 | `profile_image` | `text` | Optional | Public URL of the profile picture. |
@@ -180,8 +182,9 @@ Flat chat table (replaces the Firestore `acceptedJobs/{jobId}/messages` subcolle
 | `job_id` | `uuid` FK | **Required** | References `jobs.id`. |
 | `sender_uid` | `uuid` | **Required** | UID of the posting user. |
 | `sender_name` | `text` | **Required** | Display name of the sender. |
-| `sender_role` | `text` | **Required** | `'customer'` or `'technician'`. |
-| `text` | `text` | **Required** | Chat body text. |
+| `sender_role` | `text` | **Required** | `'customer'`, `'technician'`, or `'admin'`. |
+| `text` | `text` | **Required** | Chat body text. Stays `NOT NULL`. Image-only messages store an empty string. At least text or photo is required. |
+| `image_url` | `text` | Optional | Public URL of an optional chat photo. Rendered inline with `PhotoLightbox`. |
 | `timestamp` | `timestamptz` | **Required** | Transmission timestamp. |
 
 ### 2.4 `message_reads`
@@ -203,6 +206,7 @@ Captures 5-star feedback and written testimonials for completed repairs.
 | `id` | `uuid` PK | **Required** | Auto-generated review ID. |
 | `technician_uid` | `uuid` FK | **Required** | References `users.id` of the reviewed technician. |
 | `technician_name` | `text` | **Required** | Name of the technician. |
+| `customer_uid` | `uuid` FK | **Required** | References `users.id` of the reviewing customer. Indexed by `idx_reviews_customer`. |
 | `customer_name` | `text` | **Required** | Name of the evaluating customer. |
 | `rating` | `int` | **Required** | Integer `1`–`5`. |
 | `comment` | `text` | Optional | Qualitative feedback. |
@@ -321,7 +325,7 @@ Defined in `backend/src/db/schema.sql`:
 | Function | Purpose |
 |---|---|
 | `accept_job(job_id, technician_uid, technician_name)` | Atomically assigns + generates OTP + transitions to `Accepted`. |
-| `send_chat_message(job_id, sender_uid, sender_name, sender_role, text)` | Inserts message and fans out the chat notification together. |
+| `send_chat_message(job_id, sender_uid, sender_name, sender_role, p_text, p_image_url default null)` | Inserts message and fans out the chat notification together. Image-only messages store `text` as empty string. Notification falls back to `Sent a photo`. |
 | `recompute_technician_rating(technician_uid)` | Recomputes `users.rating` / `users.total_reviews` from `reviews`. |
 
 Backend access runs through the **service_role** key (bypasses Row Level Security); the mobile app never connects to the database directly.

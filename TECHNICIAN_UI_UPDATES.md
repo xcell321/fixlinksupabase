@@ -67,6 +67,13 @@
 2. `AvailableJobsScreen.tsx` - Styles updated
 3. `TechnicianProfileScreen.tsx` - Styles updated
 
+## Follow-up Refresh 2026-09-28
+
+- Portfolio now uses single-photo `PortfolioPhotoSheet`. Each upload requires `repairType` and `model`.
+- Chat threads support optional photos with inline `imageUrl` rendering.
+- AI matches open in `RecommendedTechSheet`. Assistant opens in shared `AssistantSheet`.
+- Reviews store `customerUid` for avatar lookup.
+
 ## Next Steps
 
 - Verify build runs
