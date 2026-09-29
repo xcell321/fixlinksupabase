@@ -1,140 +1,195 @@
+# FixLink Data Dictionary (Supabase PostgreSQL)
+
+> Naming: database columns are `snake_case` (see `backend/src/db/schema.sql` and `context/SCHEMA.md`). The Express API serializes rows to `camelCase` for the mobile client (for example `customer_uid` becomes `customerUid` via `domain/jobSerializer.js`). This file uses the mobile-facing `camelCase` names; map them back to `snake_case` when writing SQL.
+
 ## Table: users
 
 | Field Name | Data Type | Description |
 |---|---|---|
-| uid | String | User's unique identifier from Supabase Authentication. Used as the primary key of the `users` table. |
-| email | String | User's email address used for login and communication. |
-| name | String | User's full name. |
-| role | String | System role of the user. Values: customer, technician, admin. |
+| id | String (UUID) | Primary key. Equals the Supabase Auth user id. |
+| name | String | User full name. |
+| email | String | Email address used for login and communication. |
+| phone | String | Contact mobile number. |
+| address | String | User address. |
+| role | String | System role. Values: customer, technician, admin. |
 | status | String | Account status. Values: active, pending_verification, rejected, suspended. |
-| verificationStatus | String | Technician credential verification. Values: pending, verified, rejected. |
-| createdAt | String | Date and time the account was created (ISO-8601). |
-| updatedAt | String | Date and time the profile was last updated (ISO-8601). |
-| phone | String | User's contact number. |
-| address | String | User's address. |
-| bio | String | Short introduction or background of the user. |
-| skills | Array of String | List of repair skills for technicians (e.g., Refrigerator, Washing Machine). |
-| yearsExperience | Number | Number of years of repair experience (technicians only). |
+| verificationStatus | String | Technician credential verification. Values: unverified, pending, verified, rejected. |
+| rejectionReason | String | Reason given when a technician application is rejected. |
 | governmentIdNumber | String | Government-issued ID number for technician vetting. |
-| governmentIdFileUrl | String | URL of the uploaded government ID document. |
-| certificateFileUrl | String | URL of the uploaded certification document. |
-| latitude | Number | User's current latitude coordinate. |
-| longitude | Number | User's current longitude coordinate. |
-| locationUpdatedAt | String | Date and time the location was last updated (ISO-8601). |
-| fcmToken | String | Device push-notification token (reserved column; push dispatch is not actively used in the current release). |
-| portfolio | Array of Object | List of work samples. Each item contains {name, url, uploadedAt, repairType, model}. Single photo per request. Upload requires trimmed repairType and model. |
-| rating | Number | Average rating of the technician. |
-| totalReviews | Number | Total number of reviews received. |
-| isAvailable | Boolean | Availability status of the technician. Values: true, false. |
-| profileImage | String | URL of the user's profile picture. |
-| rejectionReason | String | Reason provided when a technician application is rejected. |
+| governmentIdFileUrl | String | Public URL of the uploaded government ID. |
+| certificateFileUrl | String | Public URL of the uploaded TESDA or vocational certificate. |
+| bio | String | Short introduction or background of the user. |
+| skills | Array of String | Technician skill tags (for example Refrigerator, Washing Machine, General Repair). |
+| yearsExperience | Number | Years of repair experience (technicians only). |
+| latitude | Number | Last reported GPS latitude. |
+| longitude | Number | Last reported GPS longitude. |
+| locationUpdatedAt | String (ISO-8601) | Date and time the location was last updated. |
+| fcmToken | String | Push-notification token (reserved; push dispatch is not actively used, notifications are in-app only). |
+| portfolio | Array of Object | Proof-of-work repairs. Each item holds name, url, uploadedAt, repairType, model. One photo per request; upload requires repairType and model. |
+| rating | Number | Aggregated average rating from 1.0 to 5.0. |
+| totalReviews | Number | Count of submitted reviews. |
+| isAvailable | Boolean | Technician availability toggle. True means open for jobs. |
+| profileImage | String | Public URL of the profile picture. |
+| noShowCount | Number | Customer no-show counter, bumped atomically by record_no_show(). |
+| updatedAt | String (ISO-8601) | Date and time the profile was last updated. |
+| createdAt | String (ISO-8601) | Date and time the account was created. |
 
-## Table: jobs — Pending / unassigned view (was `repairRequests`)
-
-| Field Name | Data Type | Description |
-|---|---|---|
-| customerName | String | Full name of the customer who submitted the request. |
-| customerUid | String | Unique identifier of the customer (references users.uid). |
-| applianceType | String | Type of appliance or device to be repaired (e.g., Refrigerator, Laptop). |
-| category | String | Category of the appliance (e.g., Home Appliances). |
-| description | String | Detailed description of the problem. |
-| location | String | Address or location where repair service is needed. |
-| latitude | Number | Latitude coordinate of the service location. |
-| longitude | Number | Longitude coordinate of the service location. |
-| preferredDate | String | Preferred date for the repair service. |
-| preferredTime | String | Preferred time window for the repair (e.g., Morning (8AM-12PM)). |
-| scheduledDate | String | Full date and time the repair is scheduled (ISO-8601). |
-| photoUrl | String | URL of the uploaded photo of the appliance. |
-| status | String | Status of the repair request. Values: Pending, Accepted, Confirmed, Customer Ready, In Progress, Completed, Cancelled, No-Show. Active workload = Accepted/Confirmed/Customer Ready/In Progress. |
-| isOther | Boolean | Flag indicating whether the appliance is an "other" category. |
-| declinedBy | String | UID of the technician who declined the request. |
-| createdAt | String | Date and time the request was submitted (ISO-8601). |
-| updatedAt | String | Date and time the request was last updated (ISO-8601). |
-
-## Table: jobs — Accepted / Completed view (was `acceptedJobs`)
+## Table: jobs
 
 | Field Name | Data Type | Description |
 |---|---|---|
-| customerName | String | Full name of the customer. |
-| customerUid | String | Unique identifier of the customer (references users.uid). |
-| applianceType | String | Type of appliance or device being repaired. |
-| category | String | Category of the appliance. |
-| description | String | Description of the repair problem. |
-| location | String | Address of the service location. |
-| latitude | Number | Latitude coordinate of the service location. |
-| longitude | Number | Longitude coordinate of the service location. |
-| preferredDate | String | Preferred date of service. |
-| preferredTime | String | Preferred time window of service. |
-| scheduledDate | String | Full scheduled date and time (ISO-8601). |
-| photoUrl | String | URL of the uploaded appliance photo. |
-| originalRequestId | String | ID of the original repairRequests document (for audit). |
-| technicianUid | String | Unique identifier of the assigned technician (references users.uid). |
-| technicianName | String | Full name of the assigned technician. |
-| status | String | Status of the job. Values: Accepted, In Progress, Completed, Cancelled. |
-| verificationCode | String | Random 4-digit OTP used to verify job completion. |
-| acceptedAt | String | Date and time the technician accepted the job (ISO-8601). |
-| completedAt | String | Date and time the job was completed (ISO-8601). |
-| locationUpdatedAt | String | Date and time the customer's live location was last updated (ISO-8601). |
-| reviewId | String | ID of the review document associated with this job (references reviews). |
-| reviewedAt | String | Date and time the job was reviewed (ISO-8601). |
+| id | String (UUID) | Primary key. Auto-generated job identifier. |
+| originalRequestId | String (UUID) | Legacy audit self-reference; keeps old dual-ID lookups working. |
+| customerUid | String (UUID) | Requesting customer (references users.id). |
+| customerName | String | Customer display name for the job ticket. |
+| technicianUid | String (UUID) | Assigned technician (references users.id). |
+| technicianName | String | Assigned technician display name. |
+| applianceType | String | Device name (for example Washing Machine, Laptop) or parent category. |
+| category | String | Parent admin-managed category (for example Home Appliances). |
+| description | String | Customer description of the failure. |
+| location | String | Formatted service address or community landmark. |
+| latitude | Number | Geocoded service-location latitude (submit-time snapshot). |
+| longitude | Number | Geocoded service-location longitude (submit-time snapshot). |
+| customerLatitude | Number | Customer live GPS latitude, kept separate so live pings never overwrite routing. |
+| customerLongitude | Number | Customer live GPS longitude, kept separate so live pings never overwrite routing. |
+| confirmedServiceLocation | String | Travel destination snapshot for the technician. |
+| serviceLatitude | Number | Service destination latitude used for routing. |
+| serviceLongitude | Number | Service destination longitude used for routing. |
+| preferredDate | String | Requested service date. |
+| preferredTime | String | Requested time window (for example Morning 8AM-12PM). |
+| scheduledDate | String | Full scheduled date-time string. |
+| photoUrl | String | Public URL of the uploaded appliance photo. |
+| status | String | Lifecycle state. Values: Pending, Accepted, Confirmed, Customer Ready, In Progress, Completed, Cancelled, No-Show. Active workload means Accepted, Confirmed, Customer Ready, or In Progress. |
+| isOther | Boolean | Free-text other-device flag. |
+| declinedBy | String (UUID) | Technician who dismissed this job from their feed. |
+| verificationCode | String | 4-digit completion OTP generated atomically on acceptance. |
+| verificationCodeForArrival | String | Arrival confirmation code for the confirm, ready, and arrive workflow. |
+| acceptedAt | String (ISO-8601) | Date and time the job was accepted. |
+| customerConfirmationTimestamp | String (ISO-8601) | Customer confirm-repair timestamp. |
+| customerReadyTimestamp | String (ISO-8601) | Customer-ready timestamp. |
+| startedAt | String (ISO-8601) | Date and time the repair began. |
+| technicianArrivalTimestamp | String (ISO-8601) | Technician arrival timestamp. |
+| completedAt | String (ISO-8601) | Date and time of verified completion. |
+| cancelledAt | String (ISO-8601) | Date and time of cancellation. |
+| cancellationStage | String | Stage at cancel. Values: before_accept, after_accept, after_confirmation, after_ready, after_travel. |
+| cancelledBy | String | Who cancelled the job. |
+| cancellationReason | String | Cancel reason text. |
+| locationUpdatedAt | String (ISO-8601) | Date and time the live location was last updated. |
+| reviewId | String (UUID) | Associated review (references reviews.id). One review per completed job. |
+| reviewedAt | String (ISO-8601) | Date and time the review was submitted. |
+| updatedAt | String (ISO-8601) | Date and time the job was last updated. |
+| createdAt | String (ISO-8601) | Date and time the request was submitted. |
 
-## Table: messages (was `acceptedJobs/{jobId}/messages` subcollection)
+## Table: messages
 
 | Field Name | Data Type | Description |
 |---|---|---|
-| senderUid | String | Unique identifier of the message sender (references users.uid). |
-| senderName | String | Full name of the message sender. |
-| senderRole | String | Role of the sender. Values: customer, technician, admin. |
-| text | String | Content of the chat message. Stays NOT NULL. Image-only messages store an empty string. At least text or photo is required. |
-| imageUrl | String | Public URL of an optional chat photo. Uploaded as multipart photo to chat-images bucket. Rendered inline with PhotoLightbox. |
-| timestamp | String | Date and time the message was sent (ISO-8601). |
-| readBy | Array of String | List of UIDs who have read the message (derived from the `message_reads` association table). |
+| id | String (UUID) | Primary key. Auto-generated message identifier. |
+| jobId | String (UUID) | Job this message belongs to (references jobs.id). |
+| senderUid | String (UUID) | Message sender (references users.id). |
+| senderName | String | Display name of the sender. |
+| senderRole | String | Sender role. Values: customer, technician, admin. |
+| text | String | Chat body. Never null; image-only messages store an empty string. At least text or photo is required. |
+| imageUrl | String | Public URL of an optional chat photo, rendered inline. |
+| timestamp | String (ISO-8601) | Date and time the message was sent. |
+
+## Table: message_reads
+
+| Field Name | Data Type | Description |
+|---|---|---|
+| messageId | String (UUID) | Read message (references messages.id). Part of the composite primary key. |
+| userUid | String (UUID) | Reader (references users.id). Part of the composite primary key. |
+| readAt | String (ISO-8601) | Date and time the message was read. |
 
 ## Table: reviews
 
 | Field Name | Data Type | Description |
 |---|---|---|
-| technicianUid | String | Unique identifier of the technician being reviewed (references users.uid). |
-| technicianName | String | Full name of the technician. |
-| customerUid | String | Unique identifier of the reviewing customer (references users.uid). Indexed for lookup. |
-| customerName | String | Full name of the customer who left the review. |
-| rating | Number | Rating given by the customer, integer from 1 to 5. |
-| comment | String | Written feedback/comment from the customer. |
-| requestId | String | ID of the completed job being reviewed (references jobs.id). |
-| createdAt | String | Date and time the review was submitted (ISO-8601). |
+| id | String (UUID) | Primary key. Auto-generated review identifier. |
+| technicianUid | String (UUID) | Reviewed technician (references users.id). Indexed for lookup. |
+| technicianName | String | Reviewed technician display name. |
+| customerUid | String (UUID) | Reviewing customer (references users.id). Indexed for lookup. |
+| customerName | String | Reviewing customer display name. |
+| rating | Number | Star rating, integer from 1 to 5. |
+| comment | String | Written customer feedback. |
+| requestId | String (UUID) | Completed job being reviewed (references jobs.id). |
+| createdAt | String (ISO-8601) | Date and time the review was submitted. |
 
-## Table: notifications (two-step, read persistence)
+## Table: notifications
 
 | Field Name | Data Type | Description |
 |---|---|---|
-| type | String | Type of notification. Values: chat (New Message), job (Request Update/Accepted/Completed). System reserved, not emitted. Routing uses type + jobId/messageId, never title-only. |
-| recipientUid | String | UID of the user receiving the notification (references users.uid). Auth: recipient_uid===auth. |
-| senderUid | String | UID of the user who triggered the notification (references users.uid). |
-| senderName | String | Full name of the sender. |
-| jobId | String | ID of the related job (references jobs.id, on delete cascade – UI keeps optimistic read if deleted). |
-| messageId | String | ID of the related chat message (references messages.id). |
-| text | String | Notification message content. |
-| timestamp | String | Date and time the notification was created (ISO-8601). Sorted desc, limit 100. |
-| read | Boolean | Flag indicating whether the notification has been read. First tap → optimistic read=true, badge filter(!read).length –1, fire-and-forget PUT /api/requests/notifications/:id/read (404 keep optimistic, no warn). |
-| readAt | String | Date and time the notification was read (ISO-8601). Persisted across poll/reopen/restart. |
-
-**Virtual workload (computed, not stored):** `activeJobs: number` + `workloadStatus: available (0–2) | busy (3–5) | at_capacity (6+)` exposed in `GET /api/ai/recommend` candidates and `GET /api/requests/technician/:uid/workload`. Not stored, counted via `jobs.status IN (Accepted,Confirmed,Customer Ready,In Progress)`.
+| id | String (UUID) | Primary key. Auto-generated notification identifier. |
+| recipientUid | String (UUID) | Receiver (references users.id). Only the recipient may read or mark it. |
+| senderUid | String (UUID) | User who triggered the notification (references users.id). |
+| senderName | String | Display name of the sender. |
+| jobId | String (UUID) | Related job (references jobs.id, deleted with the job; the app keeps its optimistic read state). |
+| messageId | String (UUID) | Related chat message (references messages.id). |
+| type | String | Notification kind. Values: chat for a new message, job for a request update. System is reserved and not emitted. Routing uses type plus jobId and messageId. |
+| text | String | Short notification body. |
+| read | Boolean | Read flag. First tap sets read to true optimistically and decrements the badge by one. |
+| readAt | String (ISO-8601) | Date and time the notification was read. Persisted across poll, reopen, and restart. |
+| timestamp | String (ISO-8601) | Date and time the notification was created. Feed sorts newest first, limit 100. |
 
 ## Table: announcements
 
 | Field Name | Data Type | Description |
 |---|---|---|
-| id | String | Unique identifier of the announcement (primary key). |
-| title | String | Title of the announcement. |
-| message | String | Body content of the announcement. |
-| active | Boolean | Flag indicating if the announcement is currently active/visible. |
-| createdAt | String | Date and time the announcement was created (ISO-8601). |
+| id | String (UUID) | Primary key. Auto-generated identifier. |
+| title | String | Headline text. |
+| message | String | Full announcement body. |
+| active | Boolean | Display toggle. |
+| createdAt | String (ISO-8601) | Date and time the announcement was created. |
 
 ## Table: categories
 
 | Field Name | Data Type | Description |
 |---|---|---|
-| name | String | Name of the appliance category (e.g., Home Appliances). |
-| devices | Array of String | List of device names under the category. |
-| createdAt | String | Date and time the category was created (ISO-8601). |
-| updatedAt | String | Date and time the category was last updated (ISO-8601). |
+| id | String (UUID) | Primary key. Auto-generated identifier. |
+| name | String | Category name (for example Home Appliances). Unique. |
+| devices | Array of String | Device list under the category, drives the customer picker and skill chips. |
+| createdAt | String (ISO-8601) | Date and time the category was created. |
+| updatedAt | String (ISO-8601) | Date and time the category was last updated. |
+
+## Table: service_incidents
+
+| Field Name | Data Type | Description |
+|---|---|---|
+| id | String (UUID) | Primary key. Auto-generated identifier. |
+| jobId | String (UUID) | Related job (references jobs.id, set null if the job is deleted). |
+| customerUid | String (UUID) | Customer involved (references users.id, set null if the account is deleted). |
+| technicianUid | String (UUID) | Technician involved (references users.id, set null if the account is deleted). |
+| type | String | Incident kind. Values: cancellation, no_show. |
+| stage | String | Stage at incident. Values: before_accept, after_accept, after_confirmation, after_ready, after_travel. |
+| reason | String | Incident reason text. |
+| status | String | Review state. Values: logged, warning, flagged, reviewed, resolved. Defaults to logged. |
+| createdAt | String (ISO-8601) | Date and time the incident was logged. |
+| resolvedAt | String (ISO-8601) | Date and time the incident was resolved. |
+
+## Table: reports
+
+| Field Name | Data Type | Description |
+|---|---|---|
+| id | String (UUID) | Primary key. Auto-generated identifier. |
+| reporterUid | String (UUID) | Reporting user (references users.id, set null if the account is deleted). |
+| reportedUserUid | String (UUID) | Reported user (references users.id, set null if the account is deleted). |
+| reportedUserName | String | Display name of the reported user. |
+| title | String | Report title. |
+| reason | String | Report reason. |
+| description | String | Report body. |
+| status | String | Handling state. Defaults to open. |
+| resolution | String | Admin resolution text. |
+| userStatus | String | Resulting user status action. |
+| createdAt | String (ISO-8601) | Date and time the report was created. |
+| resolvedAt | String (ISO-8601) | Date and time the report was resolved. |
+
+## Table: password_resets
+
+| Field Name | Data Type | Description |
+|---|---|---|
+| id | String (UUID) | Primary key. Auto-generated identifier. |
+| userId | String (UUID) | Account the reset was issued for (references users.id, deleted with the account). |
+| tokenHash | String | SHA-256 fingerprint of the reset token; the raw token is never stored. |
+| expiresAt | String (ISO-8601) | Link expiry, 24 hours from issuance. |
+| usedAt | String (ISO-8601) | Redemption timestamp; non-null means the link is spent and single-use. |
+| createdAt | String (ISO-8601) | Date and time the reset was issued. |

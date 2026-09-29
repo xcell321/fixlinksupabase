@@ -17,11 +17,11 @@ This matrix maps every specific challenge identified in **Chapter 1: Statement o
 
 | # | Chapter 1 Statement of the Problem (SOP) | FixLink System Module & Solution | Current Implementation Status in Codebase |
 |---|---|---|---|
-| **1** | **Inefficient & Unreliable Sourcing:** Relying on word-of-mouth or classified ads without skill guarantee. | **Skill-Based Verification & Category Matching:** Technicians undergo document verification and declare verified skill tags (appliances, computers, mobile phones, electronics). Requests match only qualified technicians. | ✅ Implemented in backend dispatch filter (`backend/src/routes/requests.js`) & register (`RegisterScreen.js`). |
-| **2** | **Lack of Real-Time Technician Availability:** Inability to know who is active and near the customer, leading to delays. | **Real-Time GPS Availability & Distance Sorting:** Live coordinates tracking via LocationIQ; available requests feed sorts by proximity (`distanceKm`). | ✅ Implemented via LocationIQ Geocoding & Haversine distance calculator in `requests.js`. |
-| **3** | **Absence of Centralized Platform:** Informal handling, lost requests, miscommunication. | **Centralized Request Lifecycle Management:** Structured Firestore state machine (`Pending` &rarr; `Accepted` &rarr; `In Progress` &rarr; `Completed`) with dedicated Customer and Technician dashboards. | ✅ Implemented across Customer (`RequestProgressScreen`) and Technician (`AvailableJobsScreen`). |
-| **4** | **Limited Livelihood for Part-Time/Unemployed:** Skilled workers lack access to consistent client sourcing. | **On-Demand Technician Portal & Portfolio:** Technicians build an online profile, portfolio gallery, and reputation score (ratings & reviews) without spending on ads. | ✅ Implemented in `TechnicianProfileScreen` and backend portfolio uploads (`/api/users/:id/portfolio`). |
-| **5** | **Inconvenience of Transporting Bulky Items:** Burden of hauling refrigerators, washers, or desktop units to repair shops. | **Home-Based Service & Mutual Live Map Tracking:** Customer geotags their home; accepted technicians navigate directly to the customer's house using turn-by-turn LocationIQ map routing. | ✅ Implemented in `LocationIQMap.js` and `MapTrackerScreen.js`. |
+| **1** | **Inefficient & Unreliable Sourcing:** Relying on word-of-mouth or classified ads without skill guarantee. | **Skill-Based Verification & Category Matching:** Technicians undergo document verification and declare verified skill tags (appliances, computers, mobile phones, electronics). Requests match only qualified technicians. | ✅ Implemented in backend dispatch filter (`backend/src/services/jobs/jobFeedService.js` + `technicianMatching.js`) and register (`mobile/src/features/auth/RegisterScreen.tsx`). |
+| **2** | **Lack of Real-Time Technician Availability:** Inability to know who is active and near the customer, leading to delays. | **Real-Time GPS Availability & Distance Sorting:** Live coordinates tracking via LocationIQ; available requests feed sorts by proximity (`distanceKm`). | ✅ Implemented via LocationIQ geocoding and Haversine distance in `backend/src/services/jobs/jobFeedService.js` + `domain/geo.js`. |
+| **3** | **Absence of Centralized Platform:** Informal handling, lost requests, miscommunication. | **Centralized Request Lifecycle Management:** Structured Supabase PostgreSQL state machine on the unified `jobs` table (`Pending` &rarr; `Accepted` &rarr; `In Progress` &rarr; `Completed`) with dedicated Customer and Technician dashboards. | ✅ Implemented across Customer (`mobile/src/features/customer/RequestProgressScreen.tsx`) and Technician (`mobile/src/features/technician/AvailableJobsScreen.tsx`). |
+| **4** | **Limited Livelihood for Part-Time/Unemployed:** Skilled workers lack access to consistent client sourcing. | **On-Demand Technician Portal & Portfolio:** Technicians build an online profile, portfolio gallery, and reputation score (ratings & reviews) without spending on ads. | ✅ Implemented in `mobile/src/features/technician/TechnicianProfileScreen.tsx` and backend portfolio uploads (`backend/src/routes/users/technicianRoutes.js`). |
+| **5** | **Inconvenience of Transporting Bulky Items:** Burden of hauling refrigerators, washers, or desktop units to repair shops. | **Home-Based Service & Mutual Live Map Tracking:** Customer geotags their home; accepted technicians navigate directly to the customer's house using turn-by-turn LocationIQ map routing. | ✅ Implemented in `mobile/src/components/LocationIQMap.tsx` and `mobile/src/features/tracking/MapTrackerScreen.tsx`. |
 
 ---
 
@@ -43,7 +43,7 @@ This matrix maps every specific challenge identified in **Chapter 1: Statement o
 ### Explicit Delimitations (Out of Scope as Stated in Capstone Paper)
 - **No In-App Payment Gateway:** Cash-on-Service / direct arrangement between customer and technician (no credit card/Stripe/GCash API required).
 - **No Automated Hardware Diagnostics:** The system connects people; it does not diagnose circuit board failures or run diagnostic tests.
-- **Categorization Limits:** Limited to the admin-managed skill categories (dynamically loaded from Firestore `categories`), e.g., Home Appliances, Mobile Devices, Networking & Internet Devices, Computer & Laptop, Other Electronic Devices.
+- **Categorization Limits:** Limited to the admin-managed skill categories (dynamically loaded from the Supabase `categories` table), e.g., Home Appliances, Mobile Devices, Networking & Internet Devices, Computer & Laptop, Other Electronic Devices.
 - **Network Dependency:** Requires active internet connection.
 
 ---
@@ -75,7 +75,7 @@ graph TD
 
     subgraph "Stage 4: Acceptance & Mutual Live Tracking"
         C4 --> D1[Technician Accepts Job]
-        D1 --> D2[Request Moves to 'acceptedJobs' Collection]
+        D1 --> D2[Job status flips to `Accepted` in place via `accept_job()` RPC]
         D2 --> D3[Customer Receives Tech Details]
         D3 --> D4[Mutual LocationIQ Map Tracking Unlocked]
         D4 --> D5[Technician Drives to Customer Home with Turn-by-Turn Route]
@@ -84,7 +84,7 @@ graph TD
     subgraph "Stage 5: Execution & Verification"
         D5 --> E1[Technician Arrives at Customer Home]
         E1 --> E2[Technician Starts Job: Status = In Progress]
-        E2 --> E3[Repair Finished: Customer Generates 4-Digit OTP]
+        E2 --> E3[Server-generated 4-digit OTP shown to customer on accept]
         E3 --> E4[Technician Inputs OTP on Device]
         E4 --> E5[System Validates OTP -> Status = Completed]
     end
@@ -209,7 +209,7 @@ sequenceDiagram
     actor Customer
     participant App as FixLink Mobile
     participant Backend as Express API Server
-    participant DB as Firebase Firestore
+    participant DB as Supabase PostgreSQL
     participant LocIQ as LocationIQ API
     actor Tech as Technician
 
@@ -218,7 +218,7 @@ sequenceDiagram
     App->>LocIQ: Forward Geocode Address
     LocIQ-->>App: Latitude & Longitude
     App->>Backend: POST /api/requests (coords, details)
-    Backend->>DB: Save in 'repairRequests' (Status: Pending)
+    Backend->>DB: Save in `jobs` (Status: Pending)
 
     %% Dispatch & Match
     Tech->>App: Opens Jobs Feed
@@ -229,7 +229,7 @@ sequenceDiagram
     %% Job Acceptance
     Tech->>App: Clicks "Accept Job"
     App->>Backend: PUT /api/requests/:id/accept
-    Backend->>DB: Move request to 'acceptedJobs' (Generates 4-digit OTP)
+    Backend->>DB: `accept_job()` RPC updates `jobs` in place (Generates 4-digit OTP)
     Backend-->>App: Job Accepted
 
     %% Mutual Live Tracking
@@ -266,15 +266,15 @@ sequenceDiagram
 
 | Feature Requirement | Capstone Status | Implementation File Reference |
 |---|---|---|
-| **Role-Based Auth (Customer/Technician)** | ✅ Complete | [AppNavigator.js](file:///c:/CAPSTONE/Fixlinkmobile/mobile/src/navigation/AppNavigator.js), [LoginScreen.js](file:///c:/CAPSTONE/Fixlinkmobile/mobile/src/screens/auth/LoginScreen.js) |
-| **Document Upload for Verification** | ✅ Complete | [RegisterScreen.js](file:///c:/CAPSTONE/Fixlinkmobile/mobile/src/screens/auth/RegisterScreen.js), [auth.js](file:///c:/CAPSTONE/Fixlinkmobile/backend/src/routes/auth.js) |
-| **Appliance Service Submission** | ✅ Complete | [SubmitRequestScreen.js](file:///c:/CAPSTONE/Fixlinkmobile/mobile/src/screens/customer/SubmitRequestScreen.js) (**static list replaced by admin-managed dynamic categories via `GET /api/users/platform/categories`**) |
-| **LocationIQ Geocoding & Route Engine** | ✅ Complete | [locationIq.js](file:///c:/CAPSTONE/Fixlinkmobile/mobile/src/screens/services/locationIq.js) |
-| **Interactive Leaflet WebView Map** | ✅ Complete | [LocationIQMap.js](file:///c:/CAPSTONE/Fixlinkmobile/mobile/src/components/LocationIQMap.js) |
-| **Mutual Tracking & Privacy Enforcement** | ✅ Complete | [MapTrackerScreen.js](file:///c:/CAPSTONE/Fixlinkmobile/mobile/src/screens/shared/MapTrackerScreen.js), [requests.js](file:///c:/CAPSTONE/Fixlinkmobile/backend/src/routes/requests.js) |
-| **Smart Skill Categorization Dispatch** | ✅ Complete | [requests.js (lines 80-125)](file:///c:/CAPSTONE/Fixlinkmobile/backend/src/routes/requests.js) |
-| **4-Digit OTP Job Completion Code** | ✅ Complete | [AvailableJobsScreen.js](file:///c:/CAPSTONE/Fixlinkmobile/mobile/src/screens/technician/AvailableJobsScreen.js), [requests.js (lines 270-302)](file:///c:/CAPSTONE/Fixlinkmobile/backend/src/routes/requests.js) |
-| **5-Star Rating & Review System** | ✅ Complete | [RequestProgressScreen.js](file:///c:/CAPSTONE/Fixlinkmobile/mobile/src/screens/customer/RequestProgressScreen.js), [requests.js (lines 220-245)](file:///c:/CAPSTONE/Fixlinkmobile/backend/src/routes/requests.js) |
-| **Technician Profile & Portfolio Uploads**| ✅ Complete | [TechnicianProfileScreen.js](file:///c:/CAPSTONE/Fixlinkmobile/mobile/src/screens/technician/TechnicianProfileScreen.js), [users.js](file:///c:/CAPSTONE/Fixlinkmobile/backend/src/routes/users.js) |
-| **In-App Direct Calling & Messaging** | ✅ Complete | [ChatScreen.js](file:///c:/CAPSTONE/Fixlinkmobile/mobile/src/screens/customer/ChatScreen.js), [RequestDetailsScreen.js](file:///c:/CAPSTONE/Fixlinkmobile/mobile/src/screens/customer/RequestDetailsScreen.js) |
-| **Admin Web/API Verification Panel** | ⚙️ Backend Ready | [admin.js](file:///c:/CAPSTONE/Fixlinkmobile/backend/src/routes/admin.js) |
+| **Role-Based Auth (Customer/Technician)** | ✅ Complete | `mobile/src/navigation/AppNavigator.tsx`, `mobile/src/features/auth/LoginScreen.tsx` |
+| **Document Upload for Verification** | ✅ Complete | `mobile/src/features/auth/RegisterScreen.tsx`, `backend/src/routes/auth/` + `backend/src/services/auth/registrationService.js` |
+| **Appliance Service Submission** | ✅ Complete | `mobile/src/features/customer/SubmitRequestScreen.tsx` (admin-managed dynamic categories via `GET /api/users/platform/categories`) |
+| **LocationIQ Geocoding & Route Engine** | ✅ Complete | `mobile/src/services/locationIq.tsx` |
+| **Interactive Leaflet WebView Map** | ✅ Complete | `mobile/src/components/LocationIQMap.tsx` |
+| **Mutual Tracking & Privacy Enforcement** | ✅ Complete | `mobile/src/features/tracking/MapTrackerScreen.tsx`, `backend/src/routes/requests.js` (thin map) + `backend/src/controllers/trackingController.js` |
+| **Smart Skill Categorization Dispatch** | ✅ Complete | `backend/src/services/jobs/jobFeedService.js` + `backend/src/services/technicianMatching.js` + `backend/src/services/skillMatcher.js` |
+| **4-Digit OTP Job Completion Code** | ✅ Complete | `mobile/src/features/technician/AvailableJobsScreen.tsx`, `backend/src/services/jobs/jobCompletionService.js` + `accept_job()` RPC in `backend/src/db/schema.sql` |
+| **5-Star Rating & Review System** | ✅ Complete | `mobile/src/features/customer/RequestProgressScreen.tsx`, `backend/src/services/jobs/reviewService.js` + `recompute_technician_rating()` RPC |
+| **Technician Profile & Portfolio Uploads**| ✅ Complete | `mobile/src/features/technician/TechnicianProfileScreen.tsx` + `mobile/src/components/PortfolioPhotoSheet.tsx`, `backend/src/routes/users/technicianRoutes.js` |
+| **In-App Direct Calling & Messaging** | ✅ Complete | `mobile/src/features/customer/ChatScreen.tsx`, `mobile/src/features/customer/RequestDetailsScreen.tsx`, `backend/src/controllers/chatController.js` + `send_chat_message()` RPC |
+| **Admin Web/API Verification Panel** | ⚙️ Backend Ready | `backend/src/routes/admin.js` (companion API at `fixlinkweb admin/backend/`, no web UI committed) |

@@ -63,14 +63,14 @@ graph TD
         C2 --> C3[Geotag Location via LocationIQ & Set Schedule]
         C3 --> C4[Submit Request: Status = Pending]
         C4 --> M1[Backend Matches Skills & Proximity within 20km]
-        M1 --> M2[FCM Alert to Qualified Technicians]
+        M1 --> M2[Qualified technicians see it in feed + in-app notification]
     end
 
     subgraph "Phase 3: Dispatch & Acceptance"
         U6 --> T1[Technician Opens Available Jobs Feed]
         T1 --> T2[View Skill-Matched Jobs with Approx Distance]
         T2 --> T3[Technician Taps 'Accept Job']
-        T3 --> T4[Atomic Move to 'acceptedJobs' + 4-Digit OTP Created]
+        T3 --> T4[In-place `Accepted` via `accept_job()` RPC + 4-Digit OTP Created]
         T4 --> C5[Customer Notified: Technician Assigned]
     end
 
@@ -100,7 +100,7 @@ graph TD
 
 ## 4. Screen-by-Screen UI Design & Interaction Specifications
 
-### Screen 1: Unified Authentication (`LoginScreen.js`)
+### Screen 1: Unified Authentication (`LoginScreen.tsx`)
 - **Purpose:** Secure entry point providing role-agnostic authentication for both Customers and Technicians.
 - **Visual Layout:**
   - **Header:** FixLink logo in dark ink with teal accent (`fixlink`), subtitle: `"All-Around Technician Service Platform"`.
@@ -113,13 +113,13 @@ graph TD
     - Bottom Switcher: `"Don't have an account? Sign Up"` $\rightarrow$ navigates to `RegisterScreen`.
 - **System Interactions:**
   - On submit: Calls `POST /api/auth/login`.
-  - Validates credentials against Firebase Auth.
-  - Fetches user profile from Firestore `users` collection.
+  - Validates credentials against Supabase Auth.
+  - Fetches user profile from the Supabase `users` table.
   - Dynamically routes user to either **Customer Navigation Stack** or **Technician Navigation Stack** based on `role`.
 
 ---
 
-### Screen 2: Role-Based Registration (`RegisterScreen.js`)
+### Screen 2: Role-Based Registration (`RegisterScreen.tsx`)
 - **Purpose:** Onboarding portal that dynamically shifts layout depending on whether the registrant is a Customer or a Technician.
 - **Visual Layout & Role Toggle:**
   - Top segmented switch: `[ I am a Customer ]` | `[ I am a Technician ]`.
@@ -133,12 +133,12 @@ graph TD
   - **Action Controls:**
     - Primary CTA: `"Create Customer Account"` or `"Submit Technician Registration"`.
 - **System Interactions:**
-  - Uploads multipart documents to local storage / Google Cloud Storage.
+  - Uploads multipart documents to Supabase Storage bucket `fixlink`.
   - Creates user record in `users` with `verificationStatus: 'pending'` for technicians.
 
 ---
 
-### Screen 3: Customer Home & Dashboard (`DashboardScreen.js`)
+### Screen 3: Customer Home & Dashboard (`DashboardScreen.tsx`)
 - **Purpose:** High-level customer command center displaying platform announcements, service categories, and active request statuses.
 - **Visual Layout:**
   - **Header Bar:** Brand wordmark (`fixlink`), subtitle `"HOME SERVICES"`, bell icon with unread indicator dot opening the announcements modal.
@@ -157,10 +157,10 @@ graph TD
 
 ---
 
-### Screen 4: Repair Request Submission (`SubmitRequestScreen.js`)
+### Screen 4: Repair Request Submission (`SubmitRequestScreen.tsx`)
 - **Purpose:** Multi-input service intake form allowing customers to describe damage, geotag their home, and set service preferences.
 - **Visual Layout & Interaction Flow:**
-  - **Step 1: Appliance Category & Device Selector:** Two-step drill-down modal. Step 1 lists the platform **skill categories** managed by the admin (`GET /api/users/platform/categories` → Firestore `categories` collection). Tapping a category opens Step 2 (**Select Device**) listing that category's specific `devices` (header shows the category name + back arrow). Tapping a device selects it; a category with no devices is selected directly. The input shows `Category — Device` (e.g., `Home Appliances — Washing Machine`).
+  - **Step 1: Appliance Category & Device Selector:** Two-step drill-down modal. Step 1 lists the platform **skill categories** managed by the admin (`GET /api/users/platform/categories` → Supabase `categories` table). Tapping a category opens Step 2 (**Select Device**) listing that category's specific `devices` (header shows the category name + back arrow). Tapping a device selects it; a category with no devices is selected directly. The input shows `Category — Device` (e.g., `Home Appliances — Washing Machine`).
   - **Step 2: Issue Description:** Multi-line text area with placeholder: *"Describe the issue (e.g., Refrigerator motor making loud noise, not cooling since yesterday)..."*.
   - **Step 3: Photo Attachment:**
     - Camera / Gallery picker button.
@@ -175,12 +175,12 @@ graph TD
     - Fixed bottom container with prominent button: `"Submit Repair Request"`.
 - **System Interactions:**
   - Posts payload to `POST /api/requests`.
-  - Invokes backend matching logic (`triggerMatching`) to dispatch FCM push notifications to technicians within 20km.
+  - Invokes backend matching logic so the request surfaces in the feeds of qualified technicians within 20km, with an in-app notification (push dispatch is not actively used; `fcm_token` is reserved).
   - Navigates customer to `RequestProgressScreen`.
 
 ---
 
-### Screen 5: Active Request Progress & Timeline (`RequestProgressScreen.js`)
+### Screen 5: Active Request Progress & Timeline (`RequestProgressScreen.tsx`)
 - **Purpose:** Real-time lifecycle tracker for customers to follow the progress of their active repair tickets.
 - **Visual Layout:**
   - **Header:** `"Active Service Requests"`.
@@ -205,13 +205,13 @@ graph TD
 
 ---
 
-### Screen 5b: AI Recommended Technicians + Workload (inside `RequestProgressScreen.js` – pending only)
-- **Purpose:** Show 3 best eligible technicians for a pending request (deterministic `technicianMatch.js` + OmniRoute AI) with safe schedule visibility and now workload.
+### Screen 5b: AI Recommended Technicians + Workload (inside `RequestProgressScreen.tsx` – pending only)
+- **Purpose:** Show 3 best eligible technicians for a pending request (deterministic `technicianMatching.js` + OmniRoute AI) with safe schedule visibility and now workload.
 - **Eligibility order:** verified/active → skill/category → workload (`0–2 available`, `3–5 busy`, `6+ at_capacity` excluded) → distance/rating → schedule. `6+` never appears as recommended.
 - **Card layout (existing + workload):** rank, avatar, `name · X% match`, `reason`, `★ rating · reviews · yrs · km · AI confidence`, **workload chip** `Available — 2 active jobs` (teal `checkmark-circle-outline`) or `Busy — 4 active jobs` (gold `time-outline`), skill chips, `Has a scheduled job that day` / `Available for this schedule` (gold/green), upcoming schedule `calendar/time · appliance`. Workload and schedule are separate rows; workload does not hide schedule.
 - **Data:** `GET /api/ai/recommend?jobId=` returns `activeJobs/workloadStatus` per candidate (no customer PII).
 
-### Screen 6: Detailed Request Summary (`RequestDetailsScreen.js`)
+### Screen 6: Detailed Request Summary (`RequestDetailsScreen.tsx`)
 - **Purpose:** Full administrative breakdown of an individual repair order for historical auditing and deep review.
 - **Visual Layout:**
   - Request ID banner with copy-to-clipboard button.
@@ -222,7 +222,7 @@ graph TD
 
 ---
 
-### Screen 7: Technician Available Jobs Feed (`AvailableJobsScreen.js`)
+### Screen 7: Technician Available Jobs Feed (`AvailableJobsScreen.tsx`)
 - **Purpose:** Primary workstation for technicians to discover nearby service leads that match their verified skills.
 - **Visual Layout & Matching Feed:**
   - **Top Filter & Status Bar:**
@@ -249,12 +249,12 @@ graph TD
 
 ---
 
-### Screen 7b: Notifications Panel ( `mobile/src/navigation/AppNavigator.js` – `Modal` )
+### Screen 7b: Notifications Panel ( `mobile/src/navigation/AppNavigator.tsx` – `Modal` )
 - **Purpose:** Unified `notifications` (`read/read_at`) inbox for `chat` + `job` (limit 100, sort `timestamp desc`, badge `filter(!read).length`).
 - **Two-step:** 1st tap → `detailCard` (sender/type/text/time/`#JOBCODE`, `Tap again to open…`) + optimistic `read=true` (badge –1, fire-and-forget `PUT /api/requests/notifications/:id/read`, 404 keep optimistic, no spinner) → 2nd tap same `id` → `GET /api/requests/job/:id` ownership check → `chat`→ exact `ChatScreen` thread (`jobId`), `job` Completed→ `RequestProgressScreen` `focusedJobId`+`autoExpandReview` (completed card `cardFocused`), otherwise `RequestDetailsScreen`/technician `AvailableJobsScreen` `highlightedJobId` (`highlightedCard`). No `jobId` → `detailError`; deleted → keep notification, show `detailError`.
 - **Persistence:** `read/read_at` DB-persisted; 10s poll `GET /api/requests/notifications` keeps badge synced across refresh/reopen/restart; already-read does not decrement, never negative.
 
-### Screen 8: Mutual Live Map Tracker (`MapTrackerScreen.js`)
+### Screen 8: Mutual Live Map Tracker (`MapTrackerScreen.tsx`)
 - **Purpose:** Full-screen interactive map displaying live mutual tracking between customer home and en-route technician.
 - **Visual Layout:**
   - **Interactive Leaflet WebView Map:**
@@ -271,7 +271,7 @@ graph TD
 
 ---
 
-### Screen 9: In-App Chat Messenger (`ChatScreen.js`)
+### Screen 9: In-App Chat Messenger (`ChatScreen.tsx`)
 - **Purpose:** Threaded communication channel tied to a specific accepted job for real-time coordination.
 - **Visual Layout:**
   - **Header Bar:** Contact name, role indicator (`Technician` or `Customer`), phone call icon.
@@ -286,7 +286,7 @@ graph TD
 
 ---
 
-### Screen 10: Technician Profile & Portfolio Hub (`TechnicianProfileScreen.js`)
+### Screen 10: Technician Profile & Portfolio Hub (`TechnicianProfileScreen.tsx`)
 - **Purpose:** Livelihood hub enabling technicians to display credentials, track ratings, and upload completed repair portfolios.
 - **Visual Layout:**
   - **Profile Header:** Profile photo, full name, verified badge, member since date.
@@ -302,7 +302,7 @@ graph TD
 
 ---
 
-### Screen 11: Customer Profile & History (`CustomerProfileScreen.js`)
+### Screen 11: Customer Profile & History (`CustomerProfileScreen.tsx`)
 - **Purpose:** Customer account management, completed repair history, and settings.
 - **Visual Layout:**
   - User name, email, phone number.

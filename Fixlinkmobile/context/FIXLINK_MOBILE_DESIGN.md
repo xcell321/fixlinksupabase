@@ -2,7 +2,7 @@
 **Cebu Roosevelt Memorial Colleges — College of Computer Studies**  
 *BSIT Capstone 2026 — FIXLINK: AN ALL-AROUND TECHNICIAN SERVICE PLATFORM*  
 **Researchers:** Jonard Masong, James Robert Rojas, Edsiel Ursal — **Advisers:** Marjorie Reso, MIT | Dr. Jonel D. Gelig  
-**Source of truth:** `mobile/src/theme.tsx` + `mobile/src/components/*` + `mobile/src/screens/*` + `mobile/src/navigation/AppNavigator.tsx` + `context/UI_WORKFLOW.md`
+**Source of truth:** `mobile/src/theme.tsx` + `mobile/src/components/*` + `mobile/src/features/*` + `mobile/src/navigation/AppNavigator.tsx` + `context/UI_WORKFLOW.md`
 
 ---
 
@@ -11,7 +11,7 @@ FixLink mobile is a **role-driven, high-contrast, outdoor-legible** service disp
 
 **Principles:**
 - One codebase, two personas (customer vs technician) via `user.role`.
-- Centralized Axios client `mobile/src/screens/services/api.tsx` (`API_BASE_URL http://${devHost}:5050/api`).
+- Centralized Axios client `mobile/src/services/api/` (`client.tsx`, `authApi.tsx`, `requestsApi.tsx`, `messagesApi.tsx`, `aiApi.tsx`, `trackingApi.tsx`, `profileApi.tsx`).
 - Optimistic UI for notifications (badge `filter(!read).length` instant) + fire-and-forget `PUT` ; authoritative backend for workload/capacity.
 - Reuse `serializeJob`/`getEligibleCandidates`/`techSchedule` helpers, never duplicate status logic.
 
@@ -228,9 +228,9 @@ Expo prototype runs `npx expo start` (SDK 57) on `Fixlinkmobile/mobile`, API `ht
 mobile/src/theme.tsx (colors, fonts, radii, spacing, shadows, monoStack)
 mobile/src/components/AppButton.tsx, Skeleton.tsx, MessageBanner.tsx, LocationIQMap.tsx, DateTimePicker(.web).tsx
 mobile/src/utils/applianceIcons.tsx (getApplianceIcon, getStatusColor/Icon/Guidance)
-mobile/src/screens/{auth, customer, technician, shared}/[11 screens + 5b/7b]
+mobile/src/features/{auth, customer, technician, tracking}/[screens + 5b/7b]
 mobile/src/navigation/AppNavigator.tsx (tabs, modals, deep-links focused/highlighted)
-mobile/src/screens/services/api.tsx (Axios baseUrl, auth)
+mobile/src/services/api/ (Axios baseUrl, auth)
 context/UI_WORKFLOW.md (screen specs), context/ARCHITECTURE.md (5.4 workload, 5.5 notifications)
 ```
 

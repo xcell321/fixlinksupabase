@@ -51,7 +51,7 @@ flowchart TD
 
 ## 2. Level 1 Data Flow Diagram (DFD Level 1)
 
-The Level 1 DFD decomposes the system into six distinct functional processes and maps data exchanges with the six underlying Firestore data stores.
+The Level 1 DFD decomposes the system into six distinct functional processes and maps data exchanges with the Supabase PostgreSQL tables (`users`, `jobs`, `messages` + `message_reads`, `reviews`, `notifications`, `announcements`, `categories`, plus `service_incidents`, `reports`, `password_resets`).
 
 ```mermaid
 flowchart TD
@@ -61,13 +61,13 @@ flowchart TD
     Admin([Administrator])
     LocIQ([LocationIQ API])
 
-    %% Data Stores
+    %% Data Stores (Supabase PostgreSQL; D2 covers the full jobs lifecycle)
     D1[(D1: users)]
-    D2[(D2: repairRequests)]
-    D3[(D3: acceptedJobs)]
-    D4[(D4: messages)]
-    D5[(D5: reviews)]
-    D6[(D6: announcements)]
+    D2[(D2: jobs)]
+    D3[(D3: messages + message_reads)]
+    D4[(D4: reviews)]
+    D5[(D5: notifications)]
+    D6[(D6: announcements + categories)]
 
     %% Processes
     P1((1.0<br/>Account Authentication<br/>& Verification))
@@ -89,36 +89,35 @@ flowchart TD
     P2 -->|Save pending request| D2
 
     %% P3 Flows
-    D2 -->|Read pending requests| P3
+    D2 -->|Read pending jobs| P3
     D1 -->|Read verified tech skills & GPS| P3
     P3 -->|Deliver skill-matched & distance-sorted jobs| Technician
     Technician -->|Accept job action| P3
-    P3 -->|Remove from pending| D2
-    P3 -->|Create accepted record with OTP| D3
+    P3 -->|In-place `Accepted` + OTP via `accept_job()` RPC| D2
 
     %% P4 Flows
     Technician -->|Push live GPS coordinates| P4
     P4 <-->|Driving route polyline & ETA| LocIQ
-    P4 <-->|Sync live coords & state| D3
+    P4 <-->|Sync live coords & state| D2
     P4 -->|Render live tracking & ETA| Customer
     Customer <-->|Send / receive in-app messages| P4
     Technician <-->|Send / receive in-app messages| P4
-    P4 <-->|Read/Write chat logs| D4
+    P4 <-->|Read/Write chat logs| D3
 
     %% P5 Flows
-    D3 -->|Display 4-digit completion code| Customer
+    D2 -->|Display 4-digit completion code| Customer
     Customer -->|Disclose OTP to technician on-site| Technician
     Technician -->|Enter 4-digit code| P5
-    P5 <-->|Validate code & update status to Completed| D3
+    P5 <-->|Validate code & update status to Completed| D2
 
     %% P6 Flows
     Customer -->|Submit 1-5 star rating & review| P6
-    P6 -->|Write review record| D5
+    P6 -->|Write review record| D4
     P6 -->|Update cumulative rating stats| D1
     Technician -->|Upload completed repair photo| P6
     P6 -->|Append portfolio gallery entry| D1
 
-    %% Announcements
+    %% Announcements + categories
     Admin -->|Post advisories| D6
     D6 -->|Display banner notices| Customer
     D6 -->|Display banner notices| Technician
@@ -192,8 +191,8 @@ flowchart LR
 | **Primary Actor** | Customer |
 | **Secondary Actor**| LocationIQ Geocoding API |
 | **Preconditions** | Customer is logged in with an active account. |
-| **Postconditions** | Request is committed to `repairRequests` with status `Pending`; nearby matched technicians receive notifications. |
-| **Main Flow** | 1. Customer navigates to "Submit Request".<br/>2. Customer selects appliance category (e.g., Refrigerator) and describes failure symptoms.<br/>3. Customer attaches a photograph of the damaged unit.<br/>4. Customer taps "Locate Me" or types street address.<br/>5. System invokes LocationIQ forward geocoding to resolve latitude/longitude.<br/>6. Customer selects preferred appointment date and time slot.<br/>7. Customer confirms submission.<br/>8. System validates inputs and records request in Firestore.<br/>9. System dispatches background push notifications to technicians within 20km possessing matching skills. |
+| **Postconditions** | Request is committed to `jobs` with status `Pending`; nearby matched technicians receive in-app notifications. |
+| **Main Flow** | 1. Customer navigates to "Submit Request".<br/>2. Customer selects appliance category (e.g., Refrigerator) and describes failure symptoms.<br/>3. Customer attaches a photograph of the damaged unit.<br/>4. Customer taps "Locate Me" or types street address.<br/>5. System invokes LocationIQ forward geocoding to resolve latitude/longitude.<br/>6. Customer selects preferred appointment date and time slot.<br/>7. Customer confirms submission.<br/>8. System validates inputs and records the request in the Supabase `jobs` table.<br/>9. System surfaces the request in the feeds of technicians within 20km possessing matching skills, with an in-app notification (push dispatch is not actively used). |
 | **Alternate Flows**| 4a. Location permission denied: Customer manually enters street address.<br/>8a. Photo upload fails: System saves request without photo and notifies customer. |
 
 ---
@@ -205,8 +204,8 @@ flowchart LR
 | **Use Case Name** | Accept & Dispatch Repair Job |
 | **Primary Actor** | Technician |
 | **Preconditions** | Technician is verified (`verificationStatus: 'verified'`) and authenticated. |
-| **Postconditions** | Job moves to `acceptedJobs`, status updates to `Accepted`, 4-digit OTP generated, customer notified. |
-| **Main Flow** | 1. Technician opens the "Available Jobs" feed.<br/>2. System displays requests matching technician's verified skills, sorted by Haversine distance.<br/>3. Technician reviews job summary and approximate proximity.<br/>4. Technician clicks "Accept Job".<br/>5. System moves the request record to `acceptedJobs` collection.<br/>6. System generates a secure 4-digit OTP code stored in the job record.<br/>7. System unmasks customer coordinates and unlocks the mutual live tracking map. |
+| **Postconditions** | Job status updates to `Accepted` in place via the `accept_job()` RPC, 4-digit OTP generated, customer notified. |
+| **Main Flow** | 1. Technician opens the "Available Jobs" feed.<br/>2. System displays requests matching technician's verified skills, sorted by Haversine distance.<br/>3. Technician reviews job summary and approximate proximity.<br/>4. Technician clicks "Accept Job".<br/>5. System flips the `jobs` row to `Accepted` in place via the atomic `accept_job()` RPC.<br/>6. System generates a secure 4-digit OTP code stored in the job record.<br/>7. System unmasks customer coordinates and unlocks the mutual live tracking map. |
 | **Alternate Flows**| 4a. Technician clicks "Decline": Request is hidden from this technician's feed but remains available for other qualified technicians. |
 
 ---
@@ -281,11 +280,11 @@ flowchart LR
 ---
 
 ### Slide 6: System Architecture & Tech Stack
-* **Three-Tier Architecture:** Presentation (React Native/Expo) $\leftrightarrow$ Logic (Node.js/Express) $\leftrightarrow$ Data (Firestore, LocationIQ API).
+* **Three-Tier Architecture:** Presentation (React Native/Expo) $\leftrightarrow$ Logic (Node.js/Express) $\leftrightarrow$ Data (Supabase PostgreSQL, LocationIQ API).
 * **Tech Stack Rationale:**
   * *Expo SDK 57:* Single codebase for Android & iOS.
   * *Node.js + Express:* Lightweight, fast asynchronous I/O for coordinate streaming.
-  * *Firebase Firestore:* Real-time document updates and security rules.
+  * *Supabase PostgreSQL:* Relational store with atomic SQL RPC functions (`accept_job`, `send_chat_message`, `recompute_technician_rating`, `record_no_show`), service_role server access, and idempotent schema in `backend/src/db/schema.sql`.
   * *LocationIQ API + Leaflet.js:* Cost-effective, high-accuracy geocoding and OSM street routing.
 
 ---
@@ -304,7 +303,7 @@ flowchart LR
 
 ### Slide 8: Analysis & Design (DFD Level 0 & Level 1)
 * Showcase the Context Diagram and Level 1 DFD (from Part 1 of this document).
-* Walk the panel through how a repair ticket moves from Customer $\rightarrow$ LocationIQ $\rightarrow$ Firestore $\rightarrow$ Technician Feed.
+* Walk the panel through how a repair ticket moves from Customer $\rightarrow$ LocationIQ $\rightarrow$ Supabase PostgreSQL $\rightarrow$ Technician Feed.
 
 ---
 
@@ -380,9 +379,9 @@ Prepare two mobile devices (or one mobile phone and one emulator):
 |---|---|---|---|---|
 | **1** | 0:00 | Device A (Customer) | Open App $\rightarrow$ Show Home Dashboard. | *"Here is the Customer Dashboard displaying active advisories and the 2x3 appliance category grid."* |
 | **2** | 0:30 | Device A (Customer) | Tap **"+ Request Service"** $\rightarrow$ Select **Refrigerator** $\rightarrow$ Type issue: *"Not cooling, compressor humming"* $\rightarrow$ Tap **"📍 Locate Me"**. | *"Notice how LocationIQ instantly reverse-geocodes the customer's current GPS location into an exact street address."* |
-| **3** | 1:15 | Device A (Customer) | Tap **"Submit Request"** $\rightarrow$ Request enters `Pending` state. | *"The request is committed to Firestore and immediately evaluated by the skill-matching engine."* |
+| **3** | 1:15 | Device A (Customer) | Tap **"Submit Request"** $\rightarrow$ Request enters `Pending` state. | *"The request is committed to the Supabase `jobs` table and immediately evaluated by the skill-matching engine."* |
 | **4** | 1:45 | Device B (Technician) | Open **"Available Jobs"** feed. | *"Notice that only technicians certified in Refrigerator repair see this job. The feed displays distance: '📍 1.8 km away', while exact house coordinates remain masked for privacy."* |
-| **5** | 2:15 | Device B (Technician) | Tap **"Accept Job"**. | *"The request is atomically moved to `acceptedJobs`, and the customer is instantly notified."* |
+| **5** | 2:15 | Device B (Technician) | Tap **"Accept Job"**. | *"The job flips to `Accepted` in place via the atomic `accept_job()` RPC, and the customer is instantly notified."* |
 | **6** | 2:45 | Both Devices | Open **"🗺️ Track on Live Map"**. | *"Both parties unlock mutual live tracking. The technician sees the LocationIQ driving route to the customer's house, and the customer watches the technician's approaching vehicle pin with live ETA."* |
 | **7** | 3:30 | Device B (Technician) | Tap **"Start Job"** $\rightarrow$ Status changes to `In Progress`. | *"Upon arriving at the home, the technician begins the repair. The customer's screen now reveals the 4-digit security OTP."* |
 | **8** | 4:00 | Device B (Technician) | Tap **"Complete Job"** $\rightarrow$ Enter Customer's 4-digit OTP. | *"The technician requests the code from the customer and enters it. The backend validates the code and transitions the job to `Completed`."* |

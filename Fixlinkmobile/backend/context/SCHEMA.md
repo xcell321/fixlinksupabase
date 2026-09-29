@@ -20,6 +20,9 @@ erDiagram
     MESSAGES ||--o{ MESSAGE_READS : "read by"
     USERS ||--o{ NOTIFICATIONS : receives
     USERS ||--o{ PASSWORD_RESETS : "issued reset links"
+    JOBS ||--o{ SERVICE_INCIDENTS : "cancellations and no-shows"
+    USERS ||--o{ SERVICE_INCIDENTS : "involved in"
+    USERS ||--o{ REPORTS : "reported or reporter"
 
     USERS {
         uuid id PK "Supabase Auth user id"
@@ -128,11 +131,15 @@ Stores credential, profile, verification, and live location data for both Custom
 | `years_experience` | `int` | Technicians | Years of repair experience. |
 | `latitude` / `longitude` | `double precision` | Optional | Last reported GPS coordinate. |
 | `location_updated_at` | `timestamptz` | Optional | Timestamp of the most recent location ping. |
-| `fcm_token` | `text` | Optional | Reserved for push notifications. |
+| `fcm_token` | `text` | Optional | Reserved for push notifications (push dispatch is not actively used; notifications are in-app only). |
 | `portfolio` | `jsonb` | Technicians | Proof-of-work repairs: single photo per request as `{ name, url, uploadedAt, repairType, model }`. Upload requires trimmed `repairType` and `model` (80 chars max) and stores only `files[0]`. |
 | `rating` | `double precision` | Optional | Aggregated average rating (1.0–5.0). |
 | `total_reviews` | `int` | Optional | Count of submitted reviews. |
+| `is_available` | `boolean` | Technicians | Availability toggle for dispatch (`true` = open for jobs). |
+| `no_show_count` | `int` | Optional | Customer no-show counter, bumped atomically by `record_no_show()`. |
 | `profile_image` | `text` | Optional | Public URL of the profile picture. |
+| `bio` | `text` | Optional | Short technician introduction. |
+| `updated_at` | `timestamptz` | Optional | Last profile update timestamp. |
 | `created_at` | `timestamptz` | **Required** | Account creation timestamp. |
 
 ---
@@ -152,7 +159,10 @@ Represents the **entire request lifecycle**: unassigned pending requests and acc
 | `category` | `text` | Optional | Parent admin-managed category (e.g., `'Home Appliances'`). |
 | `description` | `text` | **Required** | Customer's description of the failure. |
 | `location` | `text` | **Required** | Formatted address or community landmark. |
-| `latitude` / `longitude` | `double precision` | Optional | Geocoded service-location coordinates. |
+| `latitude` / `longitude` | `double precision` | Optional | Geocoded service-location coordinates (submit-time snapshot). |
+| `customer_latitude` / `customer_longitude` | `double precision` | Optional | Customer live GPS, kept separate so live pings never overwrite the confirmed service destination. |
+| `confirmed_service_location` | `text` | Optional | Technician travel destination snapshot. |
+| `service_latitude` / `service_longitude` | `double precision` | Optional | Service destination coordinates for routing. |
 | `preferred_date` / `preferred_time` | `text` | Optional | Requested service date/time slot. |
 | `scheduled_date` | `text` | Optional | Full scheduled date-time string. |
 | `photo_url` | `text` | Optional | Public URL of the uploaded appliance photo. |
@@ -160,13 +170,21 @@ Represents the **entire request lifecycle**: unassigned pending requests and acc
 | `is_other` | `boolean` | Optional | Free-text "other" device flag. |
 | `declined_by` | `uuid` FK | Optional | Technician who dismissed this job from their feed. |
 | `verification_code` | `text` | On accept | 4-digit OTP generated atomically on acceptance. |
+| `verification_code_for_arrival` | `text` | Optional | Arrival confirmation code for the confirm/ready/arrive workflow. |
 | `accepted_at` | `timestamptz` | On accept | Timestamp of acceptance. |
+| `customer_confirmation_timestamp` | `timestamptz` | Optional | Customer confirm-repair timestamp. |
+| `customer_ready_timestamp` | `timestamptz` | Optional | Customer-ready timestamp. |
+| `technician_arrival_timestamp` | `timestamptz` | Optional | Technician arrival timestamp. |
 | `started_at` | `timestamptz` | Optional | Timestamp repair began. |
 | `completed_at` | `timestamptz` | Optional | Timestamp of verified completion. |
 | `cancelled_at` | `timestamptz` | Optional | Timestamp of cancellation. |
+| `cancellation_stage` | `text` | Optional | Stage at cancel (`before_accept`, `after_accept`, `after_confirmation`, `after_ready`, `after_travel`). |
+| `cancelled_by` | `text` | Optional | Who cancelled (role or uid). |
+| `cancellation_reason` | `text` | Optional | Cancel reason text. |
 | `location_updated_at` | `timestamptz` | Optional | Latest customer live-location ping. |
 | `review_id` | `uuid` FK | Optional | Associated review (`reviews.id`). |
 | `reviewed_at` | `timestamptz` | Optional | Review submission timestamp. |
+| `updated_at` | `timestamptz` | Optional | Last job update timestamp. |
 | `created_at` | `timestamptz` | **Required** | Request submission timestamp. |
 
 **Status values:** `Pending` → `Accepted` → `Confirmed` → `Customer Ready` → `In Progress` → `Completed` (via OTP), with `Cancelled` and `No-Show` branches. **Active workload statuses (technician capacity):** `Accepted`, `Confirmed`, `Customer Ready`, `In Progress` (counted for workload; `Pending`, `Completed`, `Cancelled`, `No-Show` are not active).
@@ -232,7 +250,7 @@ In-app unread/read badge + two-step deep-link system for chat and job workflow.
 | `read_at` | `timestamptz` | Optional | Read timestamp set on `PUT /api/requests/notifications/:id/read`. |
 | `timestamp` | `timestamptz` | **Required** | Creation timestamp (sort `desc`, limit 100). |
 
-**Two-step interaction ( `mobile/src/navigation/AppNavigator.js` ):** 1st tap → show `detailCard` (sender/text/time/jobCode) + optimistic `read=true` + fire-and-forget `PUT …/read` (404 → keep optimistic, no warn). 2nd tap same `id` → `GET /api/requests/job/:id` validate ownership → `chat`→ exact `ChatScreen` thread (`jobId`), `job` Completed→ `RequestProgressScreen` `focusedJobId`+`autoExpandReview` (completed card highlighted), otherwise `RequestDetailsScreen`/technician `AvailableJobsScreen` `highlightedJobId`.
+**Two-step interaction ( `mobile/src/navigation/AppNavigator.tsx` ):** 1st tap → show `detailCard` (sender/text/time/jobCode) + optimistic `read=true` + fire-and-forget `PUT …/read` (404 → keep optimistic, no warn). 2nd tap same `id` → `GET /api/requests/job/:id` validate ownership → `chat`→ exact `ChatScreen` thread (`jobId`), `job` Completed→ `RequestProgressScreen` `focusedJobId`+`autoExpandReview` (completed card highlighted), otherwise `RequestDetailsScreen`/technician `AvailableJobsScreen` `highlightedJobId`.
 
 **Persistence:** `read/read_at` persisted in `notifications`; badge derived from `GET /api/requests/notifications` (`read + unread`, not legacy `GET /api/requests/messages/unread` unread-only). Re-poll 10s, reopen, or restart all reflect DB state. Mark failure 404 keeps optimistic, other errors revert and show `detailError`.
 
@@ -263,7 +281,49 @@ Admin-managed skill categories; `devices` drives the customer device picker and 
 
 ---
 
-### 2.9 `password_resets`
+### 2.9 `service_incidents`
+Anti-abuse and no-show history. Records the stage of a cancellation and any possible no-show so a customer history can be reviewed before admin action.
+
+| Column | Type | Requirement | Description |
+|---|---|---|---|
+| `id` | `uuid` PK | **Required** | Auto-generated ID. |
+| `job_id` | `uuid` FK | Optional | References `jobs.id` (`on delete set null`). |
+| `customer_uid` | `uuid` FK | Optional | References `users.id` (`on delete set null`). |
+| `technician_uid` | `uuid` FK | Optional | References `users.id` (`on delete set null`). |
+| `type` | `text` | **Required** | `'cancellation'` or `'no_show'`. |
+| `stage` | `text` | **Required** | `'before_accept'`, `'after_accept'`, `'after_confirmation'`, `'after_ready'`, `'after_travel'`. |
+| `reason` | `text` | Optional | Incident reason text. |
+| `status` | `text` | **Required** | `'logged'`, `'warning'`, `'flagged'`, `'reviewed'`, `'resolved'` (default `'logged'`). |
+| `created_at` | `timestamptz` | **Required** | Creation timestamp. |
+| `resolved_at` | `timestamptz` | Optional | Resolution timestamp. |
+
+Indexes: `idx_service_incidents_customer (customer_uid, created_at desc)`, `idx_service_incidents_job (job_id)`.
+
+---
+
+### 2.10 `reports`
+Admin panel reports and disputes. No mobile write path yet.
+
+| Column | Type | Requirement | Description |
+|---|---|---|---|
+| `id` | `uuid` PK | **Required** | Auto-generated ID. |
+| `reporter_uid` | `uuid` FK | Optional | References `users.id` (`on delete set null`). |
+| `reported_user_uid` | `uuid` FK | Optional | References `users.id` (`on delete set null`). |
+| `reported_user_name` | `text` | Optional | Reported user display name. |
+| `title` | `text` | Optional | Report title. |
+| `reason` | `text` | Optional | Report reason. |
+| `description` | `text` | Optional | Report body. |
+| `status` | `text` | **Required** | Default `'open'`. |
+| `resolution` | `text` | Optional | Admin resolution text. |
+| `user_status` | `text` | Optional | Resulting user status action. |
+| `created_at` | `timestamptz` | **Required** | Creation timestamp. |
+| `resolved_at` | `timestamptz` | Optional | Resolution timestamp. |
+
+Indexes: `idx_reports_status (status)`, `idx_reports_reported_user (reported_user_uid)`.
+
+---
+
+### 2.11 `password_resets`
 Backs **single-use** password-reset links. When a reset link is issued for an account, any still-unused rows for that user are deleted and one row is inserted holding a one-way fingerprint of the signed reset token. Redeeming a link marks the row `used_at` in a single atomic update, so the same link can never succeed twice.
 
 | Column | Type | Requirement | Description |
@@ -279,11 +339,11 @@ Indexes: `password_resets_token_hash_idx (token_hash)`, `password_resets_user_id
 
 ---
 
-### 2.10 `workload` (virtual, computed — no migration)
+### 2.12 `workload` (virtual, computed — no migration)
 
 Workload is **not stored** as a column; it is computed live from `jobs`:
 
-- **Definition:** `activeJobs = COUNT(*) FROM jobs WHERE technician_uid = :uid AND status IN ('Accepted','Confirmed','Customer Ready','In Progress')` (helpers `backend/src/utils/workload.js:getTechnicianActiveJobCount`, `getActiveJobCountsForTechnicians` via `count head:true` + fallback `select id`). `Pending`, `Completed`, `Cancelled`, `No-Show` are **not** counted.
+- **Definition:** `activeJobs = COUNT(*) FROM jobs WHERE technician_uid = :uid AND status IN ('Accepted','Confirmed','Customer Ready','In Progress')` (helpers `backend/src/services/workloadService.js:getTechnicianActiveJobCount`, `getActiveJobCountsForTechnicians` via `count head:true` + fallback `select id`). `Pending`, `Completed`, `Cancelled`, `No-Show` are **not** counted.
 - **Levels:** `0–2 → available`, `3–5 → busy`, `6+ → at_capacity` (`getWorkloadStatus`).
 - **AI filtering:** `GET /api/ai/recommend` annotates `candidate.activeJobs/workloadStatus`, filters `at_capacity` out, applies `-0.06` score penalty for `busy` (does not overpower skill/rating/distance). Response exposes `{activeJobs, workloadStatus}` (no customer PII).
 - **Accept guard:** `PUT /api/requests/:id/accept` recalculates count before `rpc accept_job`; if `at_capacity` → `409 {code:'TECHNICIAN_AT_CAPACITY', activeJobs, workloadStatus}`. Advisory (AI) + authoritative (accept) prevents stale-race over-accept; automatic recovery when count falls to `≤5`.
@@ -327,5 +387,6 @@ Defined in `backend/src/db/schema.sql`:
 | `accept_job(job_id, technician_uid, technician_name)` | Atomically assigns + generates OTP + transitions to `Accepted`. |
 | `send_chat_message(job_id, sender_uid, sender_name, sender_role, p_text, p_image_url default null)` | Inserts message and fans out the chat notification together. Image-only messages store `text` as empty string. Notification falls back to `Sent a photo`. |
 | `recompute_technician_rating(technician_uid)` | Recomputes `users.rating` / `users.total_reviews` from `reviews`. |
+| `record_no_show(p_job_id, p_customer_uid, p_technician_uid, p_stage, p_reason)` | Inserts a `service_incidents` no-show row and bumps `users.no_show_count` atomically; returns the new count. |
 
 Backend access runs through the **service_role** key (bypasses Row Level Security); the mobile app never connects to the database directly.
