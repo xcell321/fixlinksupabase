@@ -668,27 +668,37 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
     </View>
   );
 
+  // Mirrors the live refCard layout (header + progress bar + footer) so the
+  // skeleton sits exactly where each request card will appear.
   const renderSkeleton = (): React.JSX.Element => (
-    <View>
+    <View style={{ gap: 12 }}>
       {[1, 2, 3].map((item) => (
-        <View key={item} style={styles.card}>
-          <View style={styles.skeletonHeader}>
-            <Skeleton style={{ width: 44, height: 44, borderRadius: 14 }} />
-            <View style={styles.skeletonCopy}>
-              <Skeleton style={{ width: '62%', height: 15, marginBottom: 8 }} />
-              <Skeleton style={{ width: '40%', height: 11 }} />
+        <View key={item} style={styles.refCard}>
+          <View style={styles.refHeaderRow}>
+            <View style={styles.refTitleWrap}>
+              <Skeleton pulse style={{ width: '70%', height: 14, borderRadius: 6, marginBottom: 6 }} />
+              <Skeleton pulse style={{ width: '45%', height: 12, borderRadius: 6 }} />
             </View>
-            <Skeleton style={{ width: 70, height: 22, borderRadius: 8 }} />
+            <Skeleton pulse style={{ width: 64, height: 22, borderRadius: 999, flexShrink: 0 }} />
           </View>
-          <Skeleton style={{ width: '92%', height: 13, marginBottom: 8 }} />
-          <Skeleton style={{ width: '66%', height: 13, marginBottom: 16 }} />
-          <View style={styles.skeletonMetaRow}>
-            <Skeleton style={{ width: '34%', height: 12 }} />
-            <Skeleton style={{ width: '42%', height: 12 }} />
+          <View style={styles.refProgressBlock}>
+            <View style={styles.refProgressLabelRow}>
+              <Skeleton pulse style={{ width: 56, height: 10, borderRadius: 5 }} />
+              <Skeleton pulse style={{ width: 32, height: 10, borderRadius: 5 }} />
+            </View>
+            <View style={styles.refProgressBar}>
+              <Skeleton pulse style={{ width: '40%', height: 6, borderRadius: 999 }} />
+            </View>
           </View>
-          <View style={styles.skeletonActions}>
-            <Skeleton style={{ width: '46%', height: 42, borderRadius: 12 }} />
-            <Skeleton style={{ width: '46%', height: 42, borderRadius: 12 }} />
+          <View style={styles.refFooter}>
+            <View style={styles.refFooterItem}>
+              <Skeleton pulse style={{ width: 12, height: 12, borderRadius: 6, flexShrink: 0 }} />
+              <Skeleton pulse style={{ flex: 1, height: 12, borderRadius: 6 }} />
+            </View>
+            <View style={styles.refFooterItem}>
+              <Skeleton pulse style={{ width: 12, height: 12, borderRadius: 6, flexShrink: 0 }} />
+              <Skeleton pulse style={{ flex: 1, height: 12, borderRadius: 6 }} />
+            </View>
           </View>
         </View>
       ))}
@@ -945,10 +955,6 @@ const styles = themedStyles({
   reviewButton: { backgroundColor: colors.customer, minHeight: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', ...shadows.card },
 
   // Skeleton / empty / error
-  skeletonHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 18 },
-  skeletonCopy: { flex: 1, marginLeft: 12 },
-  skeletonMetaRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 18 },
-  skeletonActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
   emptyCard: { backgroundColor: colors.white, borderRadius: 20, padding: 32, alignItems: 'center', borderWidth: 1, borderColor: colors.line, gap: 10, ...shadows.card },
   emptyIconWrap: { width: 64, height: 64, borderRadius: 20, backgroundColor: colors.customerSoft, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   emptyTitle: { color: colors.ink, fontSize: 17, fontFamily: fonts.bold, textAlign: 'center' },
