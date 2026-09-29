@@ -12,9 +12,9 @@ export const styles = themedStyles({
 alignSelf: 'center' },
   // Dark header matching Make file design
   protoHeader: { backgroundColor: colors.dark, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 24, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, marginHorizontal: -16, marginTop: -12, marginBottom: 16 },
-  protoHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 10 },
+  protoHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16, gap: 10 },
   protoKicker: { color: colors.muted, fontSize: 13, fontFamily: fonts.regular },
-  protoName: { color: colors.onAccent, fontSize: 24, fontFamily: fonts.extraBold, letterSpacing: -0.4, marginTop: 2 },
+  protoName: { color: colors.onAccent, fontSize: 18, fontFamily: fonts.extraBold, letterSpacing: -0.4, marginTop: 2 },
   protoBell: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.10)', alignItems: 'center', justifyContent: 'center', minHeight: 44, minWidth: 44 },
   protoIdentity: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 10 },
   protoHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: 12, flexShrink: 0 },

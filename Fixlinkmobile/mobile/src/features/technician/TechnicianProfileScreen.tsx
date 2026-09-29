@@ -1031,7 +1031,7 @@ elevation: 0 },
   saveButtonText: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bold },
 
   // Shared Card Surface (About, Skills, Service Area, Schedule)
-  cardSurface: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 20, padding: 18, marginBottom: 18, elevation: 0 },
+  cardSurface: { backgroundColor: colors.white, borderWidth: 1, borderColor: '#F3F4F6', borderRadius: 16, padding: 14, marginBottom: 18, elevation: 0 },
   cardSurfaceHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
   cardSurfaceIconWell: { width: 34, height: 34, borderRadius: 10, backgroundColor: colors.techSoft, borderWidth: 1, borderColor: colors.hudBorder, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   cardSurfaceTitleWrap: { flex: 1 },
