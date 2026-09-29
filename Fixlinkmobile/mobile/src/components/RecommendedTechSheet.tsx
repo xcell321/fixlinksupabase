@@ -36,7 +36,7 @@ export interface RecommendedTechnician {
   workloadStatus?: string;
 }
 
-type LoadState = 'loading' | 'loaded' | 'empty' | 'error';
+type LoadState = 'loading' | 'loaded' | 'empty' | 'error' | 'unavailable';
 
 interface RecommendedTechSheetProps {
   visible: boolean;
@@ -73,10 +73,19 @@ export default function RecommendedTechSheet({ visible, jobId, applianceType, on
       .then((data) => {
         if (!active) return;
         const res = data as { recommendations?: RecommendedTechnician[]; ai?: string; note?: string } | null;
+        const aiOn = res?.ai === 'ai';
+        setNote(res?.note ?? null);
+        setAiAssisted(aiOn);
+        // AI gateway off or unreachable: the backend falls back to a plain
+        // deterministic list, but the sheet must not present that as an AI
+        // ranking. Show the unavailable state instead.
+        if (!aiOn) {
+          setTechs([]);
+          setState('unavailable');
+          return;
+        }
         const list = Array.isArray(res?.recommendations) ? res.recommendations : [];
         setTechs(list);
-        setNote(res?.note ?? null);
-        setAiAssisted(res?.ai === 'ai');
         setState(list.length > 0 ? 'loaded' : 'empty');
       })
       .catch(() => {
@@ -232,6 +241,27 @@ export default function RecommendedTechSheet({ visible, jobId, applianceType, on
       );
     }
 
+    if (state === 'unavailable') {
+      return (
+        <View style={styles.stateBox}>
+          <View style={styles.stateIcon}>
+            <Ionicons name="sparkles-outline" size={24} color={colors.muted} />
+          </View>
+          <Text style={styles.stateTitle}>AI Service Unavailable</Text>
+          <Text style={styles.stateText}>AI matching is temporarily unavailable. Your request is still visible to qualified technicians in the jobs feed.</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Refresh matches"
+            onPress={() => setReloadKey((k) => k + 1)}
+            style={({ pressed }) => [styles.retryBtn, pressed && styles.pressed]}
+          >
+            <Ionicons name="refresh-outline" size={15} color={colors.onAccent} />
+            <Text style={styles.retryBtnText}>Refresh</Text>
+          </Pressable>
+        </View>
+      );
+    }
+
     if (state === 'empty') {
       return (
         <View style={styles.stateBox}>
@@ -265,7 +295,9 @@ export default function RecommendedTechSheet({ visible, jobId, applianceType, on
             <View style={styles.headerCopy}>
               <Text style={styles.title} accessibilityRole="header">AI Technician Match</Text>
               <Text style={styles.subtitle} numberOfLines={1}>
-                {applianceType ? `Top ranked for ${applianceType}` : 'Top ranked for this request'}
+                {state === 'unavailable'
+                  ? 'AI matching paused'
+                  : (applianceType ? `Top ranked for ${applianceType}` : 'Top ranked for this request')}
               </Text>
             </View>
             <Pressable
