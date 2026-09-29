@@ -9,6 +9,7 @@ import { submitRepairRequest, fetchPlatformCategories } from "../../services/api
 import { geocodeAddress, geocodeAddressPrecise, geocodeAddressStructured, reverseGeocodePrecise } from "../../services/locationIq";
 import { collectBestFix, distanceInMeters } from "./locationFix";
 import CustomerLocationMap from "../../components/CustomerLocationMap";
+import InfoModal from "../../components/InfoModal";
 import { colors, fonts, shadows, themedStyles } from '../../theme';
 import { getApplianceIcon, type IconName } from '../../utils/applianceIcons';
 
@@ -220,14 +221,14 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
   const [zipCode, setZipCode] = useState("");
   const [notes, setNotes] = useState("");
   const [coords, setCoords] = useState<Coords | null>(null);
-  // Smart opacity: manual text = 50%, address derived from the pin = 100%
+  // Smart opacity: manual text = 80%, address derived from the pin = 100%
   // (medium weight, never bold).
   // `addressFromPin` means the fields were filled FROM the pin (a GPS fix or a
   // pin the customer dragged), not typed. While true the auto-geocode effect
   // must not overwrite the pin from a typed-address lookup. Editing any field
   // clears it, so manual edits still re-sync the map.
   const [addressFromPin, setAddressFromPin] = useState(false);
-  const locTextStyle = [styles.textInputSingle, { opacity: addressFromPin ? 1 : 0.5 }];
+  const locTextStyle = [styles.textInputSingle, { opacity: addressFromPin ? 1 : 0.8 }];
   // Consistent focus ring for all step 4 boxes (orange when focused)
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([]);
@@ -252,6 +253,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoViewerVisible, setPhotoViewerVisible] = useState(false);
   const [photoMenuVisible, setPhotoMenuVisible] = useState(false);
+  const [successVisible, setSuccessVisible] = useState(false);
   const scrollRef = useRef<ScrollView | null>(null);
 
   const composedLocation = [street.trim(), city.trim(), zipCode.trim()].filter(Boolean).join(', ');
@@ -755,13 +757,9 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
         ...(photo?.uri ? { photo } : {}),
       });
       
-      Alert.alert(
-        "Request Submitted!",
-        "We're finding a technician that matches your request.",
-        [
-          { text: "View Progress", onPress: onNavigateToProgress }
-        ]
-      );
+      // In-app floating modal. Alert buttons do not fire reliably on web,
+      // which left successful submits with no visible confirmation.
+      setSuccessVisible(true);
 
       setSelectedCategoryName("");
       setSelectedDevice("");
@@ -1448,6 +1446,14 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
           </View>
         </View>
       </Modal>
+
+      <InfoModal
+        visible={successVisible}
+        title="Request Submitted!"
+        message="We're finding a technician that matches your request."
+        buttonLabel="View Progress"
+        onClose={() => { setSuccessVisible(false); onNavigateToProgress?.(); }}
+      />
       </View>
     </ScrollView>
   );
