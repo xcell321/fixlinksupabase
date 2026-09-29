@@ -362,24 +362,40 @@ ChatScreenProps): React.JSX.Element {
   // Attach a photo to the next message. Only the uri/name/mime triple is kept
   // so it can be handed straight to the multipart upload helper.
   const pickPhoto = useCallback(async (): Promise<void> => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      showToast('Photo permission is required to attach an image');
-      return;
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        showToast('Photo permission is required to attach an image');
+        return;
+      }
+      let result;
+      try {
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ['images'],
+          allowsEditing: true,
+          quality: 0.7,
+        });
+      } catch {
+        // Some devices have no system crop UI, which makes the editor throw.
+        // Retry without it so attach still works there.
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ['images'],
+          allowsEditing: false,
+          quality: 0.7,
+        });
+      }
+      if (result.canceled) return;
+      const asset = result.assets?.[0];
+      if (!asset) return;
+      setPendingPhoto({
+        uri: asset.uri,
+        fileName: asset.fileName ?? undefined,
+        mimeType: asset.mimeType ?? undefined,
+      });
+    } catch (error) {
+      console.warn('Photo attach failed:', error);
+      showToast('Could not open photo library. Please try again.');
     }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      quality: 0.7,
-    });
-    if (result.canceled) return;
-    const asset = result.assets?.[0];
-    if (!asset) return;
-    setPendingPhoto({
-      uri: asset.uri,
-      fileName: asset.fileName ?? undefined,
-      mimeType: asset.mimeType ?? undefined,
-    });
   }, [showToast]);
 
   const handleSendMessage = async (): Promise<void> => {
@@ -528,7 +544,10 @@ ChatScreenProps): React.JSX.Element {
           </Pressable>
 
           <Pressable
-            onPress={() => peerPhone && handleCopyPhone(peerPhone)}
+            accessibilityRole="button"
+            accessibilityLabel="Conversation information"
+            accessibilityHint="Shows who you are talking to and the job this chat belongs to"
+            onPress={() => setInfoOpen(true)}
             style={styles.headerAvatarWrap}
           >
             {s.peerImage ? (
@@ -540,7 +559,13 @@ ChatScreenProps): React.JSX.Element {
             )}
           </Pressable>
 
-          <Pressable style={styles.headerCenter} onPress={() => peerPhone && handleCopyPhone(peerPhone)}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Conversation information"
+            accessibilityHint="Shows who you are talking to and the job this chat belongs to"
+            style={styles.headerCenter}
+            onPress={() => setInfoOpen(true)}
+          >
             <Text style={styles.headerName} numberOfLines={1}>{s.peerName}</Text>
             <Text style={[styles.headerOnline, !peerOnline && styles.headerOffline]} numberOfLines={1}>
               {peerOnline ? 'Online' : 'Offline'}
@@ -867,15 +892,15 @@ ChatScreenProps): React.JSX.Element {
       {loading ? (
         <View style={styles.skeletonList}>
           {[1, 2, 3, 4, 5].map((k) => (
-            <View key={k} style={styles.skeletonRow}>
-              <Skeleton style={styles.skeletonAvatar} />
-              <View style={styles.skeletonCol}>
-                <View style={styles.skeletonLineRow}>
-                  <Skeleton style={{ width: '46%', height: 14, borderRadius: 6 }} />
-                  <Skeleton style={{ width: 36, height: 11, borderRadius: 6 }} />
+            <View key={k} style={styles.skeletonRowCard}>
+              <Skeleton pulse style={{ width: 40, height: 40, borderRadius: 20 }} />
+              <View style={styles.rowCenter}>
+                <View style={styles.rowNameRow}>
+                  <Skeleton pulse style={{ flex: 1, height: 14, borderRadius: 6 }} />
+                  <Skeleton pulse style={{ width: 36, height: 11, borderRadius: 6, flexShrink: 0 }} />
                 </View>
-                <Skeleton style={{ width: '78%', height: 12, borderRadius: 6 }} />
-                <Skeleton style={{ width: '52%', height: 11, borderRadius: 6 }} />
+                <Skeleton pulse style={{ width: '35%', height: 11, borderRadius: 6, marginTop: 3 }} />
+                <Skeleton pulse style={{ width: '80%', height: 12, borderRadius: 6, marginTop: 4 }} />
               </View>
             </View>
           ))}
@@ -1029,11 +1054,10 @@ const styles = themedStyles({
   rowUnread: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' },
   rowUnreadText: { color: colors.onAccent, fontSize: 10, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
 
-  skeletonList: { paddingHorizontal: 16, paddingTop: 12, gap: 16 },
-  skeletonRow: { flexDirection: 'row', gap: 12, alignItems: 'center' },
-  skeletonAvatar: { width: 46, height: 46, borderRadius: 23 },
-  skeletonCol: { flex: 1, gap: 7 },
-  skeletonLineRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  // Mirrors the live rowCard footprint so each skeleton sits exactly where
+  // its conversation row will appear (same card, avatar, and line slots).
+  skeletonList: { paddingHorizontal: 20, paddingTop: 20, gap: 8 },
+  skeletonRowCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: '#F3F4F6' },
 
   listContent: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24, flexGrow: 1, backgroundColor: '#F9FAFB', gap: 8 },
   emptyWrap: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingTop: 64, paddingBottom: 32, gap: 10 },
