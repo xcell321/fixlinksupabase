@@ -158,11 +158,11 @@ export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile,
           <Text style={styles.changePhoto}>Change Photo</Text>
         </View>
         <Text style={styles.label}>FIRST NAME</Text>
-        <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Alex" placeholderTextColor="#9CA3AF" />
+        <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Alex" placeholderTextColor={colors.subtle} />
         <Text style={styles.label}>PHONE</Text>
-        <TextInput style={styles.input} value={phone} onChangeText={setPhone} placeholder="09XX XXX XXXX" placeholderTextColor="#9CA3AF" keyboardType="phone-pad" />
+        <TextInput style={styles.input} value={phone} onChangeText={setPhone} placeholder="09XX XXX XXXX" placeholderTextColor={colors.subtle} keyboardType="phone-pad" />
         <Text style={styles.label}>ADDRESS</Text>
-        <TextInput style={styles.input} value={address} onChangeText={setAddress} placeholder="142 Oak St, Apt 3B" placeholderTextColor="#9CA3AF" />
+        <TextInput style={styles.input} value={address} onChangeText={setAddress} placeholder="142 Oak St, Apt 3B" placeholderTextColor={colors.subtle} />
         <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={loading} activeOpacity={0.88}>
           {loading ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.saveBtnText}>Save Changes</Text>}
         </TouchableOpacity>
@@ -213,11 +213,11 @@ export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile,
           <Pressable key={item.key} onPress={item.onPress} style={({ pressed }) => [styles.menuRow, pressed && { opacity: 0.9 }]} accessibilityRole="button" accessibilityLabel={item.label}>
             <View style={styles.menuIcon}><Ionicons name={item.icon} size={18} color={ORANGE} /></View>
             <Text style={styles.menuLabel}>{item.label}</Text>
-            <Ionicons name="chevron-forward" size={16} color="#D1D5DB" />
+            <Ionicons name="chevron-forward" size={16} color={colors.gray300} />
           </Pressable>
         ))}
         <TouchableOpacity style={styles.logoutRow} onPress={() => setLogoutConfirmVisible(true)} activeOpacity={0.88} accessibilityRole="button" accessibilityLabel="Sign out">
-          <View style={styles.logoutIcon}><Ionicons name="log-out-outline" size={18} color="#EF4444" /></View>
+          <View style={styles.logoutIcon}><Ionicons name="log-out-outline" size={18} color={colors.dangerBright} /></View>
           <Text style={styles.logoutText}>Sign Out</Text>
         </TouchableOpacity>
       </View>
@@ -246,7 +246,7 @@ export default function CustomerProfileScreen({ user, onLogout, onUpdateProfile,
 }
 
 const styles = themedStyles({
-  screen: { flex: 1, backgroundColor: '#F9FAFB' },
+  screen: { flex: 1, backgroundColor: colors.appBg },
   content: { paddingBottom: 28 },
   header: { backgroundColor: DARK, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 32, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, alignItems: 'center' },
   avatarWrap: { marginBottom: 12 },
@@ -254,36 +254,36 @@ const styles = themedStyles({
   avatarPh: { backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: colors.onAccent, fontSize: 22, fontFamily: fonts.extraBold },
   name: { color: colors.onAccent, fontSize: 20, fontFamily: fonts.extraBold },
-  email: { color: '#9CA3AF', fontSize: 13, fontFamily: fonts.regular, marginTop: 2 },
+  email: { color: colors.subtle, fontSize: 13, fontFamily: fonts.regular, marginTop: 2 },
   statsRow: { flexDirection: 'row', gap: 24, marginTop: 16, minHeight: 38, alignItems: 'center' },
   stat: { alignItems: 'center' },
   statSkeletonValue: { width: 34, height: 17, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.22)' },
   statSkeletonLabel: { width: 52, height: 10, borderRadius: 5, marginTop: 5, backgroundColor: 'rgba(255,255,255,0.14)' },
   statValue: { color: colors.onAccent, fontSize: 17, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
-  statLabel: { color: '#9CA3AF', fontSize: 11, fontFamily: fonts.regular, marginTop: 2 },
+  statLabel: { color: colors.subtle, fontSize: 11, fontFamily: fonts.regular, marginTop: 2 },
   body: { paddingHorizontal: 20, paddingTop: 20, gap: 12 },
-  menuRow: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: '#F3F4F6' },
-  menuIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#FFF7ED', alignItems: 'center', justifyContent: 'center' },
-  menuLabel: { flex: 1, color: '#374151', fontSize: 14, fontFamily: fonts.semiBold },
+  menuRow: { backgroundColor: colors.white, borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: colors.cardBorder },
+  menuIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.customerSoft, alignItems: 'center', justifyContent: 'center' },
+  menuLabel: { flex: 1, color: colors.gray700, fontSize: 14, fontFamily: fonts.semiBold },
   // Appearance card sits between the menu list and Sign Out.
   // Same row shape as the menu items above it; the danger colour lives only in
   // the icon and label instead of a red card with a red outline.
   logoutRow: { backgroundColor: colors.white, borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: colors.cardBorder },
   logoutIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center' },
-  logoutText: { color: '#EF4444', fontSize: 14, fontFamily: fonts.semiBold },
+  logoutText: { color: colors.dangerBright, fontSize: 14, fontFamily: fonts.semiBold },
   // Edit sub-view (prototype EditProfile)
-  editScroll: { flexGrow: 1, backgroundColor: '#FFFFFF', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 32, gap: 4 },
-  editHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F3F4F6', marginBottom: 16 },
+  editScroll: { flexGrow: 1, backgroundColor: colors.white, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 32, gap: 4 },
+  editHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.cardBorder, marginBottom: 16 },
   backBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  editTitle: { color: '#111827', fontSize: 15, fontFamily: fonts.semiBold },
+  editTitle: { color: colors.gray900, fontSize: 15, fontFamily: fonts.semiBold },
   avatarCenter: { alignItems: 'center', marginBottom: 20 },
   avatarLg: { width: 56, height: 56, borderRadius: 28 },
   avatarLgPh: { width: 56, height: 56, borderRadius: 28, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center' },
   avatarLgText: { color: colors.onAccent, fontSize: 22, fontFamily: fonts.extraBold },
-  cameraBadge: { position: 'absolute', bottom: -2, right: -2, width: 24, height: 24, borderRadius: 12, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFFFFF' },
+  cameraBadge: { position: 'absolute', bottom: -2, right: -2, width: 24, height: 24, borderRadius: 12, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.white },
   changePhoto: { color: ORANGE, fontSize: 12, fontFamily: fonts.semiBold, marginTop: 8 },
-  label: { color: '#6B7280', fontSize: 11, fontFamily: fonts.bold, letterSpacing: 0.8, marginTop: 16, marginBottom: 6 },
-  input: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 16, minHeight: 52, fontSize: 14, fontFamily: fonts.medium, color: colors.ink, backgroundColor: '#F9FAFB' },
+  label: { color: colors.gray500, fontSize: 11, fontFamily: fonts.bold, letterSpacing: 0.8, marginTop: 16, marginBottom: 6 },
+  input: { borderWidth: 1, borderColor: colors.gray200, borderRadius: 12, paddingHorizontal: 16, minHeight: 52, fontSize: 14, fontFamily: fonts.medium, color: colors.ink, backgroundColor: colors.appBg },
   saveBtn: { backgroundColor: ORANGE, borderRadius: 12, minHeight: 52, alignItems: 'center', justifyContent: 'center', marginTop: 24 },
   saveBtnText: { color: colors.onAccent, fontSize: 15, fontFamily: fonts.bold },
 });

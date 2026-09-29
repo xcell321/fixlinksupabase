@@ -36,7 +36,7 @@ alignSelf: 'center' },
   // Count chip next to the label: readable, but still lighter than the label.
   protoStatBadge: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 6, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },
   protoStatBadgeActive: { backgroundColor: colors.white },
-  protoStatBadgeText: { color: '#D1D5DB', fontSize: 11, fontFamily: fonts.bold, fontVariant: ['tabular-nums'] },
+  protoStatBadgeText: { color: colors.gray300, fontSize: 11, fontFamily: fonts.bold, fontVariant: ['tabular-nums'] },
   protoStatBadgeTextActive: { color: colors.tech },
 
   topBar: {
@@ -215,7 +215,7 @@ alignSelf: 'center' },
     backgroundColor: colors.green
   },
   presenceOffline: {
-    backgroundColor: '#94A3B8'
+    backgroundColor: colors.slate400
   },
 
   workloadStrip: {
@@ -227,8 +227,8 @@ alignSelf: 'center' },
     marginBottom: 12,
     borderWidth: 1
   },
-  workloadStripBusy: { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' },
-  workloadStripAtCapacity: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
+  workloadStripBusy: { backgroundColor: colors.warningSoft, borderColor: colors.warningBorder },
+  workloadStripAtCapacity: { backgroundColor: colors.dangerSoft, borderColor: colors.dangerBorder },
   workloadTitle: { fontSize: 13, fontFamily: fonts.bold, marginBottom: 2 },
   workloadSub: { fontSize: 12, fontFamily: fonts.regular, color: colors.muted, lineHeight: 16 },
 
@@ -731,8 +731,8 @@ alignSelf: 'center' },
   },
   offlineBannerText: { flex: 1, fontSize: 11, fontFamily: fonts.medium, color: colors.muted },
   offlineRetryText: { fontSize: 12, fontFamily: fonts.bold, color: colors.tech },
-  acceptErrorBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12, marginBottom: 12 },
-  acceptErrorText: { flex: 1, fontSize: 12, fontFamily: fonts.semiBold, color: '#B91C1C', lineHeight: 17 },
+  acceptErrorBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.dangerSoft, borderWidth: 1, borderColor: colors.dangerBorder, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12, marginBottom: 12 },
+  acceptErrorText: { flex: 1, fontSize: 12, fontFamily: fonts.semiBold, color: colors.dangerText, lineHeight: 17 },
   confirmBackdrop: { flex: 1, backgroundColor: 'rgba(13,27,42,0.5)', alignItems: 'center', justifyContent: 'center', padding: 24 },
   confirmCard: { width: '100%', maxWidth: 360, backgroundColor: colors.white, borderRadius: 18, padding: 20 },
   confirmTitle: { fontSize: 16, fontFamily: fonts.bold, color: colors.ink },

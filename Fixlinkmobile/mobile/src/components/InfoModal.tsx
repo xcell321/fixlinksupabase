@@ -47,7 +47,7 @@ export default function InfoModal({
 }
 
 const styles = themedStyles({
-  backdrop: { flex: 1, backgroundColor: 'rgba(13,27,42,0.5)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  backdrop: { flex: 1, backgroundColor: colors.backdrop, alignItems: 'center', justifyContent: 'center', padding: 24 },
   card: { width: '100%', maxWidth: 360, backgroundColor: colors.white, borderRadius: 18, padding: 20, alignItems: 'center', ...shadows.hud },
   iconWell: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   title: { fontSize: 16, fontFamily: fonts.bold, color: colors.ink, textAlign: 'center' },

@@ -344,7 +344,7 @@ const styles = themedStyles({
   pressed: { transform: [{ scale: 0.97 }], opacity: 0.96 },
   pressedSoft: { transform: [{ scale: 0.97 }], opacity: 0.94 },
 
-  overlay: { flex: 1, backgroundColor: 'rgba(16, 42, 67, 0.4)', justifyContent: 'flex-end' },
+  overlay: { flex: 1, backgroundColor: colors.scrim, justifyContent: 'flex-end' },
   sheet: {
     backgroundColor: colors.white,
     borderTopLeftRadius: 28,
@@ -403,12 +403,12 @@ const styles = themedStyles({
   statTextHighlight: { color: colors.customer, fontFamily: fonts.bold },
 
   availRow: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 12, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8 },
-  availOk: { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' },
-  availBusy: { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' },
+  availOk: { backgroundColor: colors.successSoft, borderColor: colors.successBorder },
+  availBusy: { backgroundColor: colors.warningSoft, borderColor: colors.warningBorder },
   availText: { flex: 1, fontSize: 11.5, lineHeight: 16, fontFamily: fonts.semiBold },
-  // AA-safe on their tinted fills: #047857 on #ECFDF5, #B45309 on #FFFBEB.
-  availTextOk: { color: '#047857' },
-  availTextBusy: { color: '#B45309' },
+  // AA-safe on their tinted fills: successText on successSoft, warningStrong on warningSoft.
+  availTextOk: { color: colors.successText },
+  availTextBusy: { color: colors.warningStrong },
 
   nextJob: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8 },
   nextJobText: { flex: 1, color: colors.ink, fontSize: 11.5, fontFamily: fonts.medium },

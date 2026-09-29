@@ -181,7 +181,7 @@ export default function AssistantSheet({ visible, uid, context, onClose }: Assis
 }
 
 const styles = themedStyles({
-  overlay: { flex: 1, backgroundColor: 'rgba(16,42,67,0.4)', justifyContent: 'flex-end' },
+  overlay: { flex: 1, backgroundColor: colors.scrim, justifyContent: 'flex-end' },
   sheet: { flex: 1, backgroundColor: colors.white, paddingTop: 12, paddingHorizontal: 16, paddingBottom: 20 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.cardBorder },
   headerImage: { width: 32, height: 32, borderRadius: 10 },

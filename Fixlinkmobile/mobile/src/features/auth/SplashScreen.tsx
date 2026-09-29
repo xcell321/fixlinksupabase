@@ -1,4 +1,4 @@
-// Prototype Splash — FixIt CustomerSplash layout (dark #0D1B2A, orange #F97316).
+// Prototype Splash — FixIt CustomerSplash layout (colors.dark, colors.customer).
 // Entry screen before login/register. No backend calls.
 import React from 'react';
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
@@ -46,11 +46,11 @@ const styles = themedStyles({
   logo: { width: 80, height: 80, borderRadius: 20, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center', marginBottom: 24, boxShadow: '0 8px 24px rgba(249,115,22,0.35)' },
   brand: { color: colors.onAccent, fontSize: 40, fontFamily: fonts.extraBold, letterSpacing: -0.5 },
   brandAccent: { color: ORANGE, fontFamily: fonts.extraBold },
-  tagline: { color: '#9CA3AF', fontSize: 14, fontFamily: fonts.regular, textAlign: 'center', marginTop: 8 },
+  tagline: { color: colors.subtle, fontSize: 14, fontFamily: fonts.regular, textAlign: 'center', marginTop: 8 },
   actions: { width: '100%', gap: 12, marginTop: 32 },
   primary: { backgroundColor: ORANGE, borderRadius: 12, minHeight: 52, alignItems: 'center', justifyContent: 'center' },
   primaryText: { color: colors.onAccent, fontSize: 15, fontFamily: fonts.bold },
   outline: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)', borderRadius: 12, minHeight: 52, alignItems: 'center', justifyContent: 'center' },
   outlineText: { color: colors.onAccent, fontSize: 15, fontFamily: fonts.semiBold },
-  foot: { position: 'absolute', bottom: 24, color: '#4B5563', fontSize: 12, fontFamily: fonts.regular },
+  foot: { position: 'absolute', bottom: 24, color: colors.gray600, fontSize: 12, fontFamily: fonts.regular },
 });

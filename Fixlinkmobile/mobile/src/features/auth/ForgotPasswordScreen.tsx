@@ -15,7 +15,7 @@ type ForgotPasswordScreenProps = {
 // Prototype ForgotPassword: white BackHeader + role-aware (orange customer / blue technician). Logic unchanged.
 export default function ForgotPasswordScreen({ switchToLogin, role = 'customer' }: ForgotPasswordScreenProps) {
   const accent = role === 'technician' ? colors.tech : colors.customer;
-  const softBg = role === 'technician' ? colors.techSoft : '#FFF7ED';
+  const softBg = role === 'technician' ? colors.techSoft : colors.customerSoft;
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [isSent, setIsSent] = useState(false);
@@ -40,7 +40,7 @@ export default function ForgotPasswordScreen({ switchToLogin, role = 'customer' 
     <View style={styles.screen}>
       <View style={styles.backHeader}>
         <TouchableOpacity onPress={switchToLogin} style={styles.backBtn} accessibilityRole="button" accessibilityLabel="Back to login">
-          <Ionicons name="arrow-back" size={18} color="#374151" />
+          <Ionicons name="arrow-back" size={18} color={colors.gray700} />
         </TouchableOpacity>
         <Text style={styles.backTitle}>Forgot Password</Text>
       </View>
@@ -62,7 +62,7 @@ export default function ForgotPasswordScreen({ switchToLogin, role = 'customer' 
               <TextInput
                 style={styles.input}
                 placeholder="you@email.com"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={colors.subtle}
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -87,18 +87,18 @@ export default function ForgotPasswordScreen({ switchToLogin, role = 'customer' 
 }
 
 const styles = themedStyles({
-  screen: { flex: 1, backgroundColor: '#FFFFFF' },
+  screen: { flex: 1, backgroundColor: colors.white },
   // SafeAreaView in AppNavigator already clears the status bar; keep only a
   // small gap so the back row sits at the top instead of floating mid-screen.
-  backHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  backHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: colors.cardBorder },
   backBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  backTitle: { color: '#111827', fontSize: 15, fontFamily: fonts.semiBold },
+  backTitle: { color: colors.gray900, fontSize: 15, fontFamily: fonts.semiBold },
   body: { flex: 1, paddingHorizontal: 24, paddingTop: 40, gap: 4 },
-  iconTile: { width: 64, height: 64, borderRadius: 16, backgroundColor: '#FFF7ED', alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
-  title: { color: '#111827', fontSize: 20, fontFamily: fonts.extraBold, marginBottom: 8 },
-  copy: { color: '#6B7280', fontSize: 14, fontFamily: fonts.regular, lineHeight: 20, marginBottom: 20 },
-  label: { color: '#6B7280', fontSize: 11, fontFamily: fonts.bold, letterSpacing: 0.8, marginBottom: 6 },
-  inputWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 14, backgroundColor: '#F9FAFB', minHeight: 52, marginBottom: 8 },
+  iconTile: { width: 64, height: 64, borderRadius: 16, backgroundColor: colors.customerSoft, alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
+  title: { color: colors.gray900, fontSize: 20, fontFamily: fonts.extraBold, marginBottom: 8 },
+  copy: { color: colors.gray500, fontSize: 14, fontFamily: fonts.regular, lineHeight: 20, marginBottom: 20 },
+  label: { color: colors.gray500, fontSize: 11, fontFamily: fonts.bold, letterSpacing: 0.8, marginBottom: 6 },
+  inputWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: colors.gray200, borderRadius: 12, paddingHorizontal: 14, backgroundColor: colors.appBg, minHeight: 52, marginBottom: 8 },
   input: { flex: 1, color: colors.ink, fontSize: 15, fontFamily: fonts.medium, paddingVertical: 12 },
   primary: { borderRadius: 12, minHeight: 52, alignItems: 'center', justifyContent: 'center', marginTop: 16 },
   primaryText: { color: colors.onAccent, fontSize: 15, fontFamily: fonts.bold },

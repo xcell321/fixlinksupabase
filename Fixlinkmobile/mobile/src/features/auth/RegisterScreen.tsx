@@ -213,7 +213,7 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
             <TextInput
               style={styles.prefixInput}
               placeholder={placeholder}
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor={colors.subtle}
               value={value}
               onChangeText={(t) => { onChange(t); clearFieldError(fieldKey); }}
               accessibilityLabel={label}
@@ -224,7 +224,7 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
           <TextInput
             style={[styles.input, errored && styles.inputError]}
             placeholder={placeholder}
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={colors.subtle}
             value={value}
             onChangeText={(t) => { onChange(t); clearFieldError(fieldKey); }}
             accessibilityLabel={label}
@@ -254,7 +254,7 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
         <TextInput
           style={styles.passwordInput}
           placeholder="••••••••"
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor={colors.subtle}
           value={value}
           onChangeText={(t) => { onChange(t); clearFieldError(fieldKey); }}
           secureTextEntry={!visible}
@@ -268,7 +268,7 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
             accessibilityRole="button"
             accessibilityLabel={visible ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
           >
-            <Ionicons name={visible ? 'eye-outline' : 'eye-off-outline'} size={20} color="#9CA3AF" />
+            <Ionicons name={visible ? 'eye-outline' : 'eye-off-outline'} size={20} color={colors.subtle} />
           </TouchableOpacity>
         ) : null}
       </View>
@@ -282,7 +282,7 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
     <View style={styles.screen}>
       <View style={[styles.header, isTechRole && styles.headerTech]}>
         <TouchableOpacity onPress={switchToLogin} style={styles.backLink} accessibilityRole="button" accessibilityLabel="Back to login">
-          <Ionicons name="arrow-back" size={16} color="#9CA3AF" />
+          <Ionicons name="arrow-back" size={16} color={colors.subtle} />
           <Text style={styles.backText}>Back</Text>
         </TouchableOpacity>
         <Text style={styles.title}>{isTechRole ? 'Join as Technician' : 'Create account'}</Text>
@@ -418,49 +418,49 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
 }
 
 const styles = themedStyles({
-  screen: { flex: 1, backgroundColor: '#FFFFFF' },
-  header: { backgroundColor: '#0D1B2A', paddingHorizontal: 24, paddingTop: 56, paddingBottom: 40, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
-  headerTech: { backgroundColor: '#0D1B2A' },
+  screen: { flex: 1, backgroundColor: colors.white },
+  header: { backgroundColor: colors.dark, paddingHorizontal: 24, paddingTop: 56, paddingBottom: 40, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+  headerTech: { backgroundColor: colors.dark },
   backLink: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 24 },
-  backText: { color: '#9CA3AF', fontSize: 14, fontFamily: fonts.regular },
+  backText: { color: colors.subtle, fontSize: 14, fontFamily: fonts.regular },
   title: { color: colors.onAccent, fontSize: 28, fontFamily: fonts.extraBold, letterSpacing: -0.3, marginBottom: 4 },
-  subtitle: { color: '#9CA3AF', fontSize: 14, fontFamily: fonts.regular },
+  subtitle: { color: colors.subtle, fontSize: 14, fontFamily: fonts.regular },
   form: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 32, gap: 0 },
-  roleTabs: { flexDirection: 'row', backgroundColor: '#F3F4F6', borderRadius: 12, padding: 4, gap: 4, marginBottom: 20 },
+  roleTabs: { flexDirection: 'row', backgroundColor: colors.cardBorder, borderRadius: 12, padding: 4, gap: 4, marginBottom: 20 },
   roleTab: { flex: 1, paddingVertical: 10, borderRadius: 9, alignItems: 'center' },
   roleTabCustomer: { backgroundColor: colors.customer },
   roleTabTech: { backgroundColor: colors.tech },
-  roleTabText: { color: '#6B7280', fontSize: 13, fontFamily: fonts.semiBold },
+  roleTabText: { color: colors.gray500, fontSize: 13, fontFamily: fonts.semiBold },
   roleTabTextOn: { color: colors.onAccent },
   nameGrid: { flexDirection: 'row', gap: 12 },
   nameCell: { flex: 1, minWidth: 0 },
   field: { marginBottom: 16 },
-  label: { color: '#6B7280', fontSize: 12, fontFamily: fonts.semiBold, letterSpacing: 0.4, marginBottom: 6, textTransform: 'uppercase' },
-  input: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 16, minHeight: 52, fontSize: 14, fontFamily: fonts.medium, color: colors.ink, backgroundColor: '#F9FAFB' },
-  inputError: { borderColor: '#DC2626' },
-  prefixWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingLeft: 16, minHeight: 52, backgroundColor: '#F9FAFB' },
-  prefixText: { color: '#6B7280', fontSize: 14, fontFamily: fonts.semiBold },
+  label: { color: colors.gray500, fontSize: 12, fontFamily: fonts.semiBold, letterSpacing: 0.4, marginBottom: 6, textTransform: 'uppercase' },
+  input: { borderWidth: 1, borderColor: colors.gray200, borderRadius: 12, paddingHorizontal: 16, minHeight: 52, fontSize: 14, fontFamily: fonts.medium, color: colors.ink, backgroundColor: colors.appBg },
+  inputError: { borderColor: colors.danger },
+  prefixWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.gray200, borderRadius: 12, paddingLeft: 16, minHeight: 52, backgroundColor: colors.appBg },
+  prefixText: { color: colors.gray500, fontSize: 14, fontFamily: fonts.semiBold },
   prefixInput: { flex: 1, paddingHorizontal: 8, paddingVertical: 14, fontSize: 14, fontFamily: fonts.medium, color: colors.ink },
-  passwordWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 16, minHeight: 52, backgroundColor: '#F9FAFB' },
+  passwordWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.gray200, borderRadius: 12, paddingHorizontal: 16, minHeight: 52, backgroundColor: colors.appBg },
   passwordInput: { flex: 1, fontSize: 14, fontFamily: fonts.medium, color: colors.ink, paddingVertical: 14 },
   eyeButton: { paddingLeft: 12, paddingVertical: 8, marginLeft: 8 },
-  errorText: { color: '#DC2626', fontSize: 12, fontFamily: fonts.medium, marginTop: 6 },
-  hintText: { color: '#9CA3AF', fontSize: 12, fontFamily: fonts.medium, marginTop: -10, marginBottom: 16 },
-  successBox: { backgroundColor: '#E6F6F3', borderWidth: 1, borderColor: '#B5E7DE', borderRadius: 12, padding: 14, marginBottom: 16 },
-  successText: { color: '#0F766E', fontSize: 13, fontFamily: fonts.semiBold, lineHeight: 18 },
-  formErrorBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', borderRadius: 12, padding: 12, marginBottom: 16 },
-  formErrorText: { flex: 1, color: '#B91C1C', fontSize: 13, fontFamily: fonts.semiBold },
-  submitErrorBox: { backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', borderRadius: 12, padding: 14, marginBottom: 16 },
-  submitErrorText: { color: '#B91C1C', fontSize: 13, fontFamily: fonts.semiBold, lineHeight: 18 },
+  errorText: { color: colors.danger, fontSize: 12, fontFamily: fonts.medium, marginTop: 6 },
+  hintText: { color: colors.subtle, fontSize: 12, fontFamily: fonts.medium, marginTop: -10, marginBottom: 16 },
+  successBox: { backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.tealTint, borderRadius: 12, padding: 14, marginBottom: 16 },
+  successText: { color: colors.teal, fontSize: 13, fontFamily: fonts.semiBold, lineHeight: 18 },
+  formErrorBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.dangerSoft, borderWidth: 1, borderColor: colors.dangerBorder, borderRadius: 12, padding: 12, marginBottom: 16 },
+  formErrorText: { flex: 1, color: colors.dangerText, fontSize: 13, fontFamily: fonts.semiBold },
+  submitErrorBox: { backgroundColor: colors.dangerSoft, borderWidth: 1, borderColor: colors.dangerBorder, borderRadius: 12, padding: 14, marginBottom: 16 },
+  submitErrorText: { color: colors.dangerText, fontSize: 13, fontFamily: fonts.semiBold, lineHeight: 18 },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#FFFFFF' },
-  chipText: { color: '#4B5563', fontSize: 12, fontFamily: fonts.semiBold },
-  helperText: { color: '#9CA3AF', fontSize: 12, fontFamily: fonts.regular },
+  chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: colors.gray200, backgroundColor: colors.white },
+  chipText: { color: colors.gray600, fontSize: 12, fontFamily: fonts.semiBold },
+  helperText: { color: colors.subtle, fontSize: 12, fontFamily: fonts.regular },
   docButton: { flexDirection: 'row', alignItems: 'center', gap: 10, justifyContent: 'flex-start' },
-  docButtonText: { flex: 1, color: '#4B5563', fontSize: 13, fontFamily: fonts.medium },
+  docButtonText: { flex: 1, color: colors.gray600, fontSize: 13, fontFamily: fonts.medium },
   primary: { borderRadius: 12, minHeight: 52, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
   primaryText: { color: colors.onAccent, fontSize: 15, fontFamily: fonts.semiBold },
   switchRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 16 },
-  switchText: { color: '#6B7280', fontSize: 13, fontFamily: fonts.regular },
+  switchText: { color: colors.gray500, fontSize: 13, fontFamily: fonts.regular },
   switchLink: { fontSize: 13, fontFamily: fonts.semiBold },
 });

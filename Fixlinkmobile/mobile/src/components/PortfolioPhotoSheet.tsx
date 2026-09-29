@@ -235,7 +235,7 @@ const styles = themedStyles({
   pressed: { transform: [{ scale: 0.97 }], opacity: 0.96 },
   pressedSoft: { transform: [{ scale: 0.97 }], opacity: 0.94 },
 
-  overlay: { flex: 1, backgroundColor: 'rgba(16, 42, 67, 0.4)', justifyContent: 'flex-end' },
+  overlay: { flex: 1, backgroundColor: colors.scrim, justifyContent: 'flex-end' },
   sheet: { backgroundColor: colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 20, paddingHorizontal: 20, paddingBottom: 24, maxHeight: '90%' },
 
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: colors.line },

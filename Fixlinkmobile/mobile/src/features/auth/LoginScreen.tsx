@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import api, { setAuthToken } from '../../services/api';
 import { colors, fonts, themedStyles } from '../../theme';
 
-// Prototype: CustomerLogin — dark #0D1B2A header, orange #F97316 primary. Logic unchanged.
+// Prototype: CustomerLogin — colors.dark header, colors.customer primary. Logic unchanged.
 const ORANGE = colors.customer;
 const DARK = colors.dark;
 
@@ -91,12 +91,12 @@ export default function LoginScreen({ onLoginSuccess, switchToRegister, switchTo
       <Text style={styles.label}>EMAIL</Text>
       <View style={[styles.inputWrap, fieldErrors.email && styles.inputError]}>
         <Ionicons name="mail-outline" size={18} color={colors.muted} />
-        <TextInput style={styles.input} placeholder="you@email.com" placeholderTextColor="#9CA3AF" autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={(value) => { setEmail(value); setFieldErrors(e => ({ ...e, email: '' })); }}
+        <TextInput style={styles.input} placeholder="you@email.com" placeholderTextColor={colors.subtle} autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={(value) => { setEmail(value); setFieldErrors(e => ({ ...e, email: '' })); }}
         /></View>{fieldErrors.email ? <Text style={styles.fieldError}>{fieldErrors.email}</Text> : null}
       <Text style={styles.label}>PASSWORD</Text>
       <View style={[styles.inputWrap, fieldErrors.password && styles.inputError]}>
         <Ionicons name="lock-closed-outline" size={18} color={colors.muted}
-        /><TextInput style={styles.input} placeholder="••••••••" placeholderTextColor="#9CA3AF" secureTextEntry={!showPassword}
+        /><TextInput style={styles.input} placeholder="••••••••" placeholderTextColor={colors.subtle} secureTextEntry={!showPassword}
          value={password} onChangeText={(value) => { setPassword(value);
           setFieldErrors(e => ({ ...e, password: '' }));
            }} />{password ? (<TouchableOpacity onPress={() => setShowPassword(!showPassword)}
@@ -124,35 +124,35 @@ export default function LoginScreen({ onLoginSuccess, switchToRegister, switchTo
     </View>
   </ScrollView></KeyboardAvoidingView>;
 }
-const styles = themedStyles({ container: { flex: 1, backgroundColor: '#FFFFFF' },
+const styles = themedStyles({ container: { flex: 1, backgroundColor: colors.white },
    scrollContent: { flexGrow: 1 },
    header: { backgroundColor: DARK, paddingHorizontal: 24, paddingTop: 56, paddingBottom: 40, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
    modeToggle: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 12, padding: 4, gap: 4, marginBottom: 24 },
    modeTab: { flex: 1, paddingVertical: 10, borderRadius: 9, alignItems: 'center' },
    modeTabCustomer: { backgroundColor: colors.customer },
    modeTabTech: { backgroundColor: colors.tech },
-   modeText: { color: '#9CA3AF', fontSize: 13, fontFamily: fonts.semiBold },
+   modeText: { color: colors.subtle, fontSize: 13, fontFamily: fonts.semiBold },
    modeTextOn: { color: colors.onAccent },
    logoRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 24 },
    logo: { width: 40, height: 40, borderRadius: 12, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center' },
    brandSmall: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.extraBold },
-   roleSmall: { color: '#9CA3AF', fontSize: 9, letterSpacing: 1.3, fontFamily: fonts.bold },
+   roleSmall: { color: colors.subtle, fontSize: 9, letterSpacing: 1.3, fontFamily: fonts.bold },
    title: { color: colors.onAccent, fontSize: 28, fontFamily: fonts.extraBold, letterSpacing: -0.3 },
-   subtitle: { color: '#9CA3AF', fontSize: 14, marginTop: 4, fontFamily: fonts.regular },
+   subtitle: { color: colors.subtle, fontSize: 14, marginTop: 4, fontFamily: fonts.regular },
    form: { paddingHorizontal: 24, paddingTop: 32, paddingBottom: 24, gap: 4 },
-   label: { color: '#6B7280', fontSize: 11, fontFamily: fonts.bold, letterSpacing: 0.8, marginTop: 16, marginBottom: 6 },
-   inputWrap: { minHeight: 52, borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, backgroundColor: '#F9FAFB', gap: 10 },
+   label: { color: colors.gray500, fontSize: 11, fontFamily: fonts.bold, letterSpacing: 0.8, marginTop: 16, marginBottom: 6 },
+   inputWrap: { minHeight: 52, borderRadius: 12, borderWidth: 1, borderColor: colors.gray200, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, backgroundColor: colors.appBg, gap: 10 },
    input: { flex: 1, color: colors.ink, fontSize: 15, fontFamily: fonts.medium, paddingVertical: 12 },
-   inputError: { borderColor: '#DC2626' }, fieldError: { color: colors.danger, fontSize: 12, marginTop: 6, fontFamily: fonts.medium },
+   inputError: { borderColor: colors.danger }, fieldError: { color: colors.danger, fontSize: 12, marginTop: 6, fontFamily: fonts.medium },
    forgotWrap: { alignSelf: 'flex-end', marginTop: 10 },
    forgot: { color: ORANGE, fontSize: 13, fontFamily: fonts.semiBold },
     errorText: { color: colors.danger, fontSize: 11, marginTop: 10, textAlign: 'center', fontFamily: fonts.medium, lineHeight: 15 },
    button: { minHeight: 52, borderRadius: 12, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center', marginTop: 20 },
    buttonText: { color: colors.onAccent, fontSize: 15, fontFamily: fonts.bold },
     registerRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 20 },
-    registerText: { color: '#6B7280', fontSize: 13, fontFamily: fonts.regular }, registerLink: { color: ORANGE, fontSize: 13, fontFamily: fonts.bold },
+    registerText: { color: colors.gray500, fontSize: 13, fontFamily: fonts.regular }, registerLink: { color: ORANGE, fontSize: 13, fontFamily: fonts.bold },
     techLoginRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 12, flexWrap: 'wrap' },
-    techLoginText: { color: '#6B7280', fontSize: 13, fontFamily: fonts.regular },
+    techLoginText: { color: colors.gray500, fontSize: 13, fontFamily: fonts.regular },
     techLoginLink: { fontSize: 13, fontFamily: fonts.bold },
     techLoginBlue: { color: colors.tech, fontFamily: fonts.bold },
     techLoginOrange: { color: colors.customer, fontFamily: fonts.bold } });

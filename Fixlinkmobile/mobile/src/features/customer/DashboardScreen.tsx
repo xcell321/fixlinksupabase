@@ -8,7 +8,7 @@ import { getApplianceIcon, getStatusColor, getStatusIcon } from '../../utils/app
 import { getTimeGreeting } from '../../utils/timeFormat';
 import type { AssistantContext } from '../../components/AssistantSheet';
 
-// Prototype: FixIt Customer Home (orange #F97316 on dark #0D1B2A).
+// Prototype: FixIt Customer Home (colors.customer on colors.dark).
 // Logic preserved: real requests, active hero, stats, recent, categories, tip.
 const ACTIVE_STATUSES = ['accepted', 'confirmed', 'customer ready', 'in progress'];
 
@@ -285,7 +285,7 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
               return (
                 <TouchableOpacity key={req.id} style={styles.recentCard} onPress={() => onOpenRequest?.(req)} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={`${req.applianceType}, ${req.status}`}>
                   <View style={styles.recentIcon}>
-                    <Ionicons name={getApplianceIcon(req.applianceType)} size={18} color="#6B7280" />
+                    <Ionicons name={getApplianceIcon(req.applianceType)} size={18} color={colors.gray500} />
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={styles.recentTitle} numberOfLines={1}>{req.applianceType}</Text>
@@ -302,7 +302,7 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
         ) : (
           <TouchableOpacity style={styles.recentCard} onPress={onNavigateToSubmit} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel="No requests yet">
             <View style={styles.recentIcon}>
-              <Ionicons name="receipt-outline" size={18} color="#6B7280" />
+              <Ionicons name="receipt-outline" size={18} color={colors.gray500} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.recentTitle}>No requests yet</Text>
@@ -319,7 +319,7 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
               <Text style={styles.tipCopy}>Add a photo to your request so technicians can prepare before they arrive.</Text>
             </View>
             <TouchableOpacity onPress={() => setTipDismissed(true)} hitSlop={8} style={styles.tipDismiss} accessibilityRole="button" accessibilityLabel="Dismiss tip">
-              <Ionicons name="close" size={14} color="#6B7280" />
+              <Ionicons name="close" size={14} color={colors.gray500} />
             </TouchableOpacity>
           </View>
         )}
@@ -345,11 +345,11 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
 }
 
 const styles = themedStyles({
-  screen: { flex: 1, backgroundColor: '#F9FAFB' },
+  screen: { flex: 1, backgroundColor: colors.appBg },
   content: { paddingBottom: 110 },
   header: { backgroundColor: DARK, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 32, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, gap: 10 },
-  kicker: { color: '#9CA3AF', fontSize: 12, fontFamily: fonts.regular },
+  kicker: { color: colors.subtle, fontSize: 12, fontFamily: fonts.regular },
   greeting: { color: colors.onAccent, fontSize: 21, fontFamily: fonts.extraBold, letterSpacing: -0.3, marginTop: 2 },
   bell: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.10)', alignItems: 'center', justifyContent: 'center' },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -359,7 +359,7 @@ const styles = themedStyles({
   bellDot: { position: 'absolute', top: 8, right: 9, width: 8, height: 8, borderRadius: 4, backgroundColor: ORANGE, borderWidth: 2, borderColor: DARK },
   bellDotDim: { position: 'absolute', top: 8, right: 9, width: 8, height: 8, borderRadius: 4, backgroundColor: 'transparent' },
   activeCard: { backgroundColor: 'rgba(255,255,255,0.10)', borderRadius: 16, padding: 16 },
-  activeKicker: { color: '#D1D5DB', fontSize: 12, fontFamily: fonts.regular, marginBottom: 6 },
+  activeKicker: { color: colors.gray300, fontSize: 12, fontFamily: fonts.regular, marginBottom: 6 },
   activeRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   activeTitle: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bold },
   activeSub: { color: ORANGE, fontSize: 12, fontFamily: fonts.medium, marginTop: 2 },
@@ -374,31 +374,31 @@ const styles = themedStyles({
   skelStat: { width: 40, height: 24, borderRadius: 8 },
   progressFill: { height: '100%', backgroundColor: ORANGE, borderRadius: 999 },
   body: { paddingHorizontal: 20, paddingTop: 20, gap: 12 },
-  sectionKicker: { color: '#6B7280', fontSize: 11, fontFamily: fonts.bold, letterSpacing: 1.2 },
+  sectionKicker: { color: colors.gray500, fontSize: 11, fontFamily: fonts.bold, letterSpacing: 1.2 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
   viewAll: { color: ORANGE, fontFamily: fonts.bold, fontSize: 13 },
-  submitCard: { backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: ORANGE, borderStyle: 'dashed', padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16 },
+  submitCard: { backgroundColor: colors.white, borderRadius: 16, borderWidth: 1, borderColor: ORANGE, borderStyle: 'dashed', padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16 },
   plusTile: { width: 48, height: 48, borderRadius: 12, backgroundColor: colors.customerMist, alignItems: 'center', justifyContent: 'center' },
-  submitTitle: { color: '#111827', fontSize: 14, fontFamily: fonts.bold },
-  submitCopy: { color: '#6B7280', fontSize: 12, fontFamily: fonts.regular, marginTop: 2 },
+  submitTitle: { color: colors.gray900, fontSize: 14, fontFamily: fonts.bold },
+  submitCopy: { color: colors.gray500, fontSize: 12, fontFamily: fonts.regular, marginTop: 2 },
   catRow: { gap: 8, paddingVertical: 2 },
-  catChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#F3F4F6', borderRadius: 999, paddingVertical: 10, paddingHorizontal: 12, minHeight: 44 },
-  catChipText: { color: '#111827', fontSize: 12, fontFamily: fonts.semiBold },
+  catChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.cardBorder, borderRadius: 999, paddingVertical: 10, paddingHorizontal: 12, minHeight: 44 },
+  catChipText: { color: colors.gray900, fontSize: 12, fontFamily: fonts.semiBold },
   statsRow: { flexDirection: 'row', gap: 12 },
-  statCard: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: '#F3F4F6' },
-  statValue: { color: '#111827', fontSize: 24, fontFamily: fonts.extraBold },
-  statLabel: { color: '#6B7280', fontSize: 10, fontFamily: fonts.regular, marginTop: 2, textAlign: 'center' },
-  recentCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: '#F3F4F6' },
-  recentIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
-  recentTitle: { color: '#111827', fontSize: 14, fontFamily: fonts.bold },
-  recentMeta: { color: '#6B7280', fontSize: 12, fontFamily: fonts.regular, marginTop: 2 },
-  nextHint: { color: '#9CA3AF', fontSize: 11, fontFamily: fonts.medium, marginTop: 2 },
+  statCard: { flex: 1, backgroundColor: colors.white, borderRadius: 16, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: colors.cardBorder },
+  statValue: { color: colors.gray900, fontSize: 24, fontFamily: fonts.extraBold },
+  statLabel: { color: colors.gray500, fontSize: 10, fontFamily: fonts.regular, marginTop: 2, textAlign: 'center' },
+  recentCard: { backgroundColor: colors.white, borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: colors.cardBorder },
+  recentIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.cardBorder, alignItems: 'center', justifyContent: 'center' },
+  recentTitle: { color: colors.gray900, fontSize: 14, fontFamily: fonts.bold },
+  recentMeta: { color: colors.gray500, fontSize: 12, fontFamily: fonts.regular, marginTop: 2 },
+  nextHint: { color: colors.subtle, fontSize: 11, fontFamily: fonts.medium, marginTop: 2 },
   pill: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, borderWidth: 1 },
   pillText: { fontSize: 10, fontFamily: fonts.bold },
-  loadingBox: { backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#F3F4F6', paddingVertical: 28, alignItems: 'center' },
-  tipHint: { backgroundColor: '#FFF8E7', borderRadius: 16, paddingVertical: 6, paddingLeft: 12, paddingRight: 6, flexDirection: 'row', gap: 10, alignItems: 'center', borderWidth: 1, borderColor: '#FDE68A', marginTop: 6 },
-  tipTitle: { color: '#8A5B00', fontFamily: fonts.bold, fontSize: 12, lineHeight: 15 },
-  tipCopy: { color: '#9A711E', fontSize: 12, lineHeight: 16, fontFamily: fonts.regular },
+  loadingBox: { backgroundColor: colors.white, borderRadius: 16, borderWidth: 1, borderColor: colors.cardBorder, paddingVertical: 28, alignItems: 'center' },
+  tipHint: { backgroundColor: colors.tipCream, borderRadius: 16, paddingVertical: 6, paddingLeft: 12, paddingRight: 6, flexDirection: 'row', gap: 10, alignItems: 'center', borderWidth: 1, borderColor: colors.warningBorder, marginTop: 6 },
+  tipTitle: { color: colors.tipTitle, fontFamily: fonts.bold, fontSize: 12, lineHeight: 15 },
+  tipCopy: { color: colors.tipCopy, fontSize: 12, lineHeight: 16, fontFamily: fonts.regular },
   tipDismiss: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   homeWrap: { flex: 1 },
   aiFabWrap: { position: 'absolute', right: 20, bottom: 90 },

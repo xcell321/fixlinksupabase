@@ -9,8 +9,8 @@ import { colors, fonts, themedStyles } from '../../theme';
 import { type JobItem } from './availableJobsHelpers';
 import { getApplianceIcon } from '../../utils/applianceIcons';
 
-const DARK = '#0D1B2A';
-const BLUE = '#2563EB';
+const DARK = colors.dark;
+const BLUE = colors.tech;
 
 interface TechMapScreenProps {
   technician: { uid: string; name?: string };
@@ -102,7 +102,7 @@ export default function TechMapScreen({ technician, onOpenJob }: TechMapScreenPr
                   {j.distanceKm != null ? `${Number(j.distanceKm).toFixed(1)} mi · ` : ''}{j.location || 'Nearby'}
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
+              <Ionicons name="chevron-forward" size={16} color={colors.subtle} />
             </Pressable>
           ))}
           {!loading && jobs.length === 0 ? (
@@ -118,19 +118,19 @@ export default function TechMapScreen({ technician, onOpenJob }: TechMapScreenPr
 }
 
 const styles = themedStyles({
-  screen: { flex: 1, backgroundColor: '#F9FAFB' },
+  screen: { flex: 1, backgroundColor: colors.appBg },
   content: { paddingBottom: 28 },
   header: { backgroundColor: DARK, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 20, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
   title: { color: colors.onAccent, fontSize: 21, fontFamily: fonts.extraBold, letterSpacing: -0.3 },
-  subtitle: { color: '#9CA3AF', fontSize: 13, fontFamily: fonts.regular, marginTop: 4 },
+  subtitle: { color: colors.subtle, fontSize: 13, fontFamily: fonts.regular, marginTop: 4 },
   body: { paddingHorizontal: 20, paddingTop: 20, gap: 16 },
-  mapCard: { backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E5E7EB', overflow: 'hidden', height: 220 },
+  mapCard: { backgroundColor: colors.white, borderRadius: 16, borderWidth: 1, borderColor: colors.gray200, overflow: 'hidden', height: 220 },
   mapLoading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  jobRow: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: '#F3F4F6' },
-  jobIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' },
-  jobTitle: { color: '#111827', fontSize: 14, fontFamily: fonts.semiBold },
-  jobMeta: { color: '#9CA3AF', fontSize: 12, fontFamily: fonts.regular, marginTop: 2 },
-  emptyCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 24, alignItems: 'center', borderWidth: 1, borderColor: '#F3F4F6' },
-  emptyTitle: { color: '#111827', fontSize: 15, fontFamily: fonts.bold },
-  emptyCopy: { color: '#6B7280', fontSize: 13, fontFamily: fonts.regular, marginTop: 4, textAlign: 'center' },
+  jobRow: { backgroundColor: colors.white, borderRadius: 16, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: colors.cardBorder },
+  jobIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.techSoft, alignItems: 'center', justifyContent: 'center' },
+  jobTitle: { color: colors.gray900, fontSize: 14, fontFamily: fonts.semiBold },
+  jobMeta: { color: colors.subtle, fontSize: 12, fontFamily: fonts.regular, marginTop: 2 },
+  emptyCard: { backgroundColor: colors.white, borderRadius: 16, padding: 24, alignItems: 'center', borderWidth: 1, borderColor: colors.cardBorder },
+  emptyTitle: { color: colors.gray900, fontSize: 15, fontFamily: fonts.bold },
+  emptyCopy: { color: colors.gray500, fontSize: 13, fontFamily: fonts.regular, marginTop: 4, textAlign: 'center' },
 });

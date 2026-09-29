@@ -652,8 +652,8 @@ const styles = themedStyles({
   detailTitle: { color: colors.ink, fontSize: 14, fontFamily: fonts.bold },
   detailSub: { color: colors.muted, fontSize: 12, fontFamily: fonts.medium, marginTop: 2 },
   detailText: { color: colors.ink, fontSize: 13, lineHeight: 19, fontFamily: fonts.regular, marginBottom: 12 },
-  detailError: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 12 },
-  detailErrorText: { flex: 1, color: '#DC2626', fontSize: 12, fontFamily: fonts.medium, lineHeight: 16 },
+  detailError: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.dangerSoft, borderWidth: 1, borderColor: colors.dangerBorder, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 12 },
+  detailErrorText: { flex: 1, color: colors.danger, fontSize: 12, fontFamily: fonts.medium, lineHeight: 16 },
   detailActions: { flexDirection: 'row', gap: 8 },
   detailPrimary: { flex: 1, minHeight: 44, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   detailPrimaryText: { color: colors.onAccent, fontSize: 13, fontFamily: fonts.bold },
@@ -683,5 +683,5 @@ const styles = themedStyles({
   notifPreview: { color: colors.muted, fontSize: 13, lineHeight: 18, fontFamily: fonts.regular },
   notifCardTime: { color: colors.muted, fontSize: 11, fontFamily: fonts.medium, flexShrink: 0 },
   notifUnreadDot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
-  bottomNav: { flexDirection: 'row', justifyContent: 'space-around', paddingTop: 9, paddingBottom: 8, paddingHorizontal: 8, backgroundColor: colors.white, borderTopWidth: 1, borderTopColor: colors.line, gap: 4 }, navItem: { alignItems: 'center', minWidth: 64, minHeight: 52, justifyContent: 'center', flex: 1, maxWidth: 120 }, navItemPressed: { transform: [{ scale: 0.97 }], opacity: 0.94 }, navIcon: { width: 42, height: 30, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }, navIconActive: { backgroundColor: '#E6F6F3' }, navLabel: { color: colors.muted, fontSize: 10, fontFamily: fonts.semiBold, marginTop: 3, letterSpacing: 0.2 }, navLabelActive: { color: colors.teal, fontFamily: fonts.bold },
+  bottomNav: { flexDirection: 'row', justifyContent: 'space-around', paddingTop: 9, paddingBottom: 8, paddingHorizontal: 8, backgroundColor: colors.white, borderTopWidth: 1, borderTopColor: colors.line, gap: 4 }, navItem: { alignItems: 'center', minWidth: 64, minHeight: 52, justifyContent: 'center', flex: 1, maxWidth: 120 }, navItemPressed: { transform: [{ scale: 0.97 }], opacity: 0.94 }, navIcon: { width: 42, height: 30, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }, navIconActive: { backgroundColor: colors.tealLight }, navLabel: { color: colors.muted, fontSize: 10, fontFamily: fonts.semiBold, marginTop: 3, letterSpacing: 0.2 }, navLabelActive: { color: colors.teal, fontFamily: fonts.bold },
 });

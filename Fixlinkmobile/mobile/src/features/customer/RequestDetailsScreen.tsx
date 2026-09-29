@@ -74,7 +74,7 @@ function StarRating({ rating }: { rating: number }) {
   return (
     <View style={styles.starsRow}>
       {[1, 2, 3, 4, 5].map((i) => (
-        <Ionicons key={i} name={i <= Math.round(rating) ? 'star' : 'star-outline'} size={14} color={i <= Math.round(rating) ? '#F97316' : '#D1D5DB'} />
+        <Ionicons key={i} name={i <= Math.round(rating) ? 'star' : 'star-outline'} size={14} color={i <= Math.round(rating) ? colors.customer : colors.gray300} />
       ))}
     </View>
   );
@@ -212,7 +212,7 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
 
       <View style={styles.backHeader}>
         <TouchableOpacity onPress={onBack} style={styles.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityRole="button" accessibilityLabel="Go back">
-          <Ionicons name="arrow-back" size={18} color="#374151" />
+          <Ionicons name="arrow-back" size={18} color={colors.gray700} />
         </TouchableOpacity>
         <Text style={styles.backTitle}>Repair Details</Text>
       </View>
@@ -290,7 +290,7 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
                   <Text style={[styles.techActionText, styles.techActionTextPrimary]}>Message</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.techActionBtn, styles.techActionSecondary]} onPress={handleCall} activeOpacity={0.88} accessibilityRole="button" accessibilityLabel="Call technician">
-                  <Ionicons name="call-outline" size={16} color="#374151" />
+                  <Ionicons name="call-outline" size={16} color={colors.gray700} />
                   <Text style={styles.techActionText}>Call</Text>
                 </TouchableOpacity>
                 {request.technicianUid && onViewTechnicianProfile ? (
@@ -429,50 +429,50 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
 }
 
 const styles = themedStyles({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: colors.appBg },
   // Same floating robot as the Home tab, so the AI entry point feels like one system.
   aiFab: { position: 'absolute', right: 20, bottom: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 14px rgba(16,42,67,0.25)', overflow: 'hidden' },
   aiFabImage: { width: 56, height: 56, borderRadius: 28 },
-  backHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 16, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  backHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 16, backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.cardBorder },
   backBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  backTitle: { color: '#111827', fontSize: 15, fontFamily: fonts.semiBold },
+  backTitle: { color: colors.gray900, fontSize: 15, fontFamily: fonts.semiBold },
   // Extra bottom room so the floating AI button never covers the last card.
   scrollContent: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 96, gap: 16 },
-  card: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#F3F4F6' },
-  workflowErrorBox: { backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', borderRadius: 12, padding: 12, marginBottom: 12 },
-  workflowErrorText: { color: '#B91C1C', fontSize: 12, fontFamily: fonts.semiBold, lineHeight: 17 },
-  cardTitle: { color: '#111827', fontSize: 14, fontFamily: fonts.bold, marginBottom: 16 },
+  card: { backgroundColor: colors.white, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: colors.cardBorder },
+  workflowErrorBox: { backgroundColor: colors.dangerSoft, borderWidth: 1, borderColor: colors.dangerBorder, borderRadius: 12, padding: 12, marginBottom: 12 },
+  workflowErrorText: { color: colors.dangerText, fontSize: 12, fontFamily: fonts.semiBold, lineHeight: 17 },
+  cardTitle: { color: colors.gray900, fontSize: 14, fontFamily: fonts.bold, marginBottom: 16 },
   deviceRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12, gap: 10 },
   deviceCopy: { flex: 1, minWidth: 0 },
-  deviceTitle: { color: '#111827', fontSize: 16, fontFamily: fonts.bold },
-  deviceIssue: { color: '#6B7280', fontSize: 13, fontFamily: fonts.regular, marginTop: 2 },
+  deviceTitle: { color: colors.gray900, fontSize: 16, fontFamily: fonts.bold },
+  deviceIssue: { color: colors.gray500, fontSize: 13, fontFamily: fonts.regular, marginTop: 2 },
   statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, borderWidth: 1, flexShrink: 0 },
   statusBadgeText: { fontSize: 10, fontFamily: fonts.bold },
-  progressTrack: { height: 8, backgroundColor: '#F3F4F6', borderRadius: 999, overflow: 'hidden' },
+  progressTrack: { height: 8, backgroundColor: colors.cardBorder, borderRadius: 999, overflow: 'hidden' },
   progressFill: { height: '100%', backgroundColor: colors.customer, borderRadius: 999 },
   progressText: { textAlign: 'right', color: colors.customer, fontSize: 12, fontFamily: fonts.semiBold, marginTop: 4 },
-  terminalBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 14, borderWidth: 1, backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
-  terminalText: { flex: 1, color: '#B91C1C', fontSize: 13, fontFamily: fonts.semiBold, lineHeight: 18 },
+  terminalBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 14, borderWidth: 1, backgroundColor: colors.dangerSoft, borderColor: colors.dangerBorder },
+  terminalText: { flex: 1, color: colors.dangerText, fontSize: 13, fontFamily: fonts.semiBold, lineHeight: 18 },
   timelineRow: { flexDirection: 'row', gap: 12 },
   timelineRail: { flexDirection: 'column', alignItems: 'center' },
   timelineDot: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   timelineDotDone: { backgroundColor: colors.customer },
-  timelineDotTodo: { backgroundColor: '#E5E7EB' },
-  timelineLine: { width: 2, height: 32, marginTop: 2, backgroundColor: '#E5E7EB' },
+  timelineDotTodo: { backgroundColor: colors.gray200 },
+  timelineLine: { width: 2, height: 32, marginTop: 2, backgroundColor: colors.gray200 },
   timelineLineDone: { backgroundColor: colors.customer },
   timelineCopy: { paddingBottom: 16 },
   timelineLabel: { fontSize: 14, fontFamily: fonts.semiBold },
-  timelineLabelDone: { color: '#111827' },
-  timelineLabelTodo: { color: '#9CA3AF' },
-  timelineTime: { fontSize: 12, fontFamily: fonts.regular, color: '#9CA3AF', marginTop: 1 },
+  timelineLabelDone: { color: colors.gray900 },
+  timelineLabelTodo: { color: colors.subtle },
+  timelineTime: { fontSize: 12, fontFamily: fonts.regular, color: colors.subtle, marginTop: 1 },
   techRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
-  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#3B82F6', alignItems: 'center', justifyContent: 'center' },
+  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.brightBlue, alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: colors.onAccent, fontSize: 15, fontFamily: fonts.extraBold },
   techCopy: { flex: 1, minWidth: 0 },
-  techName: { color: '#111827', fontSize: 14, fontFamily: fonts.semiBold },
+  techName: { color: colors.gray900, fontSize: 14, fontFamily: fonts.semiBold },
   starsRow: { flexDirection: 'row', gap: 2, marginTop: 3 },
-  techMeta: { color: '#6B7280', fontSize: 12, fontFamily: fonts.regular, marginTop: 2 },
-  waitingText: { color: '#6B7280', fontSize: 13, fontFamily: fonts.regular },
+  techMeta: { color: colors.gray500, fontSize: 12, fontFamily: fonts.regular, marginTop: 2 },
+  waitingText: { color: colors.gray500, fontSize: 13, fontFamily: fonts.regular },
   techActions: { flexDirection: 'row', gap: 8, marginTop: 4 },
   techActionBtn: { flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 12, paddingHorizontal: 8 },
   techActionPrimary: { backgroundColor: colors.customerSoft },
@@ -480,17 +480,17 @@ const styles = themedStyles({
   techActionText: { color: colors.ink, fontSize: 13, fontFamily: fonts.semiBold },
   techActionTextPrimary: { color: colors.customerDark },
   codeHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
-  codeTitle: { color: '#111827', fontSize: 14, fontFamily: fonts.bold },
+  codeTitle: { color: colors.gray900, fontSize: 14, fontFamily: fonts.bold },
   codeDigitsRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
-  codeDigitBox: { width: 48, height: 56, borderRadius: 12, backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' },
-  codeDigitText: { color: '#111827', fontSize: 22, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
-  codeSub: { color: '#6B7280', fontSize: 12, fontFamily: fonts.regular, lineHeight: 17 },
+  codeDigitBox: { width: 48, height: 56, borderRadius: 12, backgroundColor: colors.appBg, borderWidth: 1, borderColor: colors.gray200, alignItems: 'center', justifyContent: 'center' },
+  codeDigitText: { color: colors.gray900, fontSize: 22, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
+  codeSub: { color: colors.gray500, fontSize: 12, fontFamily: fonts.regular, lineHeight: 17 },
   primaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.customer, borderRadius: 12, minHeight: 52, paddingHorizontal: 16 },
   primaryBtnText: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.semiBold },
   photoWrap: { marginBottom: 12 },
-  photoImage: { width: '100%', height: 160, borderRadius: 12, backgroundColor: '#F3F4F6' },
+  photoImage: { width: '100%', height: 160, borderRadius: 12, backgroundColor: colors.cardBorder },
   photoHintRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
   photoHintText: { color: colors.customer, fontSize: 12, fontFamily: fonts.semiBold },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  locationText: { flex: 1, color: '#4B5563', fontSize: 13, fontFamily: fonts.regular },
+  locationText: { flex: 1, color: colors.gray600, fontSize: 13, fontFamily: fonts.regular },
 });
