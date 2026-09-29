@@ -242,7 +242,17 @@ const updateJobStatus = async ({ jobId, authUid, status, technicianUid, cancella
   }
 
   const updates = { status, updated_at: new Date().toISOString() };
-  if (status === 'In Progress') updates.started_at = new Date().toISOString();
+  if (status === 'In Progress') {
+    updates.started_at = new Date().toISOString();
+    if (job.customer_uid) {
+      await notify(job.customer_uid, {
+        text: `${job.technician_name || 'Your technician'} started the repair.`,
+        jobId: job.id,
+        senderUid: technicianUid,
+        senderName: job.technician_name || 'Technician',
+      });
+    }
+  }
   if (status === 'Cancelled') {
     updates.cancelled_at = new Date().toISOString();
     updates.cancelled_by = 'technician';
