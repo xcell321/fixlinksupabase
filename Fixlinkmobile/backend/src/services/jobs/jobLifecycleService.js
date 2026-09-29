@@ -13,9 +13,13 @@ const { HttpError } = require('../../domain/httpError');
 const { assertTechnicianOwner } = require('../../middleware/identityGuards');
 const { getTechnicianActiveJobCount, getWorkloadStatus } = require('../workloadService');
 const { notify } = require('../notificationService');
+const { assertUuid } = require('../../domain/ids');
 
 // PUT /api/requests/:id/accept — accept a job atomically (via the accept_job RPC).
 const acceptJob = async ({ jobId, authUid, technicianUid, technicianName }) => {
+  // Malformed ids must fail here with a 400: passed straight to the RPC they
+  // surface as a Postgres syntax error and would otherwise become a 500.
+  assertUuid(jobId, 'job id');
   if (!technicianUid || !technicianName) {
     throw new HttpError(400, { error: 'Technician identity is required to accept a job.' });
   }
