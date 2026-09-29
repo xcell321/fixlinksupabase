@@ -5,6 +5,7 @@ import { fetchCompletedJobs, fetchCustomerRequests, fetchPlatformCategories } fr
 import Skeleton from '../../components/Skeleton';
 import { colors, fonts, themedStyles } from '../../theme';
 import { getApplianceIcon, getStatusColor, getStatusIcon } from '../../utils/applianceIcons';
+import { getTimeGreeting } from '../../utils/timeFormat';
 import type { AssistantContext } from '../../components/AssistantSheet';
 
 // Prototype: FixIt Customer Home (orange #F97316 on dark #0D1B2A).
@@ -164,7 +165,7 @@ export default function DashboardScreen({ user, notificationCount = 0, onOpenNot
       <View style={styles.header}>
         <View style={styles.headerRow}>
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={styles.kicker}>Good afternoon,</Text>
+            <Text style={styles.kicker}>{getTimeGreeting()}</Text>
             <Text style={styles.greeting} numberOfLines={1}>{fullName}</Text>
           </View>
           <View style={styles.headerActions}>

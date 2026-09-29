@@ -6,6 +6,7 @@ import { Image, Pressable, Text, View, useWindowDimensions } from 'react-native'
 import { Ionicons } from '@expo/vector-icons';
 import { styles } from './availableJobsStyles';
 import { colors } from '../../../theme';
+import { getTimeGreeting } from '../../../utils/timeFormat';
 
 interface QueueHeaderProps {
   technicianName: string;
@@ -55,7 +56,7 @@ export const QueueHeader = ({
             )
           ) : null}
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={styles.protoKicker}>Good afternoon,</Text>
+            <Text style={styles.protoKicker}>{getTimeGreeting()}</Text>
             <Text style={styles.protoName} numberOfLines={2}>{technicianName}</Text>
           </View>
         </View>
