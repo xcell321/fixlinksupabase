@@ -80,7 +80,7 @@ const sendPasswordResetEmail = async (to, link, requestHost, forwardedProto, for
     to,
     subject: 'Reset your FixLink password',
     html: `
-      <div style="font-family: 'Segoe UI', Roboto, Arial, sans-serif; color: #102A43; max-width: 440px;">
+      <div style="font-family: 'Inter', 'Segoe UI', Roboto, Arial, sans-serif; color: #102A43; max-width: 440px;">
         <h2 style="margin: 0 0 8px; font-size: 18px;">Reset your FixLink password</h2>
         <p style="margin: 0 0 16px; color: #6B7280; font-size: 13px;">This one-time link expires in 24 hours.</p>
         <p style="margin: 0 0 16px;">
@@ -124,7 +124,7 @@ const sendTechnicianApprovedEmail = async (to, name) => {
     to,
     subject: 'Your FixLink technician account is approved',
     html: `
-      <div style="font-family: 'Segoe UI', Roboto, Arial, sans-serif; color: #102A43; max-width: 440px;">
+      <div style="font-family: 'Inter', 'Segoe UI', Roboto, Arial, sans-serif; color: #102A43; max-width: 440px;">
         <h2 style="margin: 0 0 8px; font-size: 18px;">You're approved, ${firstName}</h2>
         <p style="margin: 0 0 16px; color: #6B7280; font-size: 13px;">Your FixLink technician application passed review.</p>
         <p style="margin: 0 0 14px;">You are now an <strong>active FixLink technician</strong>. Your account is registered and ready to accept repair jobs.</p>

@@ -143,6 +143,9 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
       setActionError((error as { error?: string; message?: string })?.error
         || (error as Error)?.message
         || 'The request could not be completed. Please try again.');
+      // Close the dialog on failure: its full-screen scrim otherwise stays on top
+      // of the screen and hides the error box rendered above the list.
+      setPendingAction(null);
     } finally {
       setActionBusy(false);
     }
@@ -407,11 +410,11 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
         </View>
         <View style={styles.refFooter}>
           <View style={styles.refFooterItem}>
-            <Ionicons name="person-outline" size={12} color="#9CA3AF" accessible={false} />
+            <Ionicons name="person-outline" size={12} color={colors.subtle} accessible={false} />
             <Text style={styles.refFooterText} numberOfLines={1}>{req.technicianName || 'Finding technician'}</Text>
           </View>
           <View style={styles.refFooterItem}>
-            <Ionicons name="time-outline" size={12} color="#9CA3AF" accessible={false} />
+            <Ionicons name="time-outline" size={12} color={colors.subtle} accessible={false} />
             <Text style={styles.refFooterText} numberOfLines={1}>ETA: {etaLabel(req)}</Text>
           </View>
         </View>
@@ -632,7 +635,7 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
         </View>
         <View style={styles.refFooter}>
           <View style={styles.refFooterItem}>
-            <Ionicons name="calendar-outline" size={12} color="#9CA3AF" accessible={false} />
+            <Ionicons name="calendar-outline" size={12} color={colors.subtle} accessible={false} />
             <Text style={styles.refFooterText} numberOfLines={1}>{formatCardDate(job.completedAt || job.createdAt)}</Text>
           </View>
           {reviewed ? (
@@ -665,27 +668,37 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
     </View>
   );
 
+  // Mirrors the live refCard layout (header + progress bar + footer) so the
+  // skeleton sits exactly where each request card will appear.
   const renderSkeleton = (): React.JSX.Element => (
-    <View>
+    <View style={{ gap: 12 }}>
       {[1, 2, 3].map((item) => (
-        <View key={item} style={styles.card}>
-          <View style={styles.skeletonHeader}>
-            <Skeleton style={{ width: 44, height: 44, borderRadius: 14 }} />
-            <View style={styles.skeletonCopy}>
-              <Skeleton style={{ width: '62%', height: 15, marginBottom: 8 }} />
-              <Skeleton style={{ width: '40%', height: 11 }} />
+        <View key={item} style={styles.refCard}>
+          <View style={styles.refHeaderRow}>
+            <View style={styles.refTitleWrap}>
+              <Skeleton pulse style={{ width: '70%', height: 14, borderRadius: 6, marginBottom: 6 }} />
+              <Skeleton pulse style={{ width: '45%', height: 12, borderRadius: 6 }} />
             </View>
-            <Skeleton style={{ width: 70, height: 22, borderRadius: 8 }} />
+            <Skeleton pulse style={{ width: 64, height: 22, borderRadius: 999, flexShrink: 0 }} />
           </View>
-          <Skeleton style={{ width: '92%', height: 13, marginBottom: 8 }} />
-          <Skeleton style={{ width: '66%', height: 13, marginBottom: 16 }} />
-          <View style={styles.skeletonMetaRow}>
-            <Skeleton style={{ width: '34%', height: 12 }} />
-            <Skeleton style={{ width: '42%', height: 12 }} />
+          <View style={styles.refProgressBlock}>
+            <View style={styles.refProgressLabelRow}>
+              <Skeleton pulse style={{ width: 56, height: 10, borderRadius: 5 }} />
+              <Skeleton pulse style={{ width: 32, height: 10, borderRadius: 5 }} />
+            </View>
+            <View style={styles.refProgressBar}>
+              <Skeleton pulse style={{ width: '40%', height: 6, borderRadius: 999 }} />
+            </View>
           </View>
-          <View style={styles.skeletonActions}>
-            <Skeleton style={{ width: '46%', height: 42, borderRadius: 12 }} />
-            <Skeleton style={{ width: '46%', height: 42, borderRadius: 12 }} />
+          <View style={styles.refFooter}>
+            <View style={styles.refFooterItem}>
+              <Skeleton pulse style={{ width: 12, height: 12, borderRadius: 6, flexShrink: 0 }} />
+              <Skeleton pulse style={{ flex: 1, height: 12, borderRadius: 6 }} />
+            </View>
+            <View style={styles.refFooterItem}>
+              <Skeleton pulse style={{ width: 12, height: 12, borderRadius: 6, flexShrink: 0 }} />
+              <Skeleton pulse style={{ flex: 1, height: 12, borderRadius: 6 }} />
+            </View>
           </View>
         </View>
       ))}
@@ -788,15 +801,15 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
 }
 
 const styles = themedStyles({
-  scrollContent: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 32, backgroundColor: '#F9FAFB', flexGrow: 1, alignItems: 'center' as const },
+  scrollContent: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 32, backgroundColor: colors.appBg, flexGrow: 1, alignItems: 'center' as const },
   centerWrap: { width: '100%' as const, maxWidth: 480, alignSelf: 'center' as const },
   // Prototype dark header with Active / History toggle
-  protoHeader: { backgroundColor: '#0D1B2A', paddingHorizontal: 20, paddingTop: 24, paddingBottom: 20, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, marginHorizontal: -20, marginTop: -20, marginBottom: 20 },
+  protoHeader: { backgroundColor: colors.dark, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 20, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, marginHorizontal: -20, marginTop: -20, marginBottom: 20 },
   protoTitle: { color: colors.onAccent, fontSize: 21, fontFamily: fonts.extraBold, letterSpacing: -0.3, marginBottom: 16 },
   protoTabs: { flexDirection: 'row', gap: 8 },
   protoTab: { flex: 1, paddingVertical: 10, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.10)', alignItems: 'center' },
   protoTabActive: { backgroundColor: colors.customer },
-  protoTabText: { color: '#9CA3AF', fontSize: 14, fontFamily: fonts.semiBold },
+  protoTabText: { color: colors.subtle, fontSize: 14, fontFamily: fonts.semiBold },
   protoTabTextActive: { color: colors.onAccent },
   protoBody: { gap: 12 },
   sectionHeaderContainer: { marginBottom: 16, gap: 2 },
@@ -830,30 +843,30 @@ const styles = themedStyles({
   card: { backgroundColor: colors.white, borderRadius: 20, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: colors.line, gap: 0, ...shadows.card },
   cardFocused: { borderColor: colors.customer, borderWidth: 2, ...shadows.cardStrong },
   // Reference Repairs / History cards (compact, tap-to-detail)
-  refCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#F3F4F6' },
+  refCard: { backgroundColor: colors.white, borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: colors.cardBorder },
   refHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12, gap: 10 },
   refTitleWrap: { flex: 1, minWidth: 0 },
-  refDevice: { color: '#111827', fontSize: 14, fontFamily: fonts.bold },
-  refIssue: { color: '#6B7280', fontSize: 12, fontFamily: fonts.regular, marginTop: 2 },
+  refDevice: { color: colors.gray900, fontSize: 14, fontFamily: fonts.bold },
+  refIssue: { color: colors.gray500, fontSize: 12, fontFamily: fonts.regular, marginTop: 2 },
   refProgressBlock: { marginBottom: 12 },
   refProgressLabelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  refProgressLabel: { color: '#6B7280', fontSize: 12, fontFamily: fonts.regular, fontVariant: ['tabular-nums'] },
-  refProgressBar: { height: 6, backgroundColor: '#F3F4F6', borderRadius: 999, overflow: 'hidden' },
+  refProgressLabel: { color: colors.gray500, fontSize: 12, fontFamily: fonts.regular, fontVariant: ['tabular-nums'] },
+  refProgressBar: { height: 6, backgroundColor: colors.cardBorder, borderRadius: 999, overflow: 'hidden' },
   refProgressFill: { height: '100%', backgroundColor: colors.customer, borderRadius: 999 },
   refFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   refFooterItem: { flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1, minWidth: 0 },
-  refFooterText: { color: '#6B7280', fontSize: 12, fontFamily: fonts.regular, flexShrink: 1 },
+  refFooterText: { color: colors.gray500, fontSize: 12, fontFamily: fonts.regular, flexShrink: 1 },
   refCancelBtn: { marginTop: 12, alignSelf: 'flex-start', paddingVertical: 6, paddingRight: 8 },
-  refCancelText: { color: '#DC2626', fontSize: 12, fontFamily: fonts.semiBold },
-  refDonePill: { backgroundColor: '#D1FAE5', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
-  refDonePillText: { color: '#047857', fontSize: 10, fontFamily: fonts.bold },
+  refCancelText: { color: colors.danger, fontSize: 12, fontFamily: fonts.semiBold },
+  refDonePill: { backgroundColor: colors.donePill, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
+  refDonePillText: { color: colors.successText, fontSize: 10, fontFamily: fonts.bold },
   refRateLink: { color: colors.customer, fontSize: 12, fontFamily: fonts.semiBold },
   refReviewedText: { color: colors.muted, fontSize: 12, fontFamily: fonts.semiBold },
   cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 12 },
   iconChip: { width: 44, height: 44, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  iconChipAmber: { backgroundColor: '#FFF8E7' },
-  iconChipBlue: { backgroundColor: '#EBF2FF' },
-  iconChipGreen: { backgroundColor: '#ECFDF5' },
+  iconChipAmber: { backgroundColor: colors.tipCream },
+  iconChipBlue: { backgroundColor: colors.chipBlue },
+  iconChipGreen: { backgroundColor: colors.successSoft },
   cardHeaderCopy: { flex: 1, marginRight: 8 },
   applianceTitle: { fontSize: 16, fontFamily: fonts.bold, color: colors.ink },
   subLabel: { color: colors.muted, fontSize: 11, fontFamily: fonts.medium, marginTop: 2 },
@@ -908,7 +921,7 @@ const styles = themedStyles({
   railDotInner: { width: 4, height: 4, borderRadius: 2, backgroundColor: colors.lineSoft },
   railLabel: { color: colors.muted, fontSize: 10, fontFamily: fonts.semiBold, marginTop: 3, textAlign: 'center' },
   railLabelCurrent: { color: colors.customerDark, fontFamily: fonts.bold },
-  railLabelUpcoming: { color: '#94A3B8', fontFamily: fonts.medium },
+  railLabelUpcoming: { color: colors.slate400, fontFamily: fonts.medium },
 
   // Codes
   readyBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.customerSoft, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 12, borderWidth: 1, borderColor: colors.hudBorder, marginBottom: 12, gap: 8 },
@@ -942,10 +955,6 @@ const styles = themedStyles({
   reviewButton: { backgroundColor: colors.customer, minHeight: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', ...shadows.card },
 
   // Skeleton / empty / error
-  skeletonHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 18 },
-  skeletonCopy: { flex: 1, marginLeft: 12 },
-  skeletonMetaRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 18 },
-  skeletonActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
   emptyCard: { backgroundColor: colors.white, borderRadius: 20, padding: 32, alignItems: 'center', borderWidth: 1, borderColor: colors.line, gap: 10, ...shadows.card },
   emptyIconWrap: { width: 64, height: 64, borderRadius: 20, backgroundColor: colors.customerSoft, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   emptyTitle: { color: colors.ink, fontSize: 17, fontFamily: fonts.bold, textAlign: 'center' },
@@ -955,8 +964,8 @@ const styles = themedStyles({
   terminalSection: { marginTop: 8 },
   terminalHeader: { marginTop: 12, backgroundColor: colors.white, borderRadius: 16, padding: 12, borderWidth: 1, borderColor: colors.line },
   errorCard: { backgroundColor: colors.white, borderRadius: 20, padding: 32, alignItems: 'center', borderWidth: 1, borderColor: colors.line, gap: 10, ...shadows.card },
-  actionErrorBox: { backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', borderRadius: 12, padding: 12, marginBottom: 12 },
-  actionErrorText: { color: '#B91C1C', fontSize: 12, fontFamily: fonts.semiBold, lineHeight: 17 },
+  actionErrorBox: { backgroundColor: colors.dangerSoft, borderWidth: 1, borderColor: colors.dangerBorder, borderRadius: 12, padding: 12, marginBottom: 12 },
+  actionErrorText: { color: colors.dangerText, fontSize: 12, fontFamily: fonts.semiBold, lineHeight: 17 },
   retryButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.customer, borderRadius: 14, paddingHorizontal: 22, minHeight: 48, marginTop: 6, ...shadows.card },
   retryButtonText: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bold },
 

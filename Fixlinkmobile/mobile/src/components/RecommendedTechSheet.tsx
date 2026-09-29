@@ -36,7 +36,7 @@ export interface RecommendedTechnician {
   workloadStatus?: string;
 }
 
-type LoadState = 'loading' | 'loaded' | 'empty' | 'error';
+type LoadState = 'loading' | 'loaded' | 'empty' | 'error' | 'unavailable';
 
 interface RecommendedTechSheetProps {
   visible: boolean;
@@ -73,10 +73,19 @@ export default function RecommendedTechSheet({ visible, jobId, applianceType, on
       .then((data) => {
         if (!active) return;
         const res = data as { recommendations?: RecommendedTechnician[]; ai?: string; note?: string } | null;
+        const aiOn = res?.ai === 'ai';
+        setNote(res?.note ?? null);
+        setAiAssisted(aiOn);
+        // AI gateway off or unreachable: the backend falls back to a plain
+        // deterministic list, but the sheet must not present that as an AI
+        // ranking. Show the unavailable state instead.
+        if (!aiOn) {
+          setTechs([]);
+          setState('unavailable');
+          return;
+        }
         const list = Array.isArray(res?.recommendations) ? res.recommendations : [];
         setTechs(list);
-        setNote(res?.note ?? null);
-        setAiAssisted(res?.ai === 'ai');
         setState(list.length > 0 ? 'loaded' : 'empty');
       })
       .catch(() => {
@@ -232,6 +241,27 @@ export default function RecommendedTechSheet({ visible, jobId, applianceType, on
       );
     }
 
+    if (state === 'unavailable') {
+      return (
+        <View style={styles.stateBox}>
+          <View style={styles.stateIcon}>
+            <Ionicons name="sparkles-outline" size={24} color={colors.muted} />
+          </View>
+          <Text style={styles.stateTitle}>AI Service Unavailable</Text>
+          <Text style={styles.stateText}>AI matching is temporarily unavailable. Your request is still visible to qualified technicians in the jobs feed.</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Refresh matches"
+            onPress={() => setReloadKey((k) => k + 1)}
+            style={({ pressed }) => [styles.retryBtn, pressed && styles.pressed]}
+          >
+            <Ionicons name="refresh-outline" size={15} color={colors.onAccent} />
+            <Text style={styles.retryBtnText}>Refresh</Text>
+          </Pressable>
+        </View>
+      );
+    }
+
     if (state === 'empty') {
       return (
         <View style={styles.stateBox}>
@@ -265,7 +295,9 @@ export default function RecommendedTechSheet({ visible, jobId, applianceType, on
             <View style={styles.headerCopy}>
               <Text style={styles.title} accessibilityRole="header">AI Technician Match</Text>
               <Text style={styles.subtitle} numberOfLines={1}>
-                {applianceType ? `Top ranked for ${applianceType}` : 'Top ranked for this request'}
+                {state === 'unavailable'
+                  ? 'AI matching paused'
+                  : (applianceType ? `Top ranked for ${applianceType}` : 'Top ranked for this request')}
               </Text>
             </View>
             <Pressable
@@ -312,7 +344,7 @@ const styles = themedStyles({
   pressed: { transform: [{ scale: 0.97 }], opacity: 0.96 },
   pressedSoft: { transform: [{ scale: 0.97 }], opacity: 0.94 },
 
-  overlay: { flex: 1, backgroundColor: 'rgba(16, 42, 67, 0.4)', justifyContent: 'flex-end' },
+  overlay: { flex: 1, backgroundColor: colors.scrim, justifyContent: 'flex-end' },
   sheet: {
     backgroundColor: colors.white,
     borderTopLeftRadius: 28,
@@ -354,7 +386,7 @@ const styles = themedStyles({
   name: { color: colors.ink, fontSize: 15, fontFamily: fonts.bold },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
   ratingText: { color: colors.ink, fontSize: 12, fontFamily: fonts.bold, fontVariant: ['tabular-nums'] },
-  dot: { color: colors.line, fontSize: 12 },
+  dot: { color: colors.line, fontSize: 12, fontFamily: fonts.regular },
   ratingMeta: { color: colors.muted, fontSize: 12, fontFamily: fonts.regular, flexShrink: 1 },
   matchPill: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.customerSoft, borderWidth: 1, borderColor: colors.customerMist, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7, minWidth: 56 },
   matchPillBest: { backgroundColor: colors.customer, borderColor: colors.customerDark },
@@ -371,12 +403,12 @@ const styles = themedStyles({
   statTextHighlight: { color: colors.customer, fontFamily: fonts.bold },
 
   availRow: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 12, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8 },
-  availOk: { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' },
-  availBusy: { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' },
+  availOk: { backgroundColor: colors.successSoft, borderColor: colors.successBorder },
+  availBusy: { backgroundColor: colors.warningSoft, borderColor: colors.warningBorder },
   availText: { flex: 1, fontSize: 11.5, lineHeight: 16, fontFamily: fonts.semiBold },
-  // AA-safe on their tinted fills: #047857 on #ECFDF5, #B45309 on #FFFBEB.
-  availTextOk: { color: '#047857' },
-  availTextBusy: { color: '#B45309' },
+  // AA-safe on their tinted fills: successText on successSoft, warningStrong on warningSoft.
+  availTextOk: { color: colors.successText },
+  availTextBusy: { color: colors.warningStrong },
 
   nextJob: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8 },
   nextJobText: { flex: 1, color: colors.ink, fontSize: 11.5, fontFamily: fonts.medium },

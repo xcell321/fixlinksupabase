@@ -9,6 +9,7 @@ import { submitRepairRequest, fetchPlatformCategories } from "../../services/api
 import { geocodeAddress, geocodeAddressPrecise, geocodeAddressStructured, reverseGeocodePrecise } from "../../services/locationIq";
 import { collectBestFix, distanceInMeters } from "./locationFix";
 import CustomerLocationMap from "../../components/CustomerLocationMap";
+import InfoModal from "../../components/InfoModal";
 import { colors, fonts, shadows, themedStyles } from '../../theme';
 import { getApplianceIcon, type IconName } from '../../utils/applianceIcons';
 
@@ -118,11 +119,12 @@ const WebDateTimeInput = ({ mode, date, onPick, onDismiss, openToken = 0 }: { mo
         paddingRight: 14,
         borderWidth: 1,
         borderStyle: 'solid',
-        borderColor: '#E5E7EB',
+        borderColor: colors.gray200,
         borderRadius: 14,
-        backgroundColor: '#F9FAFB',
-        color: '#102A43',
+        backgroundColor: colors.appBg,
+        color: colors.ink,
         marginTop: 8,
+        fontFamily: fonts.regular,
       }
     : { position: 'absolute' as const, opacity: 0, width: 1, height: 1, left: 0, bottom: 0, pointerEvents: 'none' as const };
 
@@ -181,7 +183,7 @@ function Skeleton({
   width = '100%',
   height = 14,
   radius = 8,
-  color = '#E1E6EB',
+  color = colors.skeletonTint,
   style,
 }: {
   width?: ViewStyle['width'];
@@ -219,14 +221,14 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
   const [zipCode, setZipCode] = useState("");
   const [notes, setNotes] = useState("");
   const [coords, setCoords] = useState<Coords | null>(null);
-  // Smart opacity: manual text = 50%, address derived from the pin = 100%
+  // Smart opacity: manual text = 80%, address derived from the pin = 100%
   // (medium weight, never bold).
   // `addressFromPin` means the fields were filled FROM the pin (a GPS fix or a
   // pin the customer dragged), not typed. While true the auto-geocode effect
   // must not overwrite the pin from a typed-address lookup. Editing any field
   // clears it, so manual edits still re-sync the map.
   const [addressFromPin, setAddressFromPin] = useState(false);
-  const locTextStyle = [styles.textInputSingle, { opacity: addressFromPin ? 1 : 0.5 }];
+  const locTextStyle = [styles.textInputSingle, { opacity: addressFromPin ? 1 : 0.8 }];
   // Consistent focus ring for all step 4 boxes (orange when focused)
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([]);
@@ -251,6 +253,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoViewerVisible, setPhotoViewerVisible] = useState(false);
   const [photoMenuVisible, setPhotoMenuVisible] = useState(false);
+  const [successVisible, setSuccessVisible] = useState(false);
   const scrollRef = useRef<ScrollView | null>(null);
 
   const composedLocation = [street.trim(), city.trim(), zipCode.trim()].filter(Boolean).join(', ');
@@ -754,13 +757,9 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
         ...(photo?.uri ? { photo } : {}),
       });
       
-      Alert.alert(
-        "Request Submitted!",
-        "We're finding a technician that matches your request.",
-        [
-          { text: "View Progress", onPress: onNavigateToProgress }
-        ]
-      );
+      // In-app floating modal. Alert buttons do not fire reliably on web,
+      // which left successful submits with no visible confirmation.
+      setSuccessVisible(true);
 
       setSelectedCategoryName("");
       setSelectedDevice("");
@@ -1447,6 +1446,14 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
           </View>
         </View>
       </Modal>
+
+      <InfoModal
+        visible={successVisible}
+        title="Request Submitted!"
+        message="We're finding a technician that matches your request."
+        buttonLabel="View Progress"
+        onClose={() => { setSuccessVisible(false); onNavigateToProgress?.(); }}
+      />
       </View>
     </ScrollView>
   );
@@ -1561,7 +1568,7 @@ const styles = themedStyles({
   photoSecondaryText: { fontSize: 12, fontFamily: fonts.semiBold, color: colors.customer },
   photoBadge: { marginLeft: 8, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, backgroundColor: colors.customerSoft, borderWidth: 1, borderColor: colors.hudBorder },
   photoBadgeText: { fontSize: 11, fontFamily: fonts.semiBold, color: colors.customer, letterSpacing: 0.2 },
-  photoMenuBackdrop: { flex: 1, backgroundColor: 'rgba(13,27,42,0.5)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  photoMenuBackdrop: { flex: 1, backgroundColor: colors.backdrop, alignItems: 'center', justifyContent: 'center', padding: 24 },
   photoMenuCard: { width: '100%', maxWidth: 340, backgroundColor: colors.white, borderRadius: 18, padding: 20 },
   photoMenuTitle: { fontSize: 16, fontFamily: fonts.bold, color: colors.ink },
   photoMenuSub: { fontSize: 13, fontFamily: fonts.regular, color: colors.muted, marginTop: 4, marginBottom: 14 },
@@ -1598,11 +1605,11 @@ const styles = themedStyles({
   
   locationContainer: { flexDirection: 'row', flexWrap: 'wrap' as const, alignItems: 'center', gap: 10 },
   locationFieldWrap: { position: 'relative', zIndex: 20 },
-  locateButton: { backgroundColor: colors.customer, height: 52, paddingHorizontal: 16, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 6, boxShadow: '0 4px 10px rgba(15,118,110,0.18)', elevation: 3, minWidth: 92, flex: 1, justifyContent: 'center' },
+  locateButton: { backgroundColor: colors.customer, height: 52, paddingHorizontal: 16, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 6, boxShadow: '0 4px 10px rgba(15,118,110,0.18)', minWidth: 92, flex: 1, justifyContent: 'center' },
   locateButtonText: { color: colors.onAccent, fontSize: 13, fontFamily: fonts.bold },
   locateRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, borderRadius: 14, borderWidth: 1.5, borderColor: colors.customer, backgroundColor: colors.customerSoft, paddingHorizontal: 16, elevation: 0 },
   locateRowText: { color: colors.customer, fontSize: 13, fontFamily: fonts.semiBold },
-  locateErrorText: { color: '#B91C1C', fontSize: 12, fontFamily: fonts.semiBold, marginTop: 8, lineHeight: 17 },
+  locateErrorText: { color: colors.dangerText, fontSize: 12, fontFamily: fonts.semiBold, marginTop: 8, lineHeight: 17 },
   locateOkText: { color: colors.customer, fontSize: 12, fontFamily: fonts.semiBold, marginTop: 8 },
 
   // Live-location panel. Previously these were referenced in the step-4 JSX but
@@ -1625,8 +1632,8 @@ const styles = themedStyles({
   accuracyOk: { color: colors.gold },
   accuracyPoor: { color: colors.danger },
 
-  suggestionsPanel: { position: 'absolute', top: 58, left: 0, right: 0, backgroundColor: colors.white, borderRadius: 14, borderWidth: 1, borderColor: colors.line, zIndex: 30, elevation: 8, boxShadow: '0 6px 12px rgba(16,42,67,0.15)', overflow: 'hidden' },
-  suggestionsModalView: { backgroundColor: colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 24, paddingHorizontal: 12, paddingBottom: 10, maxHeight: '78%', boxShadow: '0 -4px 12px rgba(0,0,0,0.1)', elevation: 10 },
+  suggestionsPanel: { position: 'absolute', top: 58, left: 0, right: 0, backgroundColor: colors.white, borderRadius: 14, borderWidth: 1, borderColor: colors.line, zIndex: 30, boxShadow: '0 6px 12px rgba(16,42,67,0.15)', overflow: 'hidden' },
+  suggestionsModalView: { backgroundColor: colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 24, paddingHorizontal: 12, paddingBottom: 10, maxHeight: '78%', boxShadow: '0 -4px 12px rgba(0,0,0,0.1)' },
   suggestionsList: { maxHeight: 360, flexGrow: 0 },
   suggestionStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 14 },
   suggestionStatusText: { flex: 1, color: colors.muted, fontSize: 12, fontFamily: fonts.medium },
@@ -1655,8 +1662,8 @@ const styles = themedStyles({
   primaryButtonTextMuted: { opacity: 0.85 },
   navHint: { fontSize: 12, fontFamily: fonts.medium, color: colors.muted, textAlign: 'center', marginTop: 10, lineHeight: 16 },
 
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(16, 42, 67, 0.4)', justifyContent: 'flex-end' },
-  modalView: { backgroundColor: colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 20, maxHeight: '80%', boxShadow: '0 -4px 12px rgba(0,0,0,0.1)', elevation: 10 },
+  modalOverlay: { flex: 1, backgroundColor: colors.scrim, justifyContent: 'flex-end' },
+  modalView: { backgroundColor: colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 20, maxHeight: '80%', boxShadow: '0 -4px 12px rgba(0,0,0,0.1)' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.line },
   modalBackIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.canvas, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.line },
   modalCloseIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.canvas, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.line },

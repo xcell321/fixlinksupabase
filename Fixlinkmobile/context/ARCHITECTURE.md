@@ -88,52 +88,53 @@ FixLink is engineered on a decoupled three-tier architecture:
 
 ```
 Fixlinkmobile/
-├── mobile/                                # React Native / Expo Mobile App
-│   ├── App.js                             # Application entry point
+├── mobile/                                # React Native / Expo Mobile App (TypeScript)
+│   ├── App.tsx / index.tsx                # Application entry points
 │   ├── src/
 │   │   ├── navigation/
-│   │   │   └── AppNavigator.js            # State-driven role routing & tabs
-│   │   ├── components/
-│   │   │   └── LocationIQMap.js           # Reusable Leaflet.js WebView map component
-│   │   ├── screens/
-│   │   │   ├── auth/                      # Authentication screens
-│   │   │   │   ├── LoginScreen.js         # Unified login (Customer / Technician)
-│   │   │   │   ├── RegisterScreen.js      # Multi-role register + doc/skill upload
-│   │   │   │   └── ForgotPasswordScreen.js
-│   │   │   ├── customer/                  # Customer workflow screens
-│   │   │   │   ├── DashboardScreen.js     # Home feed & service category grid
-│   │   │   │   ├── SubmitRequestScreen.js # Multi-step appliance repair submission
-│   │   │   │   ├── RequestProgressScreen.js# Active request lifecycle & OTP view
-│   │   │   │   ├── RequestDetailsScreen.js # Detailed order summary & call trigger
-│   │   │   │   ├── CustomerProfileScreen.js# Customer account & history
-│   │   │   │   └── ChatScreen.js          # In-app real-time messaging
-│   │   │   ├── technician/                # Technician workflow screens
-│   │   │   │   ├── AvailableJobsScreen.js # Skill-matched & proximity-sorted feed
-│   │   │   │   └── TechnicianProfileScreen.js # Skill badges, portfolio, reviews
-│   │   │   ├── shared/
-│   │   │   │   └── MapTrackerScreen.js    # Live mutual tracking & routing map
-│   │   │   └── services/
-│   │   │       ├── api.js                 # Centralized Axios client & interceptor
-│   │   │       └── locationIq.js          # LocationIQ geocoding & route helper
+│   │   │   └── AppNavigator.tsx           # State-driven role routing, tabs, notification inbox
+│   │   ├── components/                    # Shared UI (AppButton, Skeleton, MessageBanner,
+│   │   │                                  # LocationIQMap, sheets: Assistant, RecommendedTech,
+│   │   │                                  # PortfolioPhoto, ConversationInfo, Help, ConfirmDialog)
+│   │   ├── features/
+│   │   │   ├── auth/                      # LoginScreen, RegisterScreen, ForgotPasswordScreen,
+│   │   │   │                              # PasswordResetScreen, SplashScreen, VerifyPendingScreen
+│   │   │   ├── customer/                  # DashboardScreen, SubmitRequestScreen,
+│   │   │   │                              # RequestProgressScreen, RequestDetailsScreen,
+│   │   │   │                              # CustomerProfileScreen, ChatScreen, RateTechnicianScreen
+│   │   │   ├── technician/                # AvailableJobsScreen (+ availableJobs/ components),
+│   │   │   │                              # TechJobDetailScreen, TechnicianProfileScreen, TechMapScreen
+│   │   │   └── tracking/                  # MapTrackerScreen, TechnicianTrackerScreen
+│   │   ├── services/
+│   │   │   ├── api/                       # Split Axios client (client, authApi, requestsApi,
+│   │   │   │                              # messagesApi, aiApi, trackingApi, profileApi, upload)
+│   │   │   └── locationIq.tsx             # LocationIQ geocoding & route helper
+│   │   ├── theme.tsx                      # Design tokens (colors, fonts, radii, spacing, shadows)
+│   │   └── utils/applianceIcons.tsx       # Status colors, icons, guidance, progress steps
 │
-├── backend/                               # Node.js Express REST API Server
+├── backend/                               # Node.js Express REST API Server (CommonJS)
 │   ├── src/
 │   │   ├── index.js                       # Express app bootstrap & middleware
-│   │   ├── config/
-│   │   │   └── supabase.js               # Supabase secret-key client & JWKS (ES256) verification
-│   │   └── routes/
-│   │       ├── auth.js                    # Registration, login, credential parsing
-│   │       ├── requests.js                # Complete request lifecycle & OTP logic
-│   │       ├── users.js                   # Profile, portfolio & GPS coordinate endpoints
-│   │       └── admin.js                   # Admin verification & auditing routes
-│   └── uploads/                           # Local storage for IDs, certificates & images
+│   │   ├── config/supabase.js             # Supabase service-role client & JWT verification
+│   │   ├── routes/                        # Thin maps (registration order load-bearing;
+│   │   │                                  # requests.js header documents the ordering rules)
+│   │   ├── controllers/                   # jobController, chatController, trackingController,
+│   │   │                                  # notificationController per-endpoint handlers
+│   │   ├── services/                      # Business rules (jobs/*, ai/*, auth/*, workloadService,
+│   │   │                                  # techScheduleService, technicianMatching, skillMatcher,
+│   │   │                                  # chatService, notificationService, locationService, omniRoute)
+│   │   ├── repositories/                  # Database access (job, message, notification, user, review)
+│   │   ├── domain/                        # Serializers & policy (jobSerializer, otpPolicy, geo, ...)
+│   │   ├── middleware/                    # requireAuth, requireAdmin, upload, rate limits
+│   │   └── db/schema.sql                  # Idempotent Supabase PostgreSQL schema (source of truth)
 │
-└── context/                               # Project Source of Truth & SAD Docs
+└── context/                               # Project Source of Truth & SAD Docs (mirrored to backend/context/)
     ├── ARCHITECTURE.md                    # Detailed architectural blueprint
     ├── PRD.md                             # Product Requirements Document
     ├── SCHEMA.md                          # Supabase/PostgreSQL schemas & validations
     ├── UI_WORKFLOW.md                     # Complete UI wireflow & interaction guide
-    └── CEBU_ROOSEVELT.txt                 # Chapter 1 Proposal Reference
+    ├── Data_Dictionary.md                 # Mobile-facing field dictionary
+    └── CAPSTONE_CHAPTER3_AND_DEFENSE_GUIDE.md # SAD artifacts & defense guide
 ```
 
 ---
@@ -167,16 +168,16 @@ To prevent fraudulent completions and ensure physical technician presence:
 3. The customer polls `GET /api/requests/accepted/:id/live-tracking`, receiving both coordinates and LocationIQ driving geometry.
 4. **Termination:** As soon as the job is marked `Completed` or `Cancelled`, all location streaming immediately ceases.
 
-### 5.4 Technician Workload & Capacity System ( `backend/src/utils/workload.js` )
+### 5.4 Technician Workload & Capacity System ( `backend/src/services/workloadService.js` )
 **Active definition:** `Accepted`, `Confirmed`, `Customer Ready`, `In Progress` are active (require work); `Pending`, `Completed`, `Cancelled`, `No-Show` are not. Counted live via `getTechnicianActiveJobCount(uid)` / batch `getActiveJobCountsForTechnicians(uids)` (`select count head:true`).
 
 **Levels:** `0–2 available` (fully eligible), `3–5 busy` (still eligible, slight priority dip), `6+ at_capacity` (excluded from automatic AI, existing jobs untouched, auto-recover when ≤5).
 
-**Pipeline order (AI):** 1) verified/active gate + skill match (`technicianMatch.js:getEligibleCandidates`) → 2) workload annotate + filter `at_capacity` → 3) `rankObjective` + `-0.06` penalty for `busy` → 4) distance/rating/reviews/experience → 5) schedule visibility (`techSchedule.js`) kept separate (workload ≠ same-day availability). Response adds `{activeJobs, workloadStatus}`.
+**Pipeline order (AI):** 1) verified/active gate + skill match (`technicianMatching.js:getEligibleCandidates`) → 2) workload annotate + filter `at_capacity` → 3) `rankObjective` + `-0.06` penalty for `busy` → 4) distance/rating/reviews/experience → 5) schedule visibility (`techScheduleService.js`) kept separate (workload ≠ same-day availability). Response adds `{activeJobs, workloadStatus}`.
 
 **Accept guard (authoritative):** `PUT /api/requests/:id/accept` re-counts before `rpc accept_job`; if `at_capacity` → `409 {code:TECHNICIAN_AT_CAPACITY, activeJobs, workloadStatus}`. Handles race (AI advisory vs accept authoritative); recovery automatic on next `Completed`.
 
-### 5.5 Notification Two-Step Deep-Link & Read Persistence ( `mobile/src/navigation/AppNavigator.js` )
+### 5.5 Notification Two-Step Deep-Link & Read Persistence ( `mobile/src/navigation/AppNavigator.tsx` )
 `notifications` (`read/read_at`) serves badge `filter(!read).length` (10s poll `GET /api/requests/notifications` limit 100, sorted desc) and deep-link. **1st tap** → `detailCard` + optimistic `read=true` (badge –1, never negative) + fire-and-forget `PUT /api/requests/notifications/:id/read` (404 → keep optimistic, no warn). **2nd tap** same `id` → `GET /api/requests/job/:id` ownership check → `chat`→ exact `ChatScreen` thread, `job` Completed→ `RequestProgressScreen` `focusedJobId`+`autoExpandReview` (completed card `cardFocused`), other `job`→ `RequestDetailsScreen` / technician `AvailableJobsScreen` `highlightedJobId`. Deleted job → `detailError` keep notification, no crash. `read/read_at` persists across refresh/reopen/restart.
 
 ---

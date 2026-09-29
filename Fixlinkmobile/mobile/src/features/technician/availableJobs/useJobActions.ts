@@ -52,6 +52,11 @@ export const useJobActions = ({
 
   const [noShowJob, setNoShowJob] = useState<JobItem | null>(null);
 
+  // Floating success modals. Alert dialogs do not fire reliably on web,
+  // so accept/start confirmations render in-app instead.
+  const [acceptedNotice, setAcceptedNotice] = useState<boolean>(false);
+  const [startedNotice, setStartedNotice] = useState<boolean>(false);
+
   const handleAcceptJob = (job: JobItem): void => {
     if (!technician?.uid) {
       setAcceptError('Please sign in with a verified technician account.');
@@ -98,6 +103,7 @@ export const useJobActions = ({
       setSelectedJobForDetails(null);
       setFeedTab('active');
       setAcceptError(null);
+      setAcceptedNotice(true);
       loadJobs({ background: true });
     } catch (error) {
       const err = error as { code?: string; message?: string; error?: string };
@@ -179,7 +185,7 @@ export const useJobActions = ({
       setAcceptedJobs((currentJobs) =>
         currentJobs.map((j) => (j.id === job.id ? { ...j, status: 'In Progress' } : j))
       );
-      Alert.alert('Job In Progress', 'Repair started. Collect the 4-digit code from the customer when finished.');
+      setStartedNotice(true);
       loadJobs({ background: true });
     } catch (error) {
       const err = error as {
@@ -290,6 +296,10 @@ export const useJobActions = ({
     actionLoadingId,
     noShowJob,
     setNoShowJob,
+    acceptedNotice,
+    setAcceptedNotice,
+    startedNotice,
+    setStartedNotice,
     otpModalVisible,
     setOtpModalVisible,
     otpCode,

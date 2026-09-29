@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text } from 'react-native';
-import { themedStyles } from '../theme';
+import { colors, fonts, themedStyles } from '../theme';
 
 export interface DateTimePickerWebProps {
   value: Date;
@@ -51,8 +51,8 @@ const styles = themedStyles({
   },
   label: {
     fontSize: 13,
-    fontFamily: 'Inter_600SemiBold',
-    color: '#102A43',
+    fontFamily: fonts.semiBold,
+    color: colors.ink,
     marginBottom: 6,
   },
   input: {
@@ -60,9 +60,10 @@ const styles = themedStyles({
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#D9E2EC',
-    backgroundColor: '#F5F8FA',
+    borderColor: colors.line,
+    backgroundColor: colors.canvas,
     fontSize: 14,
-    color: '#102A43',
+    color: colors.ink,
+    fontFamily: fonts.regular,
   } as never,
 });

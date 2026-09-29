@@ -64,5 +64,5 @@ export const uploadPortfolioPhoto = async (
     'photos',
     (await buildUploadFile(photo, 'portfolio-photo.jpg', 'image/jpeg')) as unknown as Blob,
   );
-  return (await api.post(`/users/${uid}/portfolio`, formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120000 })).data;
+  return (await api.post(`/users/${encodeURIComponent(uid)}/portfolio`, formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120000 })).data;
 };

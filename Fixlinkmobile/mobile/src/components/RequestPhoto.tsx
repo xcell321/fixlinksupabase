@@ -88,7 +88,7 @@ export function PhotoThumb({ photoUrl, onPress, label = 'tap to view' }: PhotoTh
 const styles = themedStyles({
   pressedSoft: { transform: [{ scale: 0.97 }], opacity: 0.94 },
 
-  overlay: { flex: 1, backgroundColor: 'rgba(16, 42, 67, 0.4)', justifyContent: 'flex-end' },
+  overlay: { flex: 1, backgroundColor: colors.scrim, justifyContent: 'flex-end' },
   sheet: { backgroundColor: colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 24, paddingHorizontal: 20, paddingBottom: 28, maxHeight: '82%' },
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.line },
   headerSpacer: { width: 32 },
@@ -103,6 +103,6 @@ const styles = themedStyles({
   emptyText: { color: colors.muted, fontSize: 13, fontFamily: fonts.medium },
 
   thumbRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, borderRadius: 14, padding: 8, paddingRight: 12, marginTop: 10 },
-  thumb: { width: 52, height: 52, borderRadius: 10, backgroundColor: colors.lineSoft ?? '#E3ECF2' },
+  thumb: { width: 52, height: 52, borderRadius: 10, backgroundColor: colors.lineSoft },
   thumbLabel: { flex: 1, color: colors.tech, fontSize: 12, fontFamily: fonts.semiBold },
 });

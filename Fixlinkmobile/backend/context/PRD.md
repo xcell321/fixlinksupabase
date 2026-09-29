@@ -118,12 +118,12 @@ FixLink was conceptualized to achieve five specific objectives:
 - `FR-MATCH-02`: Proximity calculation: Distance between technician's current location and request coordinates is computed using the Haversine formula and displayed as `distanceKm`.
 - `FR-MATCH-03`: Privacy shield: Customer exact coordinates and full street address remain masked in the available jobs feed until a job is accepted.
 - `FR-MATCH-04`: Decline capability: Technicians can dismiss an available job, hiding it from their feed without canceling it for other qualified technicians.
-- `FR-MATCH-05`: Atomic acceptance: Accepting a job moves the record from `repairRequests` to `acceptedJobs`, assigns `technicianUid`, and generates a random 4-digit verification code.
+- `FR-MATCH-05`: Atomic acceptance: Accepting a job updates the `jobs` row in place via the `accept_job()` RPC, assigns `technicianUid`, and generates a random 4-digit verification code.
 
 ### Module 4: Technician Workload & Capacity (FR-WORKLOAD)
 - `FR-WORKLOAD-01`: Active workload defined as `Accepted`, `Confirmed`, `Customer Ready`, `In Progress` (not `Pending`/`Completed`/`Cancelled`/`No-Show`), computed live from `jobs` via `getTechnicianActiveJobCount` / `getActiveJobCountsForTechnicians` (no stored column, no migration).
 - `FR-WORKLOAD-02`: Levels `0–2 available` (fully eligible), `3–5 busy` (still eligible, slight `–0.06` ranking dip, not overpowering skill/rating/distance), `6+ at_capacity` (excluded from automatic `GET /api/ai/recommend`).
-- `FR-WORKLOAD-03`: AI pipeline order: verified/active + skill → workload filter (`at_capacity` out, `busy` penalty) → distance/schedule/rating → schedule visibility kept separate (`techSchedule.js`).
+- `FR-WORKLOAD-03`: AI pipeline order: verified/active + skill → workload filter (`at_capacity` out, `busy` penalty) → distance/schedule/rating → schedule visibility kept separate (`techScheduleService.js`).
 - `FR-WORKLOAD-04`: `GET /api/ai/recommend` response adds safe `{activeJobs, workloadStatus}` (`available`/`busy`/`at_capacity`) per candidate; `6+` never appears.
 - `FR-WORKLOAD-05`: Authoritative `PUT /api/requests/:id/accept` re-checks count before `rpc accept_job`; if `at_capacity` → `409 {code:TECHNICIAN_AT_CAPACITY, activeJobs, workloadStatus}`; existing jobs untouched, auto-recover when ≤5.
 - `FR-WORKLOAD-06`: `GET /api/requests/technician/:uid/workload` returns `{activeJobs, workloadStatus}` (auth `uid===auth`).

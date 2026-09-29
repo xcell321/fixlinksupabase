@@ -1,5 +1,6 @@
 import type { ComponentProps } from 'react';
 import type { Ionicons } from '@expo/vector-icons';
+import { colors } from '../theme';
 
 // Every branch below returns a real Ionicons glyph name, so the return type is
 // the icon set's own union rather than `string`. Callers can therefore drop the
@@ -25,23 +26,23 @@ export const getApplianceIcon = (type: string = ''): IconName => {
 export const getStatusColor = (status: unknown): string => {
   switch (String(status ?? '').toLowerCase()) {
     case 'completed':
-      return '#059669';
+      return colors.green;
     case 'in progress':
-      return '#2563EB';
+      return colors.tech;
     case 'customer ready':
-      return '#7C3AED';
+      return colors.signalViolet;
     case 'confirmed':
-      return '#0F766E';
+      return colors.teal;
     case 'accepted':
-      return '#0F766E';
+      return colors.teal;
     case 'no-show':
-      return '#DC2626';
+      return colors.danger;
     case 'pending':
-      return '#D97706';
+      return colors.gold;
     case 'cancelled':
-      return '#E53935';
+      return colors.error;
     default:
-      return '#3F5A6E';
+      return colors.muted;
   }
 };
 

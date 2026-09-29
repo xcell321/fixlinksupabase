@@ -114,7 +114,7 @@ export default function VerifyPendingScreen({ onBackToLogin, email }: VerifyPend
             value={query}
             onChangeText={setQuery}
             placeholder="you@email.com"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={colors.subtle}
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
@@ -173,26 +173,26 @@ export default function VerifyPendingScreen({ onBackToLogin, email }: VerifyPend
 }
 
 const styles = themedStyles({
-  screen: { flex: 1, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingVertical: 24, gap: 4 },
-  iconWrap: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#DBEAFE', alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
-  title: { color: '#111827', fontSize: 24, fontFamily: fonts.extraBold, marginBottom: 8, textAlign: 'center' },
-  copy: { color: '#6B7280', fontSize: 14, fontFamily: fonts.regular, textAlign: 'center', lineHeight: 20, marginBottom: 20 },
-  nextCard: { alignSelf: 'stretch', backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE', borderRadius: 16, padding: 16, marginBottom: 20 },
-  nextTitle: { color: '#1E40AF', fontSize: 14, fontFamily: fonts.bold, marginBottom: 8 },
-  nextItem: { color: '#2563EB', fontSize: 13, fontFamily: fonts.regular, lineHeight: 22 },
-  checkCard: { alignSelf: 'stretch', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 16, padding: 16, marginBottom: 16, gap: 10 },
-  input: { borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#F9FAFB', borderRadius: 12, paddingHorizontal: 14, minHeight: 48, fontSize: 14, fontFamily: fonts.regular, color: '#111827' },
+  screen: { flex: 1, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingVertical: 24, gap: 4 },
+  iconWrap: { width: 80, height: 80, borderRadius: 40, backgroundColor: colors.techMist, alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
+  title: { color: colors.gray900, fontSize: 24, fontFamily: fonts.extraBold, marginBottom: 8, textAlign: 'center' },
+  copy: { color: colors.gray500, fontSize: 14, fontFamily: fonts.regular, textAlign: 'center', lineHeight: 20, marginBottom: 20 },
+  nextCard: { alignSelf: 'stretch', backgroundColor: colors.techSoft, borderWidth: 1, borderColor: colors.badgeBlueBorder, borderRadius: 16, padding: 16, marginBottom: 20 },
+  nextTitle: { color: colors.deepBlue, fontSize: 14, fontFamily: fonts.bold, marginBottom: 8 },
+  nextItem: { color: colors.tech, fontSize: 13, fontFamily: fonts.regular, lineHeight: 22 },
+  checkCard: { alignSelf: 'stretch', backgroundColor: colors.white, borderWidth: 1, borderColor: colors.gray200, borderRadius: 16, padding: 16, marginBottom: 16, gap: 10 },
+  input: { borderWidth: 1, borderColor: colors.gray200, backgroundColor: colors.appBg, borderRadius: 12, paddingHorizontal: 14, minHeight: 48, fontSize: 14, fontFamily: fonts.regular, color: colors.gray900 },
   checkButton: { backgroundColor: BLUE, borderRadius: 12, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
   checkButtonBusy: { opacity: 0.7 },
   checkButtonText: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bold },
   errorText: { color: colors.error, fontSize: 12, fontFamily: fonts.medium, lineHeight: 16 },
   resultCard: { borderRadius: 12, borderWidth: 1, padding: 12, gap: 3 },
-  resultOk: { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' },
-  resultBad: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
-  resultInfo: { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
-  resultTitle: { color: '#111827', fontSize: 13, fontFamily: fonts.bold },
-  resultBody: { color: '#4B5563', fontSize: 12, fontFamily: fonts.regular, lineHeight: 17 },
+  resultOk: { backgroundColor: colors.successSoft, borderColor: colors.successBorder },
+  resultBad: { backgroundColor: colors.dangerSoft, borderColor: colors.dangerBorder },
+  resultInfo: { backgroundColor: colors.techSoft, borderColor: colors.badgeBlueBorder },
+  resultTitle: { color: colors.gray900, fontSize: 13, fontFamily: fonts.bold },
+  resultBody: { color: colors.gray600, fontSize: 12, fontFamily: fonts.regular, lineHeight: 17 },
   link: { color: BLUE, fontSize: 14, fontFamily: fonts.semiBold },
-  linkMuted: { color: '#6B7280', fontSize: 13, fontFamily: fonts.semiBold, marginTop: 14 },
+  linkMuted: { color: colors.gray500, fontSize: 13, fontFamily: fonts.semiBold, marginTop: 14 },
   checkLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
 });

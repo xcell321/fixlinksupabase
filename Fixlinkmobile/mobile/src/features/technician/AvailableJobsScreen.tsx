@@ -20,6 +20,7 @@ import TechJobDetailScreen from './TechJobDetailScreen';
 import { PhotoLightbox } from '../../components/RequestPhoto';
 import { updateTechnicianLocation } from '../../services/api';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import InfoModal from '../../components/InfoModal';
 import { colors } from '../../theme';
 import {
   calculateWorkloadSummary,
@@ -93,6 +94,10 @@ export default function AvailableJobsScreen({
     actionLoadingId,
     noShowJob,
     setNoShowJob,
+    acceptedNotice,
+    setAcceptedNotice,
+    startedNotice,
+    setStartedNotice,
     otpModalVisible,
     setOtpModalVisible,
     otpCode,
@@ -375,6 +380,25 @@ export default function AvailableJobsScreen({
         accepting={acceptingJobId !== null}
         onCancel={() => setConfirmJob(null)}
         onConfirm={doAcceptJob}
+      />
+
+      {/* Floating success modals. The backend notifies the customer on both
+          accept and repair start, so both messages are factual. */}
+      <InfoModal
+        visible={acceptedNotice}
+        title="Job Accepted"
+        message="The customer has been notified that you accepted the request."
+        buttonLabel="View Active Jobs"
+        accentColor={colors.tech}
+        onClose={() => setAcceptedNotice(false)}
+      />
+      <InfoModal
+        visible={startedNotice}
+        title="Repair Started"
+        message="The customer has been notified. Collect the 4-digit code from the customer when finished."
+        buttonLabel="Got It"
+        accentColor={colors.tech}
+        onClose={() => setStartedNotice(false)}
       />
     </ScrollView>
   );

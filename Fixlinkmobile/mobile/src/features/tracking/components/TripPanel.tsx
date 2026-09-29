@@ -5,7 +5,7 @@
 // secondary "Center Route" CTA and the empty state.
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
-import { themedStyles } from '../../../theme';
+import { colors, fonts, themedStyles } from '../../../theme';
 
 type TripPanelProps = {
   distanceKm: number | null;
@@ -61,22 +61,22 @@ export const openExternalNavigation = (latitude: number, longitude: number): voi
 };
 
 const styles = themedStyles({
-  panel: { backgroundColor: '#fff', borderRadius: 12, padding: 12, gap: 8 },
+  panel: { backgroundColor: colors.white, borderRadius: 12, padding: 12, gap: 8 },
   tripRow: { flexDirection: 'row', alignItems: 'center' },
   tripCell: { flex: 1, alignItems: 'center' },
-  tripLabel: { fontSize: 12, color: '#6b7280' },
-  tripValue: { fontSize: 16, fontWeight: '700' },
-  tripDivider: { width: 1, height: 32, backgroundColor: '#e5e7eb' },
+  tripLabel: { fontSize: 12, color: colors.gray500, fontFamily: fonts.medium },
+  tripValue: { fontSize: 16, fontFamily: fonts.bold },
+  tripDivider: { width: 1, height: 32, backgroundColor: colors.gray200 },
   destinationRow: { gap: 2 },
-  destinationLabel: { fontSize: 12, color: '#6b7280' },
-  destinationValue: { fontSize: 14 },
-  primaryCta: { backgroundColor: '#2563eb', borderRadius: 8, padding: 12, alignItems: 'center' },
-  primaryCtaText: { color: '#fff', fontWeight: '700' },
+  destinationLabel: { fontSize: 12, color: colors.gray500, fontFamily: fonts.medium },
+  destinationValue: { fontSize: 14, fontFamily: fonts.regular },
+  primaryCta: { backgroundColor: colors.tech, borderRadius: 8, padding: 12, alignItems: 'center' },
+  primaryCtaText: { color: colors.onAccent, fontFamily: fonts.bold },
   row: { flexDirection: 'row', gap: 8 },
-  secondaryCta: { flex: 1, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8, padding: 10, alignItems: 'center' },
-  secondaryCtaText: { fontWeight: '600' },
+  secondaryCta: { flex: 1, borderWidth: 1, borderColor: colors.gray300, borderRadius: 8, padding: 10, alignItems: 'center' },
+  secondaryCtaText: { fontFamily: fonts.semiBold },
   quietCta: { flex: 1, padding: 10, alignItems: 'center' },
-  quietCtaText: { color: '#2563eb', fontWeight: '600' },
+  quietCtaText: { color: colors.tech, fontFamily: fonts.semiBold },
   emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  emptyText: { color: '#6b7280', textAlign: 'center' },
+  emptyText: { color: colors.gray500, textAlign: 'center', fontFamily: fonts.regular },
 });

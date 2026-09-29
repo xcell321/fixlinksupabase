@@ -111,7 +111,7 @@ interface ConversationRowProps {
 const ConversationRow = memo(function ConversationRow({ item, currentUid, accent, online, onOpen }: ConversationRowProps): React.JSX.Element {
   const isUnread = (item.unreadCount ?? 0) > 0;
   const preview = item.lastMessage
-    ? `${String(item.lastMessage.senderUid ?? '') === String(currentUid) ? 'You: ' : ''}${item.lastMessage.text}`
+    ? `${String(item.lastMessage.senderUid ?? '') === String(currentUid) ? 'You: ' : ''}${item.lastMessage.text || (item.lastMessage.imageUrl ? 'Sent a photo' : '')}`
     : 'No messages yet. Say hello!';
   const timeLabel = item.lastMessage?.timestamp ? formatMessageTime(item.lastMessage.timestamp) : '';
 
@@ -362,24 +362,40 @@ ChatScreenProps): React.JSX.Element {
   // Attach a photo to the next message. Only the uri/name/mime triple is kept
   // so it can be handed straight to the multipart upload helper.
   const pickPhoto = useCallback(async (): Promise<void> => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      showToast('Photo permission is required to attach an image');
-      return;
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        showToast('Photo permission is required to attach an image');
+        return;
+      }
+      let result;
+      try {
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ['images'],
+          allowsEditing: true,
+          quality: 0.7,
+        });
+      } catch {
+        // Some devices have no system crop UI, which makes the editor throw.
+        // Retry without it so attach still works there.
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ['images'],
+          allowsEditing: false,
+          quality: 0.7,
+        });
+      }
+      if (result.canceled) return;
+      const asset = result.assets?.[0];
+      if (!asset) return;
+      setPendingPhoto({
+        uri: asset.uri,
+        fileName: asset.fileName ?? undefined,
+        mimeType: asset.mimeType ?? undefined,
+      });
+    } catch (error) {
+      console.warn('Photo attach failed:', error);
+      showToast('Could not open photo library. Please try again.');
     }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.7,
-    });
-    if (result.canceled) return;
-    const asset = result.assets?.[0];
-    if (!asset) return;
-    setPendingPhoto({
-      uri: asset.uri,
-      fileName: asset.fileName ?? undefined,
-      mimeType: asset.mimeType ?? undefined,
-    });
   }, [showToast]);
 
   const handleSendMessage = async (): Promise<void> => {
@@ -528,7 +544,10 @@ ChatScreenProps): React.JSX.Element {
           </Pressable>
 
           <Pressable
-            onPress={() => peerPhone && handleCopyPhone(peerPhone)}
+            accessibilityRole="button"
+            accessibilityLabel="Conversation information"
+            accessibilityHint="Shows who you are talking to and the job this chat belongs to"
+            onPress={() => setInfoOpen(true)}
             style={styles.headerAvatarWrap}
           >
             {s.peerImage ? (
@@ -540,7 +559,13 @@ ChatScreenProps): React.JSX.Element {
             )}
           </Pressable>
 
-          <Pressable style={styles.headerCenter} onPress={() => peerPhone && handleCopyPhone(peerPhone)}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Conversation information"
+            accessibilityHint="Shows who you are talking to and the job this chat belongs to"
+            style={styles.headerCenter}
+            onPress={() => setInfoOpen(true)}
+          >
             <Text style={styles.headerName} numberOfLines={1}>{s.peerName}</Text>
             <Text style={[styles.headerOnline, !peerOnline && styles.headerOffline]} numberOfLines={1}>
               {peerOnline ? 'Online' : 'Offline'}
@@ -763,7 +788,7 @@ ChatScreenProps): React.JSX.Element {
               <TextInput
                 style={styles.composerInput}
                 placeholder={isTechnician ? 'Message the customer...' : 'Message the technician...'}
-                placeholderTextColor="#8AA0B5"
+                placeholderTextColor={colors.steel}
                 value={inputText}
                 onChangeText={handleInputChange}
                 multiline
@@ -867,15 +892,15 @@ ChatScreenProps): React.JSX.Element {
       {loading ? (
         <View style={styles.skeletonList}>
           {[1, 2, 3, 4, 5].map((k) => (
-            <View key={k} style={styles.skeletonRow}>
-              <Skeleton style={styles.skeletonAvatar} />
-              <View style={styles.skeletonCol}>
-                <View style={styles.skeletonLineRow}>
-                  <Skeleton style={{ width: '46%', height: 14, borderRadius: 6 }} />
-                  <Skeleton style={{ width: 36, height: 11, borderRadius: 6 }} />
+            <View key={k} style={styles.skeletonRowCard}>
+              <Skeleton pulse style={{ width: 40, height: 40, borderRadius: 20 }} />
+              <View style={styles.rowCenter}>
+                <View style={styles.rowNameRow}>
+                  <Skeleton pulse style={{ flex: 1, height: 14, borderRadius: 6 }} />
+                  <Skeleton pulse style={{ width: 36, height: 11, borderRadius: 6, flexShrink: 0 }} />
                 </View>
-                <Skeleton style={{ width: '78%', height: 12, borderRadius: 6 }} />
-                <Skeleton style={{ width: '52%', height: 11, borderRadius: 6 }} />
+                <Skeleton pulse style={{ width: '35%', height: 11, borderRadius: 6, marginTop: 3 }} />
+                <Skeleton pulse style={{ width: '80%', height: 12, borderRadius: 6, marginTop: 4 }} />
               </View>
             </View>
           ))}
@@ -919,8 +944,8 @@ const styles = themedStyles({
   pressedSoft: { transform: [{ scale: 0.98 }], opacity: 0.92 },
 
   // -- Prototype inbox: dark header + cards --
-  inboxContainer: { flex: 1, backgroundColor: '#F9FAFB' },
-  inboxHeaderDark: { backgroundColor: '#0D1B2A', paddingHorizontal: 20, paddingTop: 24, paddingBottom: 20, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+  inboxContainer: { flex: 1, backgroundColor: colors.appBg },
+  inboxHeaderDark: { backgroundColor: colors.dark, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 20, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
   inboxTitleDark: { color: colors.onAccent, fontSize: 21, fontFamily: fonts.extraBold, letterSpacing: -0.3 },
   inboxHeader: {
     flexDirection: 'row',
@@ -931,7 +956,7 @@ const styles = themedStyles({
     paddingBottom: 12,
     backgroundColor: colors.white,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E6EAF0',
+    borderBottomColor: colors.hairline,
     gap: 12,
   },
   inboxHeaderLeft: { flex: 1 },
@@ -951,7 +976,7 @@ const styles = themedStyles({
   filterBar: {
     backgroundColor: colors.white,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E6EAF0',
+    borderBottomColor: colors.hairline,
     paddingVertical: 10,
   },
   filterScroll: { paddingHorizontal: 16, gap: 8, alignItems: 'center' },
@@ -970,7 +995,7 @@ const styles = themedStyles({
   filterLabelIdle: { color: colors.muted },
   filterLabelActive: { color: colors.onAccent },
   filterCount: { minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' },
-  filterCountIdle: { backgroundColor: '#EDF2F7' },
+  filterCountIdle: { backgroundColor: colors.frost },
   filterCountActive: { backgroundColor: 'rgba(255,255,255,0.22)' },
   filterCountText: { fontSize: 11, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
   filterCountTextIdle: { color: colors.muted },
@@ -979,9 +1004,9 @@ const styles = themedStyles({
   inlineError: {
     marginHorizontal: 16,
     marginTop: 12,
-    backgroundColor: '#FFF5F5',
+    backgroundColor: colors.blush,
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: colors.dangerBorder,
     borderRadius: 14,
     padding: 12,
     flexDirection: 'row',
@@ -1005,7 +1030,7 @@ const styles = themedStyles({
   inlineRetryText: { color: colors.onAccent, fontSize: 12, fontFamily: fonts.bold },
 
   // Prototype conversation cards
-  rowCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: '#F3F4F6' },
+  rowCard: { backgroundColor: colors.white, borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: colors.cardBorder },
   rowPressed: { opacity: 0.92 },
   rowAvatarWrap: { position: 'relative' },
   rowAvatar: {
@@ -1015,27 +1040,26 @@ const styles = themedStyles({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  rowOnlineDot: { position: 'absolute', right: -1, bottom: -1, width: 12, height: 12, borderRadius: 6, backgroundColor: '#10B981', borderWidth: 2, borderColor: '#FFFFFF' },
+  rowOnlineDot: { position: 'absolute', right: -1, bottom: -1, width: 12, height: 12, borderRadius: 6, backgroundColor: colors.success, borderWidth: 2, borderColor: colors.white },
   // Grey = not using the app right now.
-  rowDotOffline: { backgroundColor: '#C7CDD6' },
+  rowDotOffline: { backgroundColor: colors.stone },
   rowAvatarText: { color: colors.onAccent, fontFamily: fonts.extraBold, fontSize: 15 },
   rowAvatarImage: { width: 40, height: 40, borderRadius: 20 },
   rowCenter: { flex: 1, gap: 1, minWidth: 0 },
   rowNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  rowName: { flex: 1, fontSize: 14, fontFamily: fonts.bold, color: '#111827', lineHeight: 18 },
-  rowTime: { fontSize: 11, fontFamily: fonts.regular, color: '#9CA3AF', fontVariant: ['tabular-nums'], flexShrink: 0 },
-  rowRole: { fontSize: 11, fontFamily: fonts.regular, color: '#6B7280' },
-  rowPreview: { fontSize: 12, fontFamily: fonts.regular, color: '#6B7280', lineHeight: 16, marginTop: 2 },
+  rowName: { flex: 1, fontSize: 14, fontFamily: fonts.bold, color: colors.gray900, lineHeight: 18 },
+  rowTime: { fontSize: 11, fontFamily: fonts.regular, color: colors.subtle, fontVariant: ['tabular-nums'], flexShrink: 0 },
+  rowRole: { fontSize: 11, fontFamily: fonts.regular, color: colors.gray500 },
+  rowPreview: { fontSize: 12, fontFamily: fonts.regular, color: colors.gray500, lineHeight: 16, marginTop: 2 },
   rowUnread: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' },
   rowUnreadText: { color: colors.onAccent, fontSize: 10, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
 
-  skeletonList: { paddingHorizontal: 16, paddingTop: 12, gap: 16 },
-  skeletonRow: { flexDirection: 'row', gap: 12, alignItems: 'center' },
-  skeletonAvatar: { width: 46, height: 46, borderRadius: 23 },
-  skeletonCol: { flex: 1, gap: 7 },
-  skeletonLineRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  // Mirrors the live rowCard footprint so each skeleton sits exactly where
+  // its conversation row will appear (same card, avatar, and line slots).
+  skeletonList: { paddingHorizontal: 20, paddingTop: 20, gap: 8 },
+  skeletonRowCard: { backgroundColor: colors.white, borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: colors.cardBorder },
 
-  listContent: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24, flexGrow: 1, backgroundColor: '#F9FAFB', gap: 8 },
+  listContent: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24, flexGrow: 1, backgroundColor: colors.appBg, gap: 8 },
   emptyWrap: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingTop: 64, paddingBottom: 32, gap: 10 },
   emptyIcon: {
     width: 64,
@@ -1083,8 +1107,8 @@ const styles = themedStyles({
   headerAvatarImage: { width: 40, height: 40, borderRadius: 20 },
   headerCenter: { flex: 1, gap: 2, paddingRight: 4 },
   headerName: { fontSize: 15, fontFamily: fonts.bold, color: colors.ink, lineHeight: 18 },
-  headerOnline: { fontSize: 12, fontFamily: fonts.semiBold, color: '#10B981' },
-  headerOffline: { color: '#9CA3AF' },
+  headerOnline: { fontSize: 12, fontFamily: fonts.semiBold, color: colors.success },
+  headerOffline: { color: colors.subtle },
   headerSubRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   headerSub: { fontSize: 12, fontFamily: fonts.semiBold, color: colors.green, flexShrink: 1 },
   headerCall: {
@@ -1130,7 +1154,7 @@ const styles = themedStyles({
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 7,
-    backgroundColor: '#F0FDFA',
+    backgroundColor: colors.tealWash,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.line,
   },
@@ -1186,7 +1210,7 @@ const styles = themedStyles({
 
   bubble: { maxWidth: '76%', paddingHorizontal: 14, paddingVertical: 9, borderRadius: 18 },
   bubbleMe: { backgroundColor: colors.customer },
-  bubbleOther: { backgroundColor: colors.white, borderWidth: StyleSheet.hairlineWidth, borderColor: '#E3ECF2' },
+  bubbleOther: { backgroundColor: colors.white, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.lineSoft },
   bubblePending: { opacity: 0.78 },
   bubbleText: { fontSize: 14, fontFamily: fonts.medium, lineHeight: 19 },
   bubbleTextMe: { color: colors.onAccent },
@@ -1195,8 +1219,8 @@ const styles = themedStyles({
   bubbleWithImage: { paddingHorizontal: 5, paddingVertical: 5 },
   bubbleImage: { width: 220, height: 165, borderRadius: 14, backgroundColor: colors.lineSoft },
   bubbleTime: { fontSize: 10.5, fontFamily: fonts.regular, marginTop: 4, fontVariant: ['tabular-nums'], paddingHorizontal: 2 },
-  bubbleTimeMe: { color: '#6B8A9A', alignSelf: 'flex-end' },
-  bubbleTimeOther: { color: '#8AA0B5', alignSelf: 'flex-start' },
+  bubbleTimeMe: { color: colors.steelDark, alignSelf: 'flex-end' },
+  bubbleTimeOther: { color: colors.steel, alignSelf: 'flex-start' },
 
   sendErrorRow: {
     flexDirection: 'row',
@@ -1204,9 +1228,9 @@ const styles = themedStyles({
     gap: 6,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    backgroundColor: '#FEF2F2',
+    backgroundColor: colors.dangerSoft,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#FECACA',
+    borderTopColor: colors.dangerBorder,
   },
   sendErrorText: { flex: 1, fontSize: 12, fontFamily: fonts.semiBold, color: colors.error },
 
@@ -1226,7 +1250,7 @@ const styles = themedStyles({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: colors.slate100,
     borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 7,
@@ -1268,9 +1292,9 @@ const styles = themedStyles({
     flex: 1,
     minHeight: 44,
     maxHeight: 110,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: colors.slate100,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#E2E8F0',
+    borderColor: colors.slate200,
     borderRadius: 22,
     paddingHorizontal: 14,
     paddingVertical: 0,
@@ -1285,7 +1309,7 @@ const styles = themedStyles({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  composerSendDisabled: { backgroundColor: '#94A3B8', opacity: 0.55 },
+  composerSendDisabled: { backgroundColor: colors.slate400, opacity: 0.55 },
 
   toast: {
     position: 'absolute',

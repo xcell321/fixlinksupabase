@@ -635,7 +635,7 @@ const styles = themedStyles({
   container: { flex: 1, backgroundColor: colors.canvas },
 
   // Map hero - dominant
-  mapArea: { flex: 1, minHeight: 280, position: 'relative', backgroundColor: '#EEF2F5' },
+  mapArea: { flex: 1, minHeight: 280, position: 'relative', backgroundColor: colors.mapBg },
   map: { flex: 1 },
 
   // Map controls - native navigation family
@@ -662,7 +662,6 @@ const styles = themedStyles({
     maxWidth: 240,
     // subtle shadow, not excessive
     boxShadow: '0 2px 8px rgba(16,42,67,0.08)',
-    elevation: 4,
     gap: 12,
   },
   activeJobsControlLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
@@ -670,7 +669,7 @@ const styles = themedStyles({
     width: 28,
     height: 28,
     borderRadius: 8,
-    backgroundColor: '#E6F6F3',
+    backgroundColor: colors.tealLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -694,7 +693,6 @@ const styles = themedStyles({
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
     boxShadow: '0 -4px 16px rgba(16,42,67,0.08)',
-    elevation: 6,
     gap: 14,
   },
 
@@ -712,7 +710,7 @@ const styles = themedStyles({
     justifyContent: 'space-between',
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.slate50,
     borderBottomWidth: 1,
     borderBottomColor: colors.lineSoft,
     minHeight: 44,
@@ -750,11 +748,11 @@ const styles = themedStyles({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: '#E6F6F3',
+    backgroundColor: colors.tealLight,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#CBE7E1',
+    borderColor: colors.hudBorder,
   },
   jobIconWrapSelected: {
     backgroundColor: 'rgba(255,255,255,0.18)',
@@ -776,7 +774,7 @@ const styles = themedStyles({
 
   // Trip summary - ONE compact surface - white circular icon backgrounds like customer
   tripSummary: {
-    backgroundColor: '#F4F8FA',
+    backgroundColor: colors.tripSummaryBg,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.lineSoft,
@@ -866,7 +864,7 @@ const styles = themedStyles({
 
   // Empty state
   emptyContainer: { flex: 1, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  emptyIconWrap: { width: 72, height: 72, borderRadius: 18, backgroundColor: '#E6F6F3', borderWidth: 1, borderColor: '#CBE7E1', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  emptyIconWrap: { width: 72, height: 72, borderRadius: 18, backgroundColor: colors.tealLight, borderWidth: 1, borderColor: colors.hudBorder, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   emptyTitle: { color: colors.ink, fontSize: 18, fontFamily: fonts.bold, marginBottom: 8, textAlign: 'center' },
   emptySubtitle: { color: colors.muted, fontSize: 13, textAlign: 'center', lineHeight: 19, marginBottom: 20, fontFamily: fonts.regular, paddingHorizontal: 12 },
   emptyButton: { height: 48, borderRadius: 12, backgroundColor: colors.tech, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 160, justifyContent: 'center' },

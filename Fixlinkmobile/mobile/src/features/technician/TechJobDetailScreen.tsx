@@ -9,7 +9,7 @@ import { getApplianceIcon } from '../../utils/applianceIcons';
 import { splitJobDescription } from '../../utils/jobDescription';
 import { formatJobSchedule, canMarkArrival, canStartRepair, type JobItem } from './availableJobsHelpers';
 
-const BLUE = '#2563EB';
+const BLUE = colors.tech;
 
 interface TechJobDetailScreenProps {
   job: JobItem;
@@ -49,7 +49,7 @@ export default function TechJobDetailScreen({
     <View style={styles.screen}>
       <View style={styles.backHeader}>
         <Pressable onPress={onBack} style={styles.backBtn} accessibilityRole="button" accessibilityLabel="Back to jobs" hitSlop={8}>
-          <Ionicons name="arrow-back" size={18} color="#374151" />
+          <Ionicons name="arrow-back" size={18} color={colors.gray700} />
         </Pressable>
         <Text style={styles.backTitle}>Job Details</Text>
       </View>
@@ -97,11 +97,11 @@ export default function TechJobDetailScreen({
             </View>
           </View>
           <View style={styles.infoRow}>
-            <Ionicons name="location" size={14} color="#9CA3AF" />
+            <Ionicons name="location" size={14} color={colors.subtle} />
             <Text style={styles.infoText} numberOfLines={2}>{job.location || 'Local service area'}</Text>
           </View>
           <View style={styles.infoRow}>
-            <Ionicons name="time-outline" size={14} color="#9CA3AF" />
+            <Ionicons name="time-outline" size={14} color={colors.subtle} />
             <Text style={styles.infoText} numberOfLines={1}>{formatJobSchedule(job)}</Text>
           </View>
         </View>
@@ -127,7 +127,7 @@ export default function TechJobDetailScreen({
         {isQueue ? (
           <View style={styles.btnRow}>
             <Pressable onPress={() => onDecline(job)} disabled={busy} style={({ pressed }) => [styles.declineBtn, pressed && { opacity: 0.85 }]} accessibilityRole="button" accessibilityLabel="Decline job">
-              <Ionicons name="close" size={16} color="#EF4444" />
+              <Ionicons name="close" size={16} color={colors.dangerBright} />
               <Text style={styles.declineText}>Decline</Text>
             </Pressable>
             <Pressable onPress={() => onAccept(job)} disabled={busy} style={({ pressed }) => [styles.acceptBtn, pressed && { opacity: 0.88 }]} accessibilityRole="button" accessibilityLabel="Accept job">
@@ -150,7 +150,7 @@ export default function TechJobDetailScreen({
             ) : null}
             <View style={styles.btnRow}>
               <Pressable onPress={() => onMessage(job)} style={({ pressed }) => [styles.messageBtn, pressed && { opacity: 0.85 }]} accessibilityRole="button" accessibilityLabel="Message customer">
-                <Ionicons name="chatbubble-ellipses-outline" size={16} color="#374151" />
+                <Ionicons name="chatbubble-ellipses-outline" size={16} color={colors.gray700} />
                 <Text style={styles.messageText}>Message</Text>
               </Pressable>
               {startEligible ? (
@@ -184,7 +184,7 @@ const styles = themedStyles({
   jobIconTile: { width: 44, height: 44, borderRadius: 14, backgroundColor: colors.techSoft, borderWidth: 1, borderColor: colors.hudBorder, alignItems: 'center', justifyContent: 'center' },
   jobTitle: { color: colors.ink, fontSize: 16, fontFamily: fonts.bold, letterSpacing: -0.2 },
   jobMetaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 6 },
-  brandChip: { flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: '100%', backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
+  brandChip: { flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: '100%', backgroundColor: colors.techSoft, borderWidth: 1, borderColor: colors.badgeBlueBorder, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
   brandChipText: { color: BLUE, fontSize: 11, fontFamily: fonts.bold, flexShrink: 1 },
   jobCode: { color: colors.muted, fontSize: 11, fontFamily: fonts.medium, fontVariant: ['tabular-nums'] },
   descBox: { backgroundColor: colors.surfaceSunken, borderWidth: 1, borderColor: colors.lineSoft, borderRadius: 14, padding: 14, marginTop: 14 },
@@ -203,8 +203,8 @@ const styles = themedStyles({
   mapAddressText: { flex: 1, color: colors.ink, fontSize: 12, fontFamily: fonts.semiBold },
   navigateBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: BLUE, borderRadius: 12, minHeight: 44, marginTop: 8, ...shadows.card },
   navigateText: { color: colors.onAccent, fontSize: 13, fontFamily: fonts.bold },
-  navigateBtnSystem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE', borderRadius: 12, minHeight: 44, marginTop: 8 },
-  navigateTextSystem: { color: '#2563EB', fontSize: 13, fontFamily: fonts.bold },
+  navigateBtnSystem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.techSoft, borderWidth: 1, borderColor: colors.badgeBlueBorder, borderRadius: 12, minHeight: 44, marginTop: 8 },
+  navigateTextSystem: { color: colors.tech, fontSize: 13, fontFamily: fonts.bold },
   btnRow: { flexDirection: 'row', gap: 8 },
   declineBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: colors.danger + '40', borderRadius: 14, minHeight: 48, backgroundColor: colors.white },
   declineText: { color: colors.danger, fontSize: 14, fontFamily: fonts.bold },

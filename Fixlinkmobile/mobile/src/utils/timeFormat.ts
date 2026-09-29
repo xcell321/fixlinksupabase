@@ -36,3 +36,12 @@ export const formatCardDate = (value: unknown): string => {
   if (Number.isNaN(date.getTime())) return '';
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 };
+
+// Daypart greeting for header kickers. Follows the device local time:
+// before noon is morning, noon to before 6 PM is afternoon, 6 PM on is evening.
+export const getTimeGreeting = (now: Date = new Date()): string => {
+  const hour = now.getHours();
+  if (hour < 12) return 'Good morning,';
+  if (hour < 18) return 'Good afternoon,';
+  return 'Good evening,';
+};

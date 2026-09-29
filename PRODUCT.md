@@ -74,7 +74,7 @@ Open decisions: production deploy target and staging distribution method; whethe
 - `Fixlinkmobile/context/ARCHITECTURE.md` — three-tier diagram, matching/OTP/privacy/workload/notification algorithms, end-to-end sequence.
 - `Fixlinkmobile/context/UI_WORKFLOW.md` — screen-by-screen wireflow and interaction guide.
 - `Fixlinkmobile/context/SCHEMA.md`, `Data_Dictionary.md`, `FixLink_System_Workflow_Plan.md`, `implementation_plan.md` — relational model and workflow plans.
-- Implemented truth: `Fixlinkmobile/mobile/src/` (AppNavigator role routing, 11+ screens, `LocationIQMap`, chat, OTP, reviews), `Fixlinkmobile/mobile/app.json` (location/camera/photo permission rationales), `fixlinkweb admin/backend/src/` (Express + Supabase routes, `accept_job` RPC, workload utils).
+- Implemented truth: `Fixlinkmobile/mobile/src/` (AppNavigator role routing, `features/` screens, `LocationIQMap`, chat, OTP, reviews), `Fixlinkmobile/mobile/app.json` (location/camera/photo permission rationales), `Fixlinkmobile/backend/src/` (thin `routes/` map over `controllers/`/`services/`/`repositories`, `accept_job` RPC, `workloadService`).
 - Absences future work must not fabricate: no real testimonials, case studies, press, benchmarks, pricing/licensing, or production deployment proof; no Figma URL — the Expo app is the prototype (`cd Fixlinkmobile/mobile && npx expo start`).
 
 ## Product Principles

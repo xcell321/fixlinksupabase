@@ -13,9 +13,13 @@ const { HttpError } = require('../../domain/httpError');
 const { assertTechnicianOwner } = require('../../middleware/identityGuards');
 const { getTechnicianActiveJobCount, getWorkloadStatus } = require('../workloadService');
 const { notify } = require('../notificationService');
+const { assertUuid } = require('../../domain/ids');
 
 // PUT /api/requests/:id/accept — accept a job atomically (via the accept_job RPC).
 const acceptJob = async ({ jobId, authUid, technicianUid, technicianName }) => {
+  // Malformed ids must fail here with a 400: passed straight to the RPC they
+  // surface as a Postgres syntax error and would otherwise become a 500.
+  assertUuid(jobId, 'job id');
   if (!technicianUid || !technicianName) {
     throw new HttpError(400, { error: 'Technician identity is required to accept a job.' });
   }
@@ -242,7 +246,17 @@ const updateJobStatus = async ({ jobId, authUid, status, technicianUid, cancella
   }
 
   const updates = { status, updated_at: new Date().toISOString() };
-  if (status === 'In Progress') updates.started_at = new Date().toISOString();
+  if (status === 'In Progress') {
+    updates.started_at = new Date().toISOString();
+    if (job.customer_uid) {
+      await notify(job.customer_uid, {
+        text: `${job.technician_name || 'Your technician'} started the repair.`,
+        jobId: job.id,
+        senderUid: technicianUid,
+        senderName: job.technician_name || 'Technician',
+      });
+    }
+  }
   if (status === 'Cancelled') {
     updates.cancelled_at = new Date().toISOString();
     updates.cancelled_by = 'technician';
