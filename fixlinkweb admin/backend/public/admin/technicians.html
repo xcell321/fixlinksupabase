@@ -34,14 +34,37 @@
     --orange: #F59E0B;
     --hud-grid: rgba(13,27,42,0.05);
     --hud-line: #F5DFC9;
+    /* Status + surface tints referenced by the rules below, so no rule carries
+       a raw hex. Values mirror the mobile theme's equivalent tokens. */
+    --surface-sunken: #FBFDFE;
+    --brand-text-strong: #9A3412;
+    --badge-amber-bg: #FEF3C7;
+    --danger-soft: #FEE2E2;
+    --danger-line: #FECACA;
+    --danger-deep: #991B1B;
+    --success-text: #065F46;
+    --success-soft: #D1FAE5;
+    --success-line: #A7F3D0;
+    --info: #2563EB;
+    --info-soft: #DBEAFE;
+    --slate-soft: #E2E8F0;
+    --violet: #7C3AED;
+    --violet-soft: #EDE9FE;
+    /* Colour channels for translucent tints. Every rgba() below borrows its
+       RGB from here, so only the alpha stays inline. */
+    --brand-rgb: 249,115,22;
+    --ink-rgb: 16,42,67;
+    --navy-rgb: 13,27,42;
+    --white-rgb: 255,255,255;
+    --green-rgb: 5,150,105;
     /* Legacy aliases: every existing rule keeps working, now brand-mapped. */
     --teal: var(--brand);
     --teal-dark: var(--brand-dark);
     --teal-light: var(--brand-soft);
 }
 
-::selection { background: rgba(249,115,22,0.22); }
-:focus-visible { outline: 3px solid rgba(249,115,22,0.32); outline-offset: 2px; }
+::selection { background: rgba(var(--brand-rgb),0.22); }
+:focus-visible { outline: 3px solid rgba(var(--brand-rgb),0.32); outline-offset: 2px; }
 * { scrollbar-color: var(--teal) var(--canvas); scrollbar-width: thin; }
 
 body {
@@ -49,7 +72,7 @@ body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     color: var(--ink);
     background-color: var(--canvas);
-    background-image: radial-gradient(circle at 1px 1px, var(--hud-grid) 1px, transparent 0), linear-gradient(135deg, rgba(249, 115, 22, 0.06), transparent 42%), linear-gradient(315deg, rgba(13, 27, 42, 0.05), transparent 48%);
+    background-image: radial-gradient(circle at 1px 1px, var(--hud-grid) 1px, transparent 0), linear-gradient(135deg, rgba(var(--brand-rgb), 0.06), transparent 42%), linear-gradient(315deg, rgba(var(--navy-rgb), 0.05), transparent 48%);
     background-size: 22px 22px, auto, auto;
 }
 
@@ -80,11 +103,11 @@ body {
     overflow: hidden;
     border: 1px solid var(--line);
     border-radius: 16px;
-    box-shadow: 0 12px 32px rgba(16, 42, 67, 0.08), 0 1px 0 rgba(249,115,22,0.08) inset !important;
+    box-shadow: 0 12px 32px rgba(var(--ink-rgb), 0.08), 0 1px 0 rgba(var(--brand-rgb),0.08) inset !important;
 }
 
 .admin-card .card-header {
-    color: #fff;
+    color: var(--white);
     background: linear-gradient(135deg, var(--navy), var(--navy-soft)) !important;
     border-bottom: 0;
 }
@@ -129,11 +152,11 @@ body {
 }
 
 .admin-table tbody tr:hover {
-    --bs-table-hover-bg: #FFF7ED;
+    --bs-table-hover-bg: var(--brand-soft);
 }
 
 .btn-teal {
-    color: #fff;
+    color: var(--white);
     background-color: var(--teal);
     border-color: var(--teal);
     font-weight: 600;
@@ -141,18 +164,18 @@ body {
 
 .btn-teal:hover,
 .btn-teal:focus-visible {
-    color: #fff;
+    color: var(--white);
     background-color: var(--teal-dark);
     border-color: var(--teal-dark);
 }
 
 .btn-teal:focus-visible {
-    box-shadow: 0 0 0 0.25rem rgba(249, 115, 22, 0.30);
+    box-shadow: 0 0 0 0.25rem rgba(var(--brand-rgb), 0.30);
 }
 
 .pending-badge {
-    color: #D97706 !important;
-    background-color: #FEF3C7 !important;
+    color: var(--gold) !important;
+    background-color: var(--badge-amber-bg) !important;
 }
 
 .admin-layout {
@@ -168,10 +191,10 @@ body {
     width: 238px;
     padding: 2rem 1rem 1.25rem;
     flex-direction: column;
-    color: #FFFFFF;
+    color: var(--white);
     background: linear-gradient(180deg, var(--navy) 0%, var(--navy-soft) 100%);
-    border-right: 1px solid rgba(255, 255, 255, 0.10);
-    box-shadow: 4px 0 24px rgba(13,27,42,0.18);
+    border-right: 1px solid rgba(var(--white-rgb), 0.10);
+    box-shadow: 4px 0 24px rgba(var(--navy-rgb),0.18);
 }
 
 .brand {
@@ -198,10 +221,10 @@ body {
     width: 2.1rem;
     height: 2.1rem;
     place-items: center;
-    color: #fff;
+    color: var(--white);
     background: linear-gradient(135deg, var(--teal), var(--teal-dark));
     border-radius: 10px;
-    box-shadow: 0 4px 10px rgba(249, 115, 22, 0.35);
+    box-shadow: 0 4px 10px rgba(var(--brand-rgb), 0.35);
 }
 
 .brand-mark svg {
@@ -229,7 +252,7 @@ body {
     gap: 0.75rem;
     margin-bottom: 0.2rem;
     padding: 0.7rem 0.75rem;
-    color: rgba(255, 255, 255, 0.74);
+    color: rgba(var(--white-rgb), 0.74);
     border: 0;
     border-radius: 10px;
     font-size: 0.88rem;
@@ -239,11 +262,11 @@ body {
 
 .nav-link span { width: 1.1rem; height: 1.1rem; display: grid; place-items: center; }
         .nav-link span svg { width: 1.1rem; height: 1.1rem; stroke: var(--brand-mist); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-        .nav-link:hover, .nav-link.active { color: #fff; background: var(--teal); }
-        .nav-link:hover span svg, .nav-link.active span svg { stroke: rgba(255, 255, 255, 0.92); }
-.sidebar-footer { margin-top: auto; padding: 1rem 0.55rem 0; color: rgba(255, 255, 255, 0.62); border-top: 1px solid rgba(255, 255, 255, 0.12); font-size: 0.75rem; line-height: 1.6; }
-.logout-button { width: 100%; margin-top: 0.7rem; padding: 0.55rem 0; color: var(--brand-mist); background: transparent; border: 1px solid rgba(255, 255, 255, 0.26); border-radius: 10px; font: inherit; font-weight: 600; cursor: pointer; }.logout-button:hover { color: #fff; background: var(--teal); border-color: var(--teal); }
-.sidebar-footer span { color: rgba(255, 255, 255, 0.5); }
+        .nav-link:hover, .nav-link.active { color: var(--white); background: var(--teal); }
+        .nav-link:hover span svg, .nav-link.active span svg { stroke: rgba(var(--white-rgb), 0.92); }
+.sidebar-footer { margin-top: auto; padding: 1rem 0.55rem 0; color: rgba(var(--white-rgb), 0.62); border-top: 1px solid rgba(var(--white-rgb), 0.12); font-size: 0.75rem; line-height: 1.6; }
+.logout-button { width: 100%; margin-top: 0.7rem; padding: 0.55rem 0; color: var(--brand-mist); background: transparent; border: 1px solid rgba(var(--white-rgb), 0.26); border-radius: 10px; font: inherit; font-weight: 600; cursor: pointer; }.logout-button:hover { color: var(--white); background: var(--teal); border-color: var(--teal); }
+.sidebar-footer span { color: rgba(var(--white-rgb), 0.5); }
 
 .main-content { width: calc(100% - 238px); margin-left: 238px; padding: 2.2rem 4.5vw 4rem; }
 .topbar { display: flex; align-items: center; justify-content: flex-end; max-width: 1220px; margin: 0 auto 1rem; }
@@ -253,13 +276,13 @@ body {
         .refresh-button svg { width: 1rem; height: 1rem; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .refresh-button:hover { background: var(--brand-soft); border-color: var(--brand); }
 .notice { display: none; max-width: 1220px; margin: -1.4rem auto 1.5rem; padding: 0.75rem 1rem; color: var(--brand-text); background: var(--brand-soft); border: 1px solid var(--brand-line); border-radius: 10px; font-weight: 600; }
-.notice.show { display: block; }.notice.error { color: var(--danger); background: #FEE2E2; border-color: #FECACA; }
+.notice.show { display: block; }.notice.error { color: var(--danger); background: var(--danger-soft); border-color: var(--danger-line); }
 .view { display: none; max-width: 1220px; margin: auto; }.view.active { display: block; }
 .view-intro { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 1.8rem; }.view-intro h2 { margin: 0; color: var(--ink); font-size: clamp(1.45rem, 3vw, 2.2rem); font-weight: 800; letter-spacing: -0.02em; }.view-intro p:not(.eyebrow) { margin: 0.6rem 0 0; color: var(--muted); }
-.live-pill { padding: 0.45rem 0.7rem; color: #065F46; background: #D1FAE5; border: 1px solid #A7F3D0; border-radius: 999px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em; box-shadow: 0 1px 6px rgba(5,150,105,0.18); }.live-pill i { display: inline-block; width: 7px; height: 7px; margin-right: 0.35rem; background: var(--green); border-radius: 50%; box-shadow: 0 0 0 4px rgba(5,150,105,0.18); animation: pulse 2s infinite; }
+.live-pill { padding: 0.45rem 0.7rem; color: var(--success-text); background: var(--success-soft); border: 1px solid var(--success-line); border-radius: 999px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em; box-shadow: 0 1px 6px rgba(var(--green-rgb),0.18); }.live-pill i { display: inline-block; width: 7px; height: 7px; margin-right: 0.35rem; background: var(--green); border-radius: 50%; box-shadow: 0 0 0 4px rgba(var(--green-rgb),0.18); animation: pulse 2s infinite; }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.55; } }
-.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }.stat-card { position: relative; padding: 1.25rem 1.3rem; background: var(--white); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 4px 14px rgba(16, 42, 67, 0.05), 0 1px 0 rgba(249,115,22,0.08) inset; overflow: hidden; }.stat-card::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: linear-gradient(90deg, var(--teal), transparent); opacity: 0; }.stat-card:hover::after { opacity: 0.35; }.stat-card.accent { background: linear-gradient(135deg, var(--teal), var(--teal-dark)); color: #fff; border-color: var(--teal-dark); }.stat-card.accent::after { background: rgba(255,255,255,0.35); }.stat-label { display: block; color: var(--muted); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }.accent .stat-label, .accent small { color: var(--brand-mist); }.stat-card strong { display: block; margin: 0.65rem 0 0.25rem; color: var(--ink); font-size: 2rem; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }.accent strong { color: #fff; }.stat-card small { color: var(--muted); font-size: 0.75rem; }
-.overview-grid { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 1.5rem; }.panel { overflow: hidden; background: var(--white); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 4px 14px rgba(16, 42, 67, 0.05), 0 1px 0 rgba(249,115,22,0.08) inset; }.panel-heading { display: flex; justify-content: space-between; align-items: flex-start; padding: 1.3rem 1.4rem 0.8rem; border-bottom: 1px solid var(--line-soft); }.panel-heading h3 { margin: 0; color: var(--ink); font-size: 1.05rem; font-weight: 800; letter-spacing: -0.01em; }.text-button { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0; color: var(--brand-text); background: none; border: 0; font-size: 0.8rem; font-weight: 700; }.text-button svg { width: 0.85rem; height: 0.85rem; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }.text-button:hover { color: #9A3412; text-decoration: underline; }.list-area, .status-list { padding: 0 1.4rem 1rem; }.list-row, .status-row { display: flex; justify-content: space-between; align-items: center; padding: 0.9rem 0; border-bottom: 1px solid var(--line-soft); }.list-row:last-child, .status-row:last-child { border-bottom: 0; }.list-row small, .table-subtext { display: block; margin-top: 0.25rem; color: var(--muted); font-size: 0.76rem; }.status-row span { color: var(--muted); font-size: 0.88rem; }.status-row strong { color: var(--brand-text); font-variant-numeric: tabular-nums; }
+.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }.stat-card { position: relative; padding: 1.25rem 1.3rem; background: var(--white); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 4px 14px rgba(var(--ink-rgb), 0.05), 0 1px 0 rgba(var(--brand-rgb),0.08) inset; overflow: hidden; }.stat-card::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: linear-gradient(90deg, var(--teal), transparent); opacity: 0; }.stat-card:hover::after { opacity: 0.35; }.stat-card.accent { background: linear-gradient(135deg, var(--teal), var(--teal-dark)); color: var(--white); border-color: var(--teal-dark); }.stat-card.accent::after { background: rgba(var(--white-rgb),0.35); }.stat-label { display: block; color: var(--muted); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }.accent .stat-label, .accent small { color: var(--brand-mist); }.stat-card strong { display: block; margin: 0.65rem 0 0.25rem; color: var(--ink); font-size: 2rem; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }.accent strong { color: var(--white); }.stat-card small { color: var(--muted); font-size: 0.75rem; }
+.overview-grid { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 1.5rem; }.panel { overflow: hidden; background: var(--white); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 4px 14px rgba(var(--ink-rgb), 0.05), 0 1px 0 rgba(var(--brand-rgb),0.08) inset; }.panel-heading { display: flex; justify-content: space-between; align-items: flex-start; padding: 1.3rem 1.4rem 0.8rem; border-bottom: 1px solid var(--line-soft); }.panel-heading h3 { margin: 0; color: var(--ink); font-size: 1.05rem; font-weight: 800; letter-spacing: -0.01em; }.text-button { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0; color: var(--brand-text); background: none; border: 0; font-size: 0.8rem; font-weight: 700; }.text-button svg { width: 0.85rem; height: 0.85rem; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }.text-button:hover { color: var(--brand-text-strong); text-decoration: underline; }.list-area, .status-list { padding: 0 1.4rem 1rem; }.list-row, .status-row { display: flex; justify-content: space-between; align-items: center; padding: 0.9rem 0; border-bottom: 1px solid var(--line-soft); }.list-row:last-child, .status-row:last-child { border-bottom: 0; }.list-row small, .table-subtext { display: block; margin-top: 0.25rem; color: var(--muted); font-size: 0.76rem; }.status-row span { color: var(--muted); font-size: 0.88rem; }.status-row strong { color: var(--brand-text); font-variant-numeric: tabular-nums; }
         .analytics-panel { display: contents; }
         .analytics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
         .metric-row { padding: 0.9rem 0; border-bottom: 1px solid var(--line); }
@@ -267,35 +290,75 @@ body {
         .metric-label { display: flex; gap: 0.75rem; justify-content: space-between; align-items: baseline; }
         .metric-label span { color: var(--ink); font-size: 0.88rem; font-weight: 600; }
         .metric-label strong { color: var(--brand-text); font-size: 0.82rem; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
-        .metric-bar { height: 7px; margin-top: 0.55rem; overflow: hidden; background: var(--teal-light); border-radius: 999px; box-shadow: inset 0 1px 2px rgba(16,42,67,0.06); }
+        .metric-bar { height: 7px; margin-top: 0.55rem; overflow: hidden; background: var(--teal-light); border-radius: 999px; box-shadow: inset 0 1px 2px rgba(var(--ink-rgb),0.06); }
         .metric-bar i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--teal), var(--teal-dark)); }
         @media (max-width: 768px) { .analytics-grid { grid-template-columns: 1fr; } }
-.toolbar { display: flex; gap: 0.65rem; padding: 1.1rem 1.25rem; border-bottom: 1px solid var(--line); background: #FBFDFE; }.toolbar input, .toolbar select, .inline-form input, #announcementForm input, #announcementForm textarea { min-height: 2.45rem; padding: 0.55rem 0.7rem; color: var(--ink); background: var(--white); border: 1px solid var(--line); border-radius: 10px; font: inherit; font-size: 0.82rem; transition: border-color 0.15s, box-shadow 0.15s; }.toolbar input:focus, .toolbar select:focus, .inline-form input:focus, #announcementForm input:focus, #announcementForm textarea:focus { outline: 3px solid rgba(249, 115, 22, 0.20); border-color: var(--brand); box-shadow: 0 2px 8px rgba(249,115,22,0.10); }.search-input { flex: 1; }.toolbar select { min-width: 145px; }.table-wrap { overflow-x: auto; }.admin-table { width: 100%; margin: 0; border-collapse: collapse; font-size: 0.86rem; }.admin-table th { padding: 0.85rem 1.25rem; color: var(--brand-text); background: var(--brand-soft); font-size: 0.70rem; font-weight: 800; letter-spacing: 0.07em; text-align: left; text-transform: uppercase; white-space: nowrap; border-bottom: 1px solid var(--brand-line); }.admin-table td { padding: 1rem 1.25rem; border-bottom: 1px solid var(--line-soft); vertical-align: middle; white-space: nowrap; }.admin-table tr:last-child td { border-bottom: 0; }.admin-table tbody tr:hover td { background: var(--brand-soft); }.status { display: inline-block; padding: 0.3rem 0.55rem; border-radius: 999px; color: #D97706; background: #FEF3C7; font-size: 0.7rem; font-weight: 700; text-transform: capitalize; }.status-pending { color: #D97706; background: #FEF3C7; }.status-accepted { color: var(--brand-text); background: var(--brand-soft); }.status-in-progress { color: #2563EB; background: #DBEAFE; }.status-active, .status-completed { color: #059669; background: #D1FAE5; }.status-cancelled, .status-rejected, .status-banned { color: #E53935; background: #FEE2E2; }.status-suspended, .status-inactive { color: var(--muted); background: #E2E8F0; }.status-confirmed { color: var(--brand-text); background: var(--brand-soft); }.status-customer-ready { color: #7C3AED; background: #EDE9FE; }.status-no-show, .status-flagged { color: #E53935; background: #FEE2E2; }.status-resolved { color: #059669; background: #D1FAE5; }.action-group { display: flex; gap: 0.55rem; }.action-link { padding: 0; color: var(--brand-text); background: none; border: 0; font-size: 0.78rem; font-weight: 700; }.action-link:hover { color: #9A3412; text-decoration: underline; }.action-link.danger { color: var(--danger); }.action-link.danger:hover { color: #991B1B; }.empty-state { padding: 2rem 1.3rem; color: var(--muted); text-align: center; }.inline-form { display: flex; gap: 0.65rem; padding: 1.25rem; border-bottom: 1px solid var(--line); }.inline-form input { flex: 1; }.btn-teal { padding: 0.6rem 0.9rem; border: 0; border-radius: 10px; }.category-list { display: flex; flex-wrap: wrap; gap: 0.65rem; padding: 1.25rem; }.category-chip { padding: 0.6rem 0.8rem; color: var(--brand-text); background: var(--brand-soft); border: 1px solid var(--brand-line); border-radius: 999px; font-size: 0.82rem; font-weight: 600; }.announcement-panel { padding: 1.25rem; }.announcement-panel form { display: grid; gap: 0.7rem; }.announcement-panel .btn-teal { justify-self: start; }.announcement-list { margin-top: 1.5rem; }.announcement { padding: 1rem 0; border-top: 1px solid var(--line); }.announcement strong { color: var(--ink); }.announcement p { margin: 0.4rem 0; color: var(--muted); }.announcement small { color: var(--muted); }.rating { color: var(--gold); display: inline-flex; align-items: center; gap: 0.1rem; }.rating svg { width: 0.95rem; height: 0.95rem; fill: currentColor; }
+.toolbar { display: flex; gap: 0.65rem; padding: 1.1rem 1.25rem; border-bottom: 1px solid var(--line); background: var(--surface-sunken); }.toolbar input, .toolbar select, .inline-form input, #announcementForm input, #announcementForm textarea { min-height: 2.45rem; padding: 0.55rem 0.7rem; color: var(--ink); background: var(--white); border: 1px solid var(--line); border-radius: 10px; font: inherit; font-size: 0.82rem; transition: border-color 0.15s, box-shadow 0.15s; }.toolbar input:focus, .toolbar select:focus, .inline-form input:focus, #announcementForm input:focus, #announcementForm textarea:focus { outline: 3px solid rgba(var(--brand-rgb), 0.20); border-color: var(--brand); box-shadow: 0 2px 8px rgba(var(--brand-rgb),0.10); }.search-input { flex: 1; }.toolbar select { min-width: 145px; }.table-wrap { overflow-x: auto; }.admin-table { width: 100%; margin: 0; border-collapse: collapse; font-size: 0.86rem; }.admin-table th { padding: 0.85rem 1.25rem; color: var(--brand-text); background: var(--brand-soft); font-size: 0.70rem; font-weight: 800; letter-spacing: 0.07em; text-align: left; text-transform: uppercase; white-space: nowrap; border-bottom: 1px solid var(--brand-line); }.admin-table td { padding: 1rem 1.25rem; border-bottom: 1px solid var(--line-soft); vertical-align: middle; white-space: nowrap; }.admin-table tr:last-child td { border-bottom: 0; }.admin-table tbody tr:hover td { background: var(--brand-soft); }.status { display: inline-block; padding: 0.3rem 0.55rem; border-radius: 999px; color: var(--gold); background: var(--badge-amber-bg); font-size: 0.7rem; font-weight: 700; text-transform: capitalize; }.status-pending { color: var(--gold); background: var(--badge-amber-bg); }.status-accepted { color: var(--brand-text); background: var(--brand-soft); }.status-in-progress { color: var(--info); background: var(--info-soft); }.status-active, .status-completed { color: var(--green); background: var(--success-soft); }.status-cancelled, .status-rejected, .status-banned { color: var(--error); background: var(--danger-soft); }.status-suspended, .status-inactive { color: var(--muted); background: var(--slate-soft); }.status-confirmed { color: var(--brand-text); background: var(--brand-soft); }.status-customer-ready { color: var(--violet); background: var(--violet-soft); }.status-no-show, .status-flagged { color: var(--error); background: var(--danger-soft); }.status-resolved { color: var(--green); background: var(--success-soft); }.action-group { display: flex; gap: 0.55rem; }.action-link { padding: 0; color: var(--brand-text); background: none; border: 0; font-size: 0.78rem; font-weight: 700; }.action-link:hover { color: var(--brand-text-strong); text-decoration: underline; }.action-link.danger { color: var(--danger); }.action-link.danger:hover { color: var(--danger-deep); }.empty-state { padding: 2rem 1.3rem; color: var(--muted); text-align: center; }.inline-form { display: flex; gap: 0.65rem; padding: 1.25rem; border-bottom: 1px solid var(--line); }.inline-form input { flex: 1; }.btn-teal { padding: 0.6rem 0.9rem; border: 0; border-radius: 10px; }.category-list { display: flex; flex-wrap: wrap; gap: 0.65rem; padding: 1.25rem; }.category-chip { padding: 0.6rem 0.8rem; color: var(--brand-text); background: var(--brand-soft); border: 1px solid var(--brand-line); border-radius: 999px; font-size: 0.82rem; font-weight: 600; }.announcement-panel { padding: 1.25rem; }.announcement-panel form { display: grid; gap: 0.7rem; }.announcement-panel .btn-teal { justify-self: start; }.announcement-list { margin-top: 1.5rem; }.announcement { padding: 1rem 0; border-top: 1px solid var(--line); }.announcement strong { color: var(--ink); }.announcement p { margin: 0.4rem 0; color: var(--muted); }.announcement small { color: var(--muted); }.rating { color: var(--gold); display: inline-flex; align-items: center; gap: 0.1rem; }.rating svg { width: 0.95rem; height: 0.95rem; fill: currentColor; }
 
 @media (max-width: 576px) {
     .sidebar { position: static; width: 100%; min-height: auto; padding: 1rem; background: var(--navy); }.admin-layout { display: block; }.brand { margin-bottom: 1rem; }    .sidebar-label, .sidebar-footer { display: none; }.nav { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.2rem; }.nav-link { margin: 0; font-size: 0.75rem; }.main-content { width: 100%; margin: 0; padding: 1.5rem 1rem 3rem; }.topbar { margin-bottom: 1.7rem; }.refresh-button span { display: none; }.stats-grid, .overview-grid { grid-template-columns: 1fr 1fr; gap: 0.7rem; }.stat-card { padding: 1rem; }.stat-card strong { font-size: 1.5rem; }.view-intro { display: block; }.live-pill { display: inline-block; margin-top: 1rem; }.toolbar { flex-wrap: wrap; }.toolbar input, .toolbar select { min-width: 100%; }.action-group { flex-wrap: wrap; }.admin-table th, .admin-table td { padding-right: 0.8rem; padding-left: 0.8rem; }
     .admin-shell { margin-top: 2rem !important; }
     .module-badge { max-width: 48%; white-space: normal; text-align: center; }
 }
+.tech-rating-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 20px 24px 0; }
+.tech-rating-summary .summary-cell { padding: 12px 16px; background: var(--surface-sunken); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+.tech-rating-summary strong { display: block; font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.tech-rating-summary span { color: var(--muted); font-size: 0.76rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.tech-cards-grid { display: grid; grid-template-columns: 1fr; gap: 16px; padding: 20px 24px 24px; }
+.tech-card { display: flex; flex-direction: column; align-items: stretch; gap: 12px; padding: 20px; background: var(--white); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); animation: techCardEnter 300ms ease-out both; }
+.tech-card:hover { box-shadow: 0 4px 6px rgba(0,0,0,0.1); transform: translateY(-2px); }
+@keyframes techCardEnter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.tech-name-button { min-height: 44px; padding: 0; color: var(--ink); background: none; border: 0; border-radius: 8px; font: inherit; font-size: 1.12rem; font-weight: 700; text-align: left; cursor: pointer; }
+.tech-name-button:hover { color: var(--brand-text); }
+.tech-name-button:focus-visible, .tech-action-button:focus-visible, .tech-tab:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.tech-name-button:active { color: var(--brand-text-strong); }
+.tech-meta { margin: 0; color: var(--muted); font-size: 1rem; line-height: 1.5; }
+.tech-statline { margin: 0; color: var(--muted); font-size: 0.88rem; line-height: 1.5; }
+.tech-actions { display: flex; gap: 8px; }
+.tech-actions .tech-action-button { flex: 1; }
+.tech-action-button { min-height: 44px; min-width: 44px; padding: 12px 16px; color: var(--brand-text); background: var(--brand-soft); border: 1px solid var(--brand-line); border-radius: 8px; font: inherit; font-size: 0.88rem; font-weight: 700; cursor: pointer; }
+.tech-action-button:hover { background: var(--brand-mist); border-color: var(--brand); }
+.tech-action-button:active { background: var(--brand-mist); }
+.tech-action-button.secondary { color: var(--ink); background: var(--white); border-color: var(--line); }
+.tech-action-button.secondary:hover { background: var(--surface-sunken); border-color: var(--muted); }
+.tech-tabs { display: flex; gap: 8px; padding: 16px 20px 0; }
+.tech-tab { min-height: 44px; padding: 12px 16px; color: var(--muted); background: var(--surface-sunken); border: 1px solid var(--line); border-radius: 8px 8px 0 0; font: inherit; font-weight: 700; cursor: pointer; }
+.tech-tab[aria-selected="true"] { color: var(--brand-text); background: var(--white); border-bottom-color: var(--white); }
+.tech-tab:hover { color: var(--ink); }
+.work-list { display: grid; gap: 12px; padding: 20px; }
+.work-item { padding: 16px; background: var(--surface-sunken); border: 1px solid var(--line); border-left: 4px solid var(--brand); border-radius: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+.work-item-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.mini-avatar { display: inline-grid; place-items: center; width: 32px; height: 32px; margin-right: 8px; vertical-align: middle; color: var(--white); background: linear-gradient(135deg, var(--brand), var(--brand-dark)); border-radius: 8px; font-size: 0.76rem; font-weight: 800; }
+@media (min-width: 640px) { .tech-cards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1024px) { .tech-cards-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (prefers-reduced-motion: no-preference) { .tech-card, .tech-action-button, .tech-name-button { transition: box-shadow 200ms, background 100ms, transform 200ms; } }
+@media (prefers-reduced-motion: reduce) { .tech-card { animation: none; } .tech-card:hover { transform: none; } }
+.tech-cards-grid .tech-card:nth-child(2) { animation-delay: 40ms; }
+.tech-cards-grid .tech-card:nth-child(3) { animation-delay: 80ms; }
+.tech-cards-grid .tech-card:nth-child(n+4) { animation-delay: 120ms; }
+#techWorkModal:not([hidden]) .review-dialog { animation: techCardEnter 200ms ease-out both; }
+.tech-name-button { transition: color 100ms ease-out, text-decoration-color 100ms ease-out, transform 100ms ease-out; }
+.tech-name-button:hover { transform: translateY(-1px); }
+@media (forced-colors: active) { .tech-card, .tech-action-button, .tech-name-button:focus-visible { border: 2px solid CanvasText; } }
 .review-modal[hidden] { display: none; }
-.review-modal { position: fixed; inset: 0; z-index: 10; display: grid; padding: 1rem; place-items: center; background: rgba(16, 42, 67, 0.58); }
-.review-dialog { width: min(720px, 100%); max-height: min(760px, 92vh); overflow-y: auto; background: var(--white); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 20px 60px rgba(16, 42, 67, 0.3); }
-.review-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.3rem 1.4rem; color: #fff; background: linear-gradient(135deg, var(--navy), var(--navy-soft)); }
+.review-modal { position: fixed; inset: 0; z-index: 10; display: grid; padding: 1rem; place-items: center; background: rgba(var(--ink-rgb), 0.58); }
+.review-dialog { width: min(720px, 100%); max-height: min(760px, 92vh); overflow-y: auto; background: var(--white); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 20px 60px rgba(var(--ink-rgb), 0.3); }
+.review-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.3rem 1.4rem; color: var(--white); background: linear-gradient(135deg, var(--navy), var(--navy-soft)); }
 .review-header h3 { margin: 0; font-size: 1.15rem; font-weight: 800; }
 .review-header p { margin: 0.35rem 0 0; color: var(--brand-mist); font-size: 0.8rem; }
-.review-close { display: grid; place-items: center; width: 2.1rem; height: 2.1rem; padding: 0; color: #fff; background: transparent; border: 1px solid rgba(255, 255, 255, 0.42); border-radius: 9px; cursor: pointer; }.review-close svg { width: 1.05rem; height: 1.05rem; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
-.review-close:hover { background: rgba(255, 255, 255, 0.15); }
+.review-close { display: grid; place-items: center; width: 2.1rem; height: 2.1rem; padding: 0; color: var(--white); background: transparent; border: 1px solid rgba(var(--white-rgb), 0.42); border-radius: 9px; cursor: pointer; }.review-close svg { width: 1.05rem; height: 1.05rem; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.review-close:hover { background: rgba(var(--white-rgb), 0.15); }
 .review-body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.8rem; padding: 1.3rem 1.4rem; }
-.review-field { min-width: 0; padding: 0.75rem; background: #FBFDFE; border: 1px solid var(--line); border-radius: 10px; }
+.review-field { min-width: 0; padding: 0.75rem; background: var(--surface-sunken); border: 1px solid var(--line); border-radius: 10px; }
 .review-field.wide { grid-column: 1 / -1; }
 .review-field dt { color: var(--muted); font-size: 0.70rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; }
 .review-field dd { margin: 0.3rem 0 0; overflow-wrap: anywhere; white-space: pre-wrap; }
 .review-footer { display: flex; justify-content: flex-end; gap: 0.65rem; padding: 1rem 1.4rem 1.3rem; border-top: 1px solid var(--line); }
 .review-footer button { padding: 0.6rem 0.9rem; border: 0; border-radius: 10px; font: inherit; font-weight: 700; cursor: pointer; }
-.review-approve { color: #fff; background: var(--teal); }
+.review-approve { color: var(--white); background: var(--teal); }
 .review-approve:hover { background: var(--teal-dark); }
-.review-reject { color: var(--danger); background: #FEE2E2; }
-.review-reject:hover { color: #991B1B; background: #FECACA; }
+.review-reject { color: var(--danger); background: var(--danger-soft); }
+.review-reject:hover { color: var(--danger-deep); background: var(--danger-line); }
 .review-footer button:disabled { opacity: 0.55; cursor: wait; }
 @media (max-width: 576px) { .review-body { grid-template-columns: 1fr; }.review-field.wide { grid-column: auto; }.review-footer { flex-wrap: wrap; }.review-footer button { flex: 1; } }
 </style>
@@ -346,7 +409,7 @@ body {
             <section class="view data-view" id="requests"><div class="view-intro"><div><p class="eyebrow">Marketplace activity</p><h2>Repair requests</h2><p>Monitor service work across the platform.</p></div></div><div class="panel"><div class="toolbar"><select id="requestFilter"><option value="all">All statuses</option><option>Pending</option><option>Accepted</option><option>Confirmed</option><option>Customer Ready</option><option>In Progress</option><option>Completed</option><option>Cancelled</option><option>No-Show</option></select><input type="date" id="requestDate" aria-label="Filter by date"></div><div class="table-wrap"><table class="admin-table"><thead><tr><th>Request</th><th>Customer</th><th>Appliance</th><th>Location</th><th>Status</th><th>Assigned technician</th></tr></thead><tbody id="requestTableBody"></tbody></table></div></div></section>
             <section class="view data-view" id="incidents"><div class="view-intro"><div><p class="eyebrow">Trust & safety</p><h2>Service incidents</h2><p>Review cancellations and no-shows before taking action, then resolve with a warning or restriction.</p></div></div><div class="panel"><div class="toolbar"><select id="incidentFilter"><option value="all">All incidents</option><option value="no_show">No-shows</option><option value="cancellation">Cancellations</option></select><select id="incidentStage"><option value="all">All stages</option><option value="after_ready">After ready</option><option value="after_confirmation">After confirmation</option><option value="after_accept">After accept</option><option value="before_accept">Before accept</option></select></div><div class="table-wrap"><table class="admin-table"><thead><tr><th>Incident</th><th>Customer</th><th>Technician</th><th>Appliance</th><th>Stage</th><th>Review</th></tr></thead><tbody id="incidentTableBody"></tbody></table></div></div></section>
             <section class="view data-view" id="reports"><div class="view-intro"><div><p class="eyebrow">Trust & safety</p><h2>Reports & disputes</h2><p>Review complaints and take action on harmful behavior.</p></div></div><div class="panel"><div class="table-wrap"><table class="admin-table"><thead><tr><th>Report</th><th>Reported user</th><th>Reason</th><th>Status</th><th>Action</th></tr></thead><tbody id="reportsTableBody"></tbody></table></div></div></section>
-            <section class="view data-view" id="reviews"><div class="view-intro"><div><p class="eyebrow">Quality control</p><h2>Ratings & feedback</h2><p>Keep the marketplace constructive and trustworthy.</p></div></div><div class="panel"><div class="table-wrap"><table class="admin-table"><thead><tr><th>Rating</th><th>Review</th><th>Technician</th><th>Customer</th><th>Date</th><th>Action</th></tr></thead><tbody id="reviewTableBody"></tbody></table></div></div></section>
+            <section class="view data-view" id="reviews"><div class="view-intro"><div><p class="eyebrow">Quality control</p><h2>Ratings & feedback</h2><p>Select a technician to inspect completed work, then open customer reviews.</p></div></div><div class="panel"><div class="toolbar"><input class="search-input" id="techReviewSearch" placeholder="Search technician by name" aria-label="Search technicians by name"><select id="techReviewSort" aria-label="Sort technicians"><option value="rating">Top rated</option><option value="jobs">Most jobs</option><option value="reviews">Most reviewed</option><option value="name">Name A to Z</option></select></div><div class="tech-rating-summary" id="techRatingSummary" aria-live="polite"></div><div class="tech-cards-grid" id="techCardsGrid" role="list" aria-label="Technicians with ratings"></div><div id="techCardsEmpty" class="empty-state" hidden>No technicians match this search. Clear the search to view all technicians.</div></div></section>
             <section class="view" id="categories"><div class="view-intro"><div><p class="eyebrow">Marketplace structure</p><h2>Skill categories</h2><p>Keep technician specializations aligned with customer needs.</p></div></div><div class="panel"><form class="inline-form" id="categoryForm"><input id="categoryName" required placeholder="New category name" aria-label="New category name"><button class="btn-teal" type="submit">Add category</button></form><div id="categoryList" class="category-list"></div></div></section>
             <section class="view" id="announcements"><div class="view-intro"><div><p class="eyebrow">Communication</p><h2>Announcements</h2><p>Send important updates to the FixLink community.</p></div></div><div class="panel announcement-panel"><form id="announcementForm"><input id="announcementTitle" required placeholder="Announcement title"><textarea id="announcementMessage" required rows="4" placeholder="Write an update for the platform..."></textarea><button class="btn-teal" type="submit">Publish announcement</button></form><div id="announcementList" class="announcement-list"></div></div></section>
             <section class="view data-view" id="analytics"><div class="view-intro"><div><p class="eyebrow">Performance</p><h2>Reports & analytics</h2><p>Track demand, completed work, and technician performance.</p></div></div><div class="analytics-panel" id="analyticsPanel">Loading analytics...</div></section>
@@ -358,6 +421,14 @@ body {
             <header class="review-header"><div><h3 id="reviewTitle">Technician application</h3><p id="reviewSubtitle">Review identity and profile information before deciding.</p></div><button class="review-close" id="closeReview" type="button" aria-label="Close review"><svg viewBox="0 0 24 24" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button></header>
             <dl class="review-body" id="reviewDetails"><div class="empty-state">Loading profile...</div></dl>
             <footer class="review-footer"><button class="review-reject" id="reviewReject" type="button">Reject</button><button class="review-approve" id="reviewApprove" type="button">Approve technician</button></footer>
+        </section>
+    </div>
+
+    <div class="review-modal" id="techWorkModal" hidden>
+        <section class="review-dialog" role="dialog" aria-modal="true" aria-labelledby="techWorkTitle">
+            <header class="review-header"><div><h3 id="techWorkTitle">Technician work</h3><p id="techWorkSubtitle">Completed jobs and customer feedback.</p></div><button class="review-close" id="closeTechWork" type="button" aria-label="Close technician details"><svg viewBox="0 0 24 24" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button></header>
+            <div class="tech-tabs" role="tablist" aria-label="Technician detail tabs"><button class="tech-tab" id="techTabJobs" role="tab" aria-selected="true" type="button">View jobs</button><button class="tech-tab" id="techTabReviews" role="tab" aria-selected="false" type="button">View reviews</button></div>
+            <div class="work-list" id="techWorkBody" role="tabpanel" aria-live="polite"><div class="empty-state">Select a technician to inspect work.</div></div>
         </section>
     </div>
 
@@ -376,7 +447,117 @@ body {
         async function loadOverview() { const data = await api('/api/admin/overview'); Object.entries({ userCount: data.counts.customers + data.counts.technicians, customerCount: data.counts.customers, technicianCount: data.counts.technicians, requestCount: data.counts.requests, activeRequestCount: data.counts.activeRequests, completedRequestCount: data.counts.completedRequests, pendingTechnicianCount: data.counts.pendingTechnicians, ratingCount: data.counts.averageRating || '—' }).forEach(([id, value]) => document.getElementById(id).textContent = value); document.getElementById('overviewTechs').innerHTML = data.pendingTechnicians.length ? data.pendingTechnicians.map(tech => `<div class="list-row"><div><strong>${escapeHtml(tech.name || 'Unnamed technician')}</strong><small>${escapeHtml(tech.email || 'No email')}</small></div>${statusBadge(tech.status)}</div>`).join('') : '<div class="empty-state">No pending applications.</div>'; const statuses = Object.entries(data.requestStatuses); document.getElementById('requestSummary').innerHTML = statuses.length ? statuses.map(([status, count]) => `<div class="status-row"><span>${escapeHtml(status)}</span><strong>${count}</strong></div>`).join('') : '<div class="empty-state">No repair requests yet.</div>'; }
         async function loadTechnicians() { const search = document.getElementById('techSearch').value; const status = document.getElementById('techStatus').value; state.technicians = await api(`/api/admin/users?role=technician&status=${encodeURIComponent(status)}&search=${encodeURIComponent(search)}`); renderRows(document.getElementById('techTableBody'), state.technicians.map(tech => `<tr><td><strong>${escapeHtml(tech.name || 'Unnamed')}</strong></td><td>${escapeHtml(tech.email || '—')}</td><td>${dateText(tech.createdAt)}</td><td>${statusBadge(tech.status)}</td><td class="action-group">${tech.status === 'pending_verification' ? `<button class="action-link" onclick="reviewTechnician('${tech.uid}')">View credentials</button>` : `<button class="action-link" onclick="setUserStatus('${tech.uid}','${tech.status === 'active' ? 'suspended' : 'active'}')">${tech.status === 'active' ? 'Suspend' : 'Activate'}</button>`}</td></tr>`)); }
         async function loadAccounts() { const params = new URLSearchParams({ role: document.getElementById('accountRole').value, status: document.getElementById('accountStatus').value, search: document.getElementById('accountSearch').value }); state.users = await api(`/api/admin/users?${params}`); renderRows(document.getElementById('accountTableBody'), state.users.map(user => `<tr><td><strong>${escapeHtml(user.name || 'Unnamed')}</strong><small class="table-subtext">${escapeHtml(user.email || '—')}</small></td><td>${escapeHtml(user.role || '—')}</td><td>${dateText(user.createdAt)}</td><td>${statusBadge(user.status)}</td><td class="action-group"><button class="action-link" onclick="setUserStatus('${user.uid}','${user.status === 'active' ? 'suspended' : 'active'}')">${user.status === 'active' ? 'Suspend' : 'Activate'}</button><button class="action-link" onclick="setUserStatus('${user.uid}','inactive')">Deactivate</button><button class="action-link danger" onclick="setUserStatus('${user.uid}','banned')">Ban</button><button class="action-link" onclick="resetPassword('${user.uid}')">Reset password</button><button class="action-link danger" onclick="deleteUser('${user.uid}')">Delete</button></td></tr>`)); }
-        async function loadCollection(section) { const data = await api(`/api/admin/${section}`); if (section === 'requests') { const status = document.getElementById('requestFilter').value; const date = document.getElementById('requestDate').value; const filtered = data.filter(item => (status === 'all' || item.status === status) && (!date || String(item.createdAt || '').startsWith(date))); renderRows(document.getElementById('requestTableBody'), filtered.map(item => `<tr><td><strong>${escapeHtml(item.title || item.id)}</strong><small class="table-subtext">${dateText(item.createdAt)}</small></td><td>${escapeHtml(item.customerName || item.customerEmail || '—')}</td><td>${escapeHtml(item.applianceType || item.category || '—')}</td><td>${escapeHtml(item.location || '—')}</td><td>${statusBadge(item.status)}</td><td>${escapeHtml(item.technicianName || 'Unassigned')} ${['Cancelled', 'Pending'].includes(item.status) ? `<button class="action-link" onclick="reassignRequest('${item.id}')">Reassign</button>` : ''}</td></tr>`, 6)); } if (section === 'reports') renderRows(document.getElementById('reportsTableBody'), data.map(item => `<tr><td>${escapeHtml(item.title || item.id)}</td><td>${escapeHtml(item.reportedUserName || item.userName || item.userUid || '—')}</td><td>${escapeHtml(item.reason || item.description || '—')}</td><td>${statusBadge(item.status || 'open')}</td><td><button class="action-link" onclick="resolveReport('${item.id}','warn','${item.userUid || ''}')">Warn</button><button class="action-link" onclick="resolveReport('${item.id}','suspend','${item.userUid || ''}')">Suspend</button><button class="action-link danger" onclick="resolveReport('${item.id}','ban','${item.userUid || ''}')">Ban</button></td></tr>`), 5); if (section === 'reviews') renderRows(document.getElementById('reviewTableBody'), data.map(item => `<tr><td class="rating" aria-label="${Number(item.rating) || 0} out of 5 stars">${starRating(item.rating)}</td><td>${escapeHtml(item.comment || item.text || '—')}</td><td>${escapeHtml(item.technicianName || '—')}</td><td>${escapeHtml(item.customerName || '—')}</td><td>${dateText(item.createdAt)}</td><td><button class="action-link danger" onclick="removeReview('${item.id}')">Remove</button></td></tr>`), 6); if (section === 'categories') document.getElementById('categoryList').innerHTML = data.length ? data.map(item => `<span class="category-chip">${escapeHtml(item.name || item.title || item.id)} <button class="action-link" onclick="editCategory('${item.id}','${escapeHtml(item.name || '')}')">Edit</button> <button class="action-link danger" onclick="deleteCategory('${item.id}')">Remove</button></span>`).join('') : '<div class="empty-state">No categories yet.</div>'; if (section === 'announcements') document.getElementById('announcementList').innerHTML = data.length ? data.reverse().map(item => `<article class="announcement"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.message)}</p><small>${dateText(item.createdAt)}</small></article>`).join('') : '<div class="empty-state">No announcements yet.</div>'; }
+        async function loadCollection(section) { const data = await api(`/api/admin/${section}`); if (section === 'requests') { const status = document.getElementById('requestFilter').value; const date = document.getElementById('requestDate').value; const filtered = data.filter(item => (status === 'all' || item.status === status) && (!date || String(item.createdAt || '').startsWith(date))); renderRows(document.getElementById('requestTableBody'), filtered.map(item => `<tr><td><strong>${escapeHtml(item.title || item.id)}</strong><small class="table-subtext">${dateText(item.createdAt)}</small></td><td>${escapeHtml(item.customerName || item.customerEmail || '—')}</td><td>${escapeHtml(item.applianceType || item.category || '—')}</td><td>${escapeHtml(item.location || '—')}</td><td>${statusBadge(item.status)}</td><td>${escapeHtml(item.technicianName || 'Unassigned')} ${['Cancelled', 'Pending'].includes(item.status) ? `<button class="action-link" onclick="reassignRequest('${item.id}')">Reassign</button>` : ''}</td></tr>`, 6)); } if (section === 'reports') renderRows(document.getElementById('reportsTableBody'), data.map(item => `<tr><td>${escapeHtml(item.title || item.id)}</td><td>${escapeHtml(item.reportedUserName || item.userName || item.userUid || '—')}</td><td>${escapeHtml(item.reason || item.description || '—')}</td><td>${statusBadge(item.status || 'open')}</td><td><button class="action-link" onclick="resolveReport('${item.id}','warn','${item.userUid || ''}')">Warn</button><button class="action-link" onclick="resolveReport('${item.id}','suspend','${item.userUid || ''}')">Suspend</button><button class="action-link danger" onclick="resolveReport('${item.id}','ban','${item.userUid || ''}')">Ban</button></td></tr>`), 5); if (section === 'reviews') return loadTechnicianReviewCards(); if (section === 'categories') document.getElementById('categoryList').innerHTML = data.length ? data.map(item => `<span class="category-chip">${escapeHtml(item.name || item.title || item.id)} <button class="action-link" onclick="editCategory('${item.id}','${escapeHtml(item.name || '')}')">Edit</button> <button class="action-link danger" onclick="deleteCategory('${item.id}')">Remove</button></span>`).join('') : '<div class="empty-state">No categories yet.</div>'; if (section === 'announcements') document.getElementById('announcementList').innerHTML = data.length ? data.reverse().map(item => `<article class="announcement"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.message)}</p><small>${dateText(item.createdAt)}</small></article>`).join('') : '<div class="empty-state">No announcements yet.</div>'; }
+        const techReviewState = { technicians: [], jobs: [], reviews: [], activeUid: null, activeTab: 'jobs' };
+        const pick = (obj, ...keys) => { for (const k of keys) { if (obj && obj[k] !== undefined && obj[k] !== null && obj[k] !== '') return obj[k]; } return null; };
+        const techKey = tech => String(tech.uid || tech.id || tech.name || '');
+        function jobMatchesTech(job, tech) {
+          const uid = techKey(tech);
+          const jUid = String(pick(job, 'technicianUid', 'technician_uid') || '');
+          if (uid && jUid && uid === jUid) return true;
+          const jName = String(pick(job, 'technicianName', 'technician_name') || '').toLowerCase();
+          const tName = String(tech.name || '').toLowerCase();
+          return Boolean(jName && tName && jName === tName);
+        }
+        function reviewMatchesTech(review, tech) {
+          const uid = techKey(tech);
+          const rUid = String(pick(review, 'technicianUid', 'technician_uid') || '');
+          if (uid && rUid && uid === rUid) return true;
+          const rName = String(pick(review, 'technicianName', 'technician_name') || '').toLowerCase();
+          const tName = String(tech.name || '').toLowerCase();
+          return Boolean(rName && tName && rName === tName);
+        }
+        function techAverage(tech, reviews) {
+          if (reviews.length) return (reviews.reduce((t, r) => t + (Number(r.rating) || 0), 0) / reviews.length);
+          return Number(tech.rating) || 0;
+        }
+        async function loadTechnicianReviewCards() {
+          const grid = document.getElementById('techCardsGrid');
+          grid.innerHTML = '<div class="empty-state">Loading technicians...</div>';
+          try {
+            const [technicians, jobs, reviews] = await Promise.all([api('/api/admin/users?role=technician'), api('/api/admin/requests'), api('/api/admin/reviews')]);
+            techReviewState.technicians = Array.isArray(technicians) ? technicians : [];
+            techReviewState.jobs = Array.isArray(jobs) ? jobs : [];
+            techReviewState.reviews = Array.isArray(reviews) ? reviews : [];
+            renderTechCards();
+          } catch (error) { grid.innerHTML = ''; showNotice(error.message, true); }
+        }
+        function initialsOf(name) { const parts = String(name || '').trim().split(/\s+/).filter(Boolean); if (!parts.length) return 'FX'; return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase(); }
+        function initialsOf(name) { const parts = String(name || '').trim().split(/\s+/).filter(Boolean); if (!parts.length) return 'FX'; return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase(); }
+        function renderTechCards() {
+          const query = String(document.getElementById('techReviewSearch').value || '').toLowerCase();
+          const sort = String((document.getElementById('techReviewSort') || {}).value || 'rating');
+          const grid = document.getElementById('techCardsGrid');
+          const empty = document.getElementById('techCardsEmpty');
+          const summary = document.getElementById('techRatingSummary');
+          const enriched = techReviewState.technicians.map(tech => {
+            const jobs = techReviewState.jobs.filter(j => jobMatchesTech(j, tech));
+            const reviews = techReviewState.reviews.filter(r => reviewMatchesTech(r, tech));
+            const avg = techAverage(tech, reviews);
+            const completed = jobs.filter(j => String(j.status || '').toLowerCase() === 'completed').length;
+            return { tech, jobs, reviews, avg, completed };
+          });
+          const allReviews = techReviewState.reviews.length;
+          const globalAvg = allReviews ? (techReviewState.reviews.reduce((t, r) => t + (Number(r.rating) || 0), 0) / allReviews) : 0;
+          if (summary) summary.innerHTML = '<div class="summary-cell"><strong>' + techReviewState.technicians.length + '</strong><span>Rated technicians</span></div><div class="summary-cell"><strong>' + allReviews + '</strong><span>Customer reviews</span></div><div class="summary-cell"><strong>' + globalAvg.toFixed(1) + '</strong><span>Marketplace average</span></div>';
+          const filtered = enriched.filter(x => !query || String(x.tech.name || '').toLowerCase().includes(query));
+          filtered.sort((a, b) => sort === 'jobs' ? b.jobs.length - a.jobs.length : sort === 'reviews' ? b.reviews.length - a.reviews.length : sort === 'name' ? String(a.tech.name || '').localeCompare(String(b.tech.name || '')) : b.avg - a.avg);
+          empty.hidden = filtered.length > 0;
+          grid.innerHTML = filtered.length ? filtered.map(x => {
+            const uid = escapeHtml(techKey(x.tech));
+            const name = escapeHtml(x.tech.name || 'Unnamed technician');
+            const reviewWord = x.reviews.length === 1 ? 'review' : 'reviews';
+            const jobWord = x.completed === 1 ? 'job' : 'jobs';
+            return '<article class="tech-card" role="listitem"><div class="tech-top"><span class="tech-avatar" aria-hidden="true">' + escapeHtml(initialsOf(x.tech.name)) + '</span><div class="tech-identity"><button class="tech-name-button" type="button" data-tech-jobs="' + uid + '" aria-label="View jobs worked by ' + name + '">' + name + '</button></div></div>'
+              + '<div class="rating" aria-label="' + x.avg.toFixed(1) + ' out of 5 stars">' + starRating(x.avg) + '</div>'
+              + '<p class="tech-statline">' + x.avg.toFixed(1) + ' / 5 &middot; ' + x.reviews.length + ' ' + reviewWord + ' &middot; ' + x.completed + ' ' + jobWord + ' done</p>'
+              + '<div class="tech-actions"><button class="tech-action-button secondary" type="button" data-tech-jobs="' + uid + '">View jobs</button><button class="tech-action-button" type="button" data-tech-reviews="' + uid + '">View reviews</button></div></article>';
+          }).join('') : '';
+        }
+        function openTechWork(uid, tab) {
+          const tech = techReviewState.technicians.find(t => techKey(t) === String(uid));
+          if (!tech) { showNotice('Technician record not found. Refresh the list and try again.', true); return; }
+          techReviewState.activeUid = String(uid);
+          techReviewState.activeTab = tab === 'reviews' ? 'reviews' : 'jobs';
+          document.getElementById('techWorkTitle').textContent = tech.name || 'Technician work';
+          paintTechWork();
+          const modal = document.getElementById('techWorkModal');
+          modal.hidden = false;
+          document.body.style.overflow = 'hidden';
+          document.getElementById('closeTechWork').focus();
+        }
+        function paintTechWork() {
+          const tech = techReviewState.technicians.find(t => techKey(t) === String(techReviewState.activeUid));
+          if (!tech) return;
+          const isJobs = techReviewState.activeTab !== 'reviews';
+          document.getElementById('techTabJobs').setAttribute('aria-selected', String(isJobs));
+          document.getElementById('techTabReviews').setAttribute('aria-selected', String(!isJobs));
+          const body = document.getElementById('techWorkBody');
+          if (isJobs) {
+            const jobs = techReviewState.jobs.filter(j => jobMatchesTech(j, tech));
+            document.getElementById('techWorkSubtitle').textContent = jobs.length ? 'Jobs worked by this technician.' : 'No jobs recorded for this technician yet.';
+            body.innerHTML = jobs.length ? jobs.map(j => {
+              const title = escapeHtml(pick(j, 'title', 'applianceType', 'appliance_type', 'category') || 'Repair job');
+              const status = pick(j, 'status') || 'Pending';
+              const date = dateText(pick(j, 'createdAt', 'created_at'));
+              const loc = escapeHtml(pick(j, 'location') || 'Location withheld');
+              return '<div class="work-item"><div><strong>' + title + '</strong><small class="table-subtext">' + date + ' &middot; ' + loc + '</small></div><div>' + statusBadge(status) + '</div></div>';
+            }).join('') : '<div class="empty-state">No jobs recorded for this technician yet. New assignments appear here after dispatch.</div>';
+          } else {
+            const reviews = techReviewState.reviews.filter(r => reviewMatchesTech(r, tech));
+            document.getElementById('techWorkSubtitle').textContent = reviews.length ? 'Customer reviews about this technician.' : 'No reviews submitted for this technician yet.';
+            body.innerHTML = reviews.length ? reviews.map(r => {
+              const rating = Number(r.rating) || 0;
+              const text = escapeHtml(pick(r, 'comment', 'text') || 'No written feedback.');
+              const customer = escapeHtml(pick(r, 'customerName', 'customer_name') || 'Verified customer');
+              const date = dateText(pick(r, 'createdAt', 'created_at'));
+              const id = escapeHtml(r.id || '');
+              return '<div class="work-item"><div class="work-item-top"><div class="rating" aria-label="' + rating + ' out of 5 stars">' + starRating(rating) + '</div><div>' + statusBadge('completed') + '</div></div><p>' + text + '</p><small class="table-subtext"><span class="mini-avatar" aria-hidden="true">' + escapeHtml(initialsOf(customer)) + '</span>' + customer + ' &middot; ' + date + '</small><div><button class="action-link danger" type="button" onclick="removeReview(\'' + id + '\')">Remove review</button></div></div>';
+            }).join('') : '<div class="empty-state">No reviews submitted for this technician yet. Reviews appear here after customers rate completed work.</div>';
+          }
+        }
+        function closeTechWork() { document.getElementById('techWorkModal').hidden = true; document.body.style.overflow = ''; }
+        async function removeReview(id) { if (!id || !confirm('Remove this review permanently?')) return; try { await api('/api/admin/reviews/' + encodeURIComponent(id), { method: 'DELETE' }); showNotice('Review removed.'); techReviewState.reviews = techReviewState.reviews.filter(r => String(r.id) !== String(id)); renderTechCards(); paintTechWork(); } catch (error) { showNotice(error.message, true); } }
         function displayValue(value) { if (value === null || value === undefined || value === '') return '—'; if (typeof value === 'object') return JSON.stringify(value, null, 2); return String(value); }
         function profileLabel(key) { return key.replace(/([A-Z])/g, ' $1').replace(/[_-]+/g, ' ').replace(/^./, character => character.toUpperCase()); }
         function credentialValue(key, profile) { if (!profile[key]) return '<span class="muted">Not uploaded</span>'; const type = key === 'governmentIdFileUrl' ? 'government-id' : 'certificate'; const safeUrl = `/api/admin/technicians/${encodeURIComponent(profile.uid)}/credential/${type}`; return `<a href="${safeUrl}" target="_blank" rel="noopener">Open ${escapeHtml(profileLabel(key))}</a>`; }
@@ -399,7 +580,7 @@ body {
         async function loadCurrentView(view) { if (view === 'overview') return loadOverview(); if (view === 'technicians') return loadTechnicians(); if (view === 'accounts') return loadAccounts(); if (view === 'analytics') return loadAnalytics(); if (view === 'incidents') return loadIncidents(); if (['requests', 'reports', 'reviews', 'categories', 'announcements'].includes(view)) return loadCollection(view); }
         document.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => { const view = button.dataset.view; document.querySelectorAll('[data-view]').forEach(item => item.classList.toggle('active', item === button)); document.querySelectorAll('.view').forEach(item => item.classList.toggle('active', item.id === view)); loadCurrentView(view).catch(error => showNotice(error.message, true)); }));
         document.querySelectorAll('[data-view-target]').forEach(button => button.addEventListener('click', () => document.querySelector(`[data-view="${button.dataset.viewTarget}"]`).click())); document.getElementById('logoutButton').addEventListener('click', async () => { await fetch('/api/admin/logout', { method: 'POST' }); window.location.href = '/admin/login.html'; });
-        document.getElementById('closeReview').addEventListener('click', closeReview); document.getElementById('reviewModal').addEventListener('click', event => { if (event.target.id === 'reviewModal') closeReview(); }); document.addEventListener('keydown', event => { if (event.key === 'Escape' && !document.getElementById('reviewModal').hidden) closeReview(); });
+        document.getElementById('closeReview').addEventListener('click', closeReview); document.getElementById('closeTechWork').addEventListener('click', closeTechWork); document.getElementById('techWorkModal').addEventListener('click', function(event){ if(event.target.id==='techWorkModal') closeTechWork(); }); document.getElementById('techTabJobs').addEventListener('click', function(){ techReviewState.activeTab='jobs'; paintTechWork(); }); document.getElementById('techTabReviews').addEventListener('click', function(){ techReviewState.activeTab='reviews'; paintTechWork(); }); document.getElementById('techCardsGrid').addEventListener('click', function(event){ var j=event.target.closest('[data-tech-jobs]'); var r=event.target.closest('[data-tech-reviews]'); if(j){ openTechWork(j.getAttribute('data-tech-jobs'),'jobs'); } else if(r){ openTechWork(r.getAttribute('data-tech-reviews'),'reviews'); } }); document.getElementById('techReviewSearch').addEventListener('input', renderTechCards); document.getElementById('techReviewSort').addEventListener('input', renderTechCards);  document.getElementById('reviewModal').addEventListener('click', event => { if (event.target.id === 'reviewModal') closeReview(); }); document.addEventListener('keydown', event => { if (event.key === 'Escape' && !document.getElementById('reviewModal').hidden) closeReview(); if (event.key === 'Escape' && !document.getElementById('techWorkModal').hidden) closeTechWork(); });
         ['techSearch', 'techStatus'].forEach(id => document.getElementById(id).addEventListener('input', loadTechnicians)); ['accountSearch', 'accountRole', 'accountStatus'].forEach(id => document.getElementById(id).addEventListener('input', loadAccounts)); ['requestFilter', 'requestDate'].forEach(id => document.getElementById(id).addEventListener('input', () => loadCollection('requests'))); ['incidentFilter', 'incidentStage'].forEach(id => document.getElementById(id).addEventListener('input', loadIncidents)); document.getElementById('refreshButton').addEventListener('click', () => loadCurrentView(document.querySelector('.view.active').id).then(() => showNotice('Data refreshed.')).catch(error => showNotice(error.message, true)));
         document.getElementById('categoryForm').addEventListener('submit', async event => { event.preventDefault(); try { await api('/api/admin/categories', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: document.getElementById('categoryName').value }) }); event.target.reset(); showNotice('Category added.'); loadCollection('categories'); } catch (error) { showNotice(error.message, true); } }); document.getElementById('announcementForm').addEventListener('submit', async event => { event.preventDefault(); try { await api('/api/admin/announcements', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: document.getElementById('announcementTitle').value, message: document.getElementById('announcementMessage').value }) }); event.target.reset(); showNotice('Announcement published.'); loadCollection('announcements'); } catch (error) { showNotice(error.message, true); } }); api('/api/admin/session').then(session => { if (!session || !session.authenticated) window.location.href = '/admin/login.html'; else loadOverview().catch(error => showNotice(error.message, true)); });
     </script>
