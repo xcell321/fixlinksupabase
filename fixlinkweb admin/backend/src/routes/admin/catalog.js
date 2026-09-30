@@ -6,6 +6,13 @@ const express = require('express');
 const router = express.Router();
 const { supabase } = require('../../config/supabase');
 const { listJobs } = require('../../services/adminAnalyticsService');
+const {
+  serializeAnnouncement,
+  serializeCategory,
+  serializeJob,
+  serializeReport,
+  serializeReview,
+} = require('../../utils/serialize');
 
 router.get('/:section', async (req, res) => {
   try {
@@ -14,11 +21,16 @@ router.get('/:section', async (req, res) => {
     if (!table) return res.status(404).json({ error: 'Unknown admin section' });
     if (req.params.section === 'requests') {
       const jobs = await listJobs();
-      return res.json(jobs);
+      return res.json(jobs.map(serializeJob));
     }
     const { data, error } = await supabase.from(table).select('*');
     if (error) throw error;
-    res.json(data || []);
+    const rows = data || [];
+    if (req.params.section === 'reviews') return res.json(rows.map(serializeReview));
+    if (req.params.section === 'reports') return res.json(rows.map(serializeReport));
+    if (req.params.section === 'categories') return res.json(rows.map(serializeCategory));
+    if (req.params.section === 'announcements') return res.json(rows.map(serializeAnnouncement));
+    res.json(rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
