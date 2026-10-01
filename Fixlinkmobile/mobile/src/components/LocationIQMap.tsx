@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useMemo } from 'react';
 import { StyleSheet, View, Platform, ActivityIndicator, type StyleProp, type ViewStyle } from 'react-native';
 import { getLocationIqTileUrl } from '../services/locationIq';
-import { colors, themedStyles } from '../theme';
+import { alpha, colors, themedStyles } from '../theme';
 
 // Latitude/longitude are nullable because a job pin is genuinely unresolved
 // until geocoding or live tracking fills it; every use below guards first.
@@ -139,21 +139,21 @@ export default function LocationIQMap({
           html, body, #map { width: 100%; height: 100%; overflow: hidden; background: ${colors.mapBg}; font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
           .leaflet-container, .leaflet-popup-content, .leaflet-control-attribution, .job-pin-badge { font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
           .pulse-wrapper { position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
-          .pulse-ring { position: absolute; width: 44px; height: 44px; border-radius: 50%; background: rgba(37, 99, 235, 0.30); animation: pulse-animation 1.8s infinite ease-out; }
-          .pulse-dot { position: relative; z-index: 2; width: 32px; height: 32px; border-radius: 50%; background: ${colors.tech}; border: 3px solid ${colors.white}; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; }
+          .pulse-ring { position: absolute; width: 44px; height: 44px; border-radius: 50%; background: ${alpha(colors.tech, 0.3)}; animation: pulse-animation 1.8s infinite ease-out; }
+          .pulse-dot { position: relative; z-index: 2; width: 32px; height: 32px; border-radius: 50%; background: ${colors.tech}; border: 3px solid ${colors.white}; box-shadow: 0 4px 10px ${alpha(colors.black, 0.3)}; display: flex; align-items: center; justify-content: center; }
           .pulse-dot svg { width: 16px; height: 16px; display: block; }
           .pulse-inner { width: 10px; height: 10px; border-radius: 50%; background: ${colors.white}; opacity: 0.95; }
           .customer-pin-wrapper { position: relative; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; }
-          .customer-pin { width: 34px; height: 34px; border-radius: 50%; background: ${colors.customer}; border: 3px solid ${colors.white}; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; }
+          .customer-pin { width: 34px; height: 34px; border-radius: 50%; background: ${colors.customer}; border: 3px solid ${colors.white}; box-shadow: 0 4px 10px ${alpha(colors.black, 0.3)}; display: flex; align-items: center; justify-content: center; }
           .customer-pin svg { width: 16px; height: 16px; display: block; }
           .customer-pin-dot { width: 10px; height: 10px; border-radius: 50%; background: ${colors.white}; opacity: 0.98; }
-          .job-pin-badge { background: ${colors.tech}; color: ${colors.white}; font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 999px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); border: 2px solid ${colors.white}; white-space: nowrap; }
+          .job-pin-badge { background: ${colors.tech}; color: ${colors.white}; font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 999px; box-shadow: 0 4px 10px ${alpha(colors.black, 0.3)}; border: 2px solid ${colors.white}; white-space: nowrap; }
           @keyframes pulse-animation { 0% { transform: scale(0.6); opacity: 0.9; } 100% { transform: scale(1.6); opacity: 0; } }
-          .leaflet-popup-content-wrapper { border-radius: 12px; padding: 4px; box-shadow: 0 6px 16px rgba(0,0,0,0.18); }
+          .leaflet-popup-content-wrapper { border-radius: 12px; padding: 4px; box-shadow: 0 6px 16px ${alpha(colors.black, 0.18)}; }
           .custom-popup { font-size: 13px; color: ${colors.ink}; line-height: 1.4; }
           .custom-popup strong { display: block; font-size: 14px; margin-bottom: 3px; }
           .custom-popup .subtext { color: ${colors.muted}; font-size: 11px; }
-          .map-watermark { position: absolute; bottom: 8px; right: 8px; background: rgba(255,255,255,0.85); padding: 3px 7px; border-radius: 6px; font-size: 10px; font-weight: 700; color: ${colors.mapWatermark}; z-index: 1000; pointer-events: none; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+          .map-watermark { position: absolute; bottom: 8px; right: 8px; background: ${alpha(colors.white, 0.85)}; padding: 3px 7px; border-radius: 6px; font-size: 10px; font-weight: 700; color: ${colors.mapWatermark}; z-index: 1000; pointer-events: none; box-shadow: 0 1px 3px ${alpha(colors.black, 0.1)}; }
         </style>
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
       </head>

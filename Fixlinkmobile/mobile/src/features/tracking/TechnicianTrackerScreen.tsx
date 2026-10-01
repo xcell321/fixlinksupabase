@@ -19,7 +19,7 @@ import {
   updateTechnicianLocation
 } from '../../services/api';
 import { geocodeAddressPrecise, getDrivingRoute } from '../../services/locationIq';
-import { colors, fonts, themedStyles } from '../../theme';
+import { alpha, colors, fonts, themedStyles } from '../../theme';
 import { getApplianceIcon } from '../../utils/applianceIcons';
 import { customerPinFromJob, distanceInKm } from './trackingGeometry';
 
@@ -661,7 +661,7 @@ const styles = themedStyles({
     minWidth: 168,
     maxWidth: 240,
     // subtle shadow, not excessive
-    boxShadow: '0 2px 8px rgba(16,42,67,0.08)',
+    boxShadow: `0 2px 8px ${alpha(colors.ink, 0.08)}`,
     gap: 12,
   },
   activeJobsControlLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
@@ -692,7 +692,7 @@ const styles = themedStyles({
     paddingBottom: 16,
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
-    boxShadow: '0 -4px 16px rgba(16,42,67,0.08)',
+    boxShadow: `0 -4px 16px ${alpha(colors.ink, 0.08)}`,
     gap: 14,
   },
 
@@ -755,14 +755,14 @@ const styles = themedStyles({
     borderColor: colors.hudBorder,
   },
   jobIconWrapSelected: {
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    borderColor: 'rgba(255,255,255,0.28)',
+    backgroundColor: alpha(colors.white, 0.18),
+    borderColor: alpha(colors.white, 0.28),
   },
   jobCopy: { flex: 1, minWidth: 0 },
   jobName: { color: colors.ink, fontSize: 13, fontFamily: fonts.bold, lineHeight: 16 },
   jobNameSelected: { color: colors.onAccent },
   jobCustomer: { color: colors.muted, fontSize: 11, fontFamily: fonts.medium, marginTop: 2, lineHeight: 14 },
-  jobCustomerSelected: { color: 'rgba(255,255,255,0.9)' },
+  jobCustomerSelected: { color: alpha(colors.white, 0.9) },
   selectedCheck: {
     width: 24,
     height: 24,

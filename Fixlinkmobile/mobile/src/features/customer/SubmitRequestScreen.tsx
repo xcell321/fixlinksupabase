@@ -10,7 +10,7 @@ import { geocodeAddress, geocodeAddressPrecise, geocodeAddressStructured, revers
 import { collectBestFix, distanceInMeters } from "./locationFix";
 import CustomerLocationMap from "../../components/CustomerLocationMap";
 import InfoModal from "../../components/InfoModal";
-import { colors, fonts, shadows, themedStyles } from '../../theme';
+import { alpha, colors, fonts, shadows, themedStyles } from '../../theme';
 import { getApplianceIcon, type IconName } from '../../utils/applianceIcons';
 
 type CurrentUserRef = {
@@ -1605,7 +1605,7 @@ const styles = themedStyles({
   
   locationContainer: { flexDirection: 'row', flexWrap: 'wrap' as const, alignItems: 'center', gap: 10 },
   locationFieldWrap: { position: 'relative', zIndex: 20 },
-  locateButton: { backgroundColor: colors.customer, height: 52, paddingHorizontal: 16, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 6, boxShadow: '0 4px 10px rgba(15,118,110,0.18)', minWidth: 92, flex: 1, justifyContent: 'center' },
+  locateButton: { backgroundColor: colors.customer, height: 52, paddingHorizontal: 16, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 6, boxShadow: `0 4px 10px ${alpha(colors.teal, 0.18)}`, minWidth: 92, flex: 1, justifyContent: 'center' },
   locateButtonText: { color: colors.onAccent, fontSize: 13, fontFamily: fonts.bold },
   locateRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, borderRadius: 14, borderWidth: 1.5, borderColor: colors.customer, backgroundColor: colors.customerSoft, paddingHorizontal: 16, elevation: 0 },
   locateRowText: { color: colors.customer, fontSize: 13, fontFamily: fonts.semiBold },
@@ -1622,7 +1622,7 @@ const styles = themedStyles({
   mapPin: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.customer, alignItems: 'center', justifyContent: 'center', ...shadows.subtle },
   mapSkeleton: { height: 144, position: 'relative' as const, alignItems: 'center', justifyContent: 'center' },
   mapSkeletonBody: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 16 },
-  mapSkeletonStatus: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.94)', borderWidth: 1, borderColor: colors.line, maxWidth: '100%' },
+  mapSkeletonStatus: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, backgroundColor: alpha(colors.white, 0.94), borderWidth: 1, borderColor: colors.line, maxWidth: '100%' },
   mapSkeletonText: { fontSize: 12, fontFamily: fonts.semiBold, color: colors.ink, flexShrink: 1 },
   addressSkeletonGroup: { gap: 20 },
   twoColGrid: { flexDirection: 'row', gap: 12 },
@@ -1632,8 +1632,8 @@ const styles = themedStyles({
   accuracyOk: { color: colors.gold },
   accuracyPoor: { color: colors.danger },
 
-  suggestionsPanel: { position: 'absolute', top: 58, left: 0, right: 0, backgroundColor: colors.white, borderRadius: 14, borderWidth: 1, borderColor: colors.line, zIndex: 30, boxShadow: '0 6px 12px rgba(16,42,67,0.15)', overflow: 'hidden' },
-  suggestionsModalView: { backgroundColor: colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 24, paddingHorizontal: 12, paddingBottom: 10, maxHeight: '78%', boxShadow: '0 -4px 12px rgba(0,0,0,0.1)' },
+  suggestionsPanel: { position: 'absolute', top: 58, left: 0, right: 0, backgroundColor: colors.white, borderRadius: 14, borderWidth: 1, borderColor: colors.line, zIndex: 30, boxShadow: `0 6px 12px ${alpha(colors.ink, 0.15)}`, overflow: 'hidden' },
+  suggestionsModalView: { backgroundColor: colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 24, paddingHorizontal: 12, paddingBottom: 10, maxHeight: '78%', boxShadow: `0 -4px 12px ${alpha(colors.black, 0.1)}` },
   suggestionsList: { maxHeight: 360, flexGrow: 0 },
   suggestionStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 14 },
   suggestionStatusText: { flex: 1, color: colors.muted, fontSize: 12, fontFamily: fonts.medium },
@@ -1663,7 +1663,7 @@ const styles = themedStyles({
   navHint: { fontSize: 12, fontFamily: fonts.medium, color: colors.muted, textAlign: 'center', marginTop: 10, lineHeight: 16 },
 
   modalOverlay: { flex: 1, backgroundColor: colors.scrim, justifyContent: 'flex-end' },
-  modalView: { backgroundColor: colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 20, maxHeight: '80%', boxShadow: '0 -4px 12px rgba(0,0,0,0.1)' },
+  modalView: { backgroundColor: colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 20, maxHeight: '80%', boxShadow: `0 -4px 12px ${alpha(colors.black, 0.1)}` },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.line },
   modalBackIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.canvas, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.line },
   modalCloseIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.canvas, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.line },

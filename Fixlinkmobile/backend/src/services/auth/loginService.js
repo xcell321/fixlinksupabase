@@ -11,11 +11,38 @@ const login = async ({ email, password, expectedRole }) => {
   }
 
   const sanitizedEmail = email.trim().toLowerCase();
+
+  const statusMessage = (status) => {
+    const state = String(status || '').toLowerCase();
+    if (state === 'banned') return 'This account has been banned. Contact support for help.';
+    if (state === 'suspended') return 'This account is suspended. Contact support for help.';
+    if (state === 'inactive') return 'This account is deactivated. Contact support for help.';
+    return null;
+  };
+
+  // Restricted states are resolved from the stored profile so a banned,
+  // suspended, or deactivated account sees its real state instead of a
+  // misleading credentials error (works for customer and technician roles).
+  const lookupStatusMessage = async () => {
+    try {
+      const { data: row } = await supabase
+        .from('users')
+        .select('status')
+        .eq('email', sanitizedEmail)
+        .maybeSingle();
+      return row ? statusMessage(row.status) : null;
+    } catch {
+      return null;
+    }
+  };
+
   const { data, error } = await supabaseAuth.auth.signInWithPassword({ email: sanitizedEmail, password });
 
   if (error) {
     console.error('Supabase Login Error:', error.message);
-    if (error.message && /invalid login credentials/i.test(error.message)) {
+    if (error.message && /invalid login credentials|user is banned|banned/i.test(error.message)) {
+      const restricted = await lookupStatusMessage();
+      if (restricted) throw new HttpError(403, { error: restricted });
       throw new HttpError(401, { error: 'Incorrect email or password.' });
     }
     if (error.message && /email not confirmed/i.test(error.message)) {
@@ -49,6 +76,13 @@ const login = async ({ email, password, expectedRole }) => {
   // Check if technician account is still pending verification
   if (userData.role === 'technician' && userData.status === 'pending_verification') {
     throw new HttpError(403, { error: 'Your account is pending admin verification.' });
+  }
+
+  // Restricted states win over a successful sign-in so an admin ban or
+  // suspension takes effect even when the auth record still accepts credentials.
+  const restricted = statusMessage(userData.status);
+  if (restricted) {
+    throw new HttpError(403, { error: restricted });
   }
 
   if (userData.role === 'technician' && userData.status === 'rejected') {

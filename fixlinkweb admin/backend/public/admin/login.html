@@ -10,16 +10,16 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         /* FixLink brand palette — mirrors Fixlinkmobile/mobile/src/theme.tsx. */
-        :root { --navy: #0D1B2A; --navy-soft: #102A43; --brand: #F97316; --brand-dark: #EA580C; --brand-text: #C2410C; --brand-soft: #FFF7ED; --brand-mist: #FFEDD5; --brand-line: #FED7AA; --ink: #102A43; --canvas: #F5F8FA; --white: #FFFFFF; --muted: #3F5A6E; --line: #D9E2EC; --line-soft: #E3ECF2; --danger: #E53935; --hud-grid: rgba(13,27,42,0.05); --teal: var(--brand); --teal-dark: var(--brand-dark); --teal-light: var(--brand-soft); }
+        :root { --navy: #0D1B2A; --navy-soft: #102A43; --brand: #F97316; --brand-dark: #EA580C; --brand-text: #C2410C; --brand-soft: #FFF7ED; --brand-mist: #FFEDD5; --brand-line: #FED7AA; --ink: #102A43; --canvas: #F5F8FA; --white: #FFFFFF; --muted: #3F5A6E; --line: #D9E2EC; --line-soft: #E3ECF2; --danger: #E53935; --surface-sunken: #FBFDFE; --hud-grid: rgba(13,27,42,0.05); --teal: var(--brand); --teal-dark: var(--brand-dark); --teal-light: var(--brand-soft); --brand-rgb: 249,115,22; --ink-rgb: 16,42,67; --navy-rgb: 13,27,42; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        ::selection { background: rgba(249,115,22,0.22); }
-        :focus-visible { outline: 3px solid rgba(249,115,22,0.32); outline-offset: 2px; }
-        body { display: grid; min-height: 100vh; place-items: center; background: var(--canvas); background-image: radial-gradient(circle at 1px 1px, var(--hud-grid) 1px, transparent 0), linear-gradient(135deg, rgba(249, 115, 22, 0.06), transparent 42%), linear-gradient(315deg, rgba(13, 27, 42, 0.05), transparent 48%); background-size: 22px 22px, auto, auto; font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; color: var(--ink); }
-        .login-card { position: relative; overflow: hidden; width: min(440px, calc(100% - 2rem)); background: var(--white); border: 1px solid var(--line); border-radius: 22px; box-shadow: 0 20px 55px rgba(16, 42, 67, 0.1), 0 1px 0 rgba(249,115,22,0.10) inset; padding: 2.5rem 2rem; }
+        ::selection { background: rgba(var(--brand-rgb),0.22); }
+        :focus-visible { outline: 3px solid rgba(var(--brand-rgb),0.32); outline-offset: 2px; }
+        body { display: grid; min-height: 100vh; place-items: center; background: var(--canvas); background-image: radial-gradient(circle at 1px 1px, var(--hud-grid) 1px, transparent 0), linear-gradient(135deg, rgba(var(--brand-rgb), 0.06), transparent 42%), linear-gradient(315deg, rgba(var(--navy-rgb), 0.05), transparent 48%); background-size: 22px 22px, auto, auto; font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; color: var(--ink); }
+        .login-card { position: relative; overflow: hidden; width: min(440px, calc(100% - 2rem)); background: var(--white); border: 1px solid var(--line); border-radius: 22px; box-shadow: 0 20px 55px rgba(var(--ink-rgb), 0.1), 0 1px 0 rgba(var(--brand-rgb),0.10) inset; padding: 2.5rem 2rem; }
         /* Navy-to-orange brand strip, mirroring the mobile app's dark header. */
         .login-card::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 5px; background: linear-gradient(90deg, var(--navy), var(--brand)); }
         .brand { display: flex; flex-direction: column; align-items: center; margin-bottom: 2.5rem; }
-        .logo { display: grid; place-items: center; width: 54px; height: 54px; background: linear-gradient(135deg, var(--teal), var(--teal-dark)); color: #fff; border-radius: 16px; margin-bottom: 0.9rem; }
+        .logo { display: grid; place-items: center; width: 54px; height: 54px; background: linear-gradient(135deg, var(--teal), var(--teal-dark)); color: var(--white); border-radius: 16px; margin-bottom: 0.9rem; }
         .logo svg { width: 26px; height: 26px; fill: currentColor; }
         .brand-name { font-size: 1.15rem; font-weight: 800; letter-spacing: -0.01em; }
         .brand-name span { color: var(--teal); }
@@ -28,9 +28,9 @@
         h2 { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 0.5rem; }
         .subtitle { color: var(--muted); font-size: 0.88rem; }
         label { display: block; margin: 1rem 0 0.4rem; font-size: 0.82rem; font-weight: 700; }
-        input { width: 100%; padding: 0.85rem 0.9rem; color: var(--ink); background: #FBFDFE; border: 1px solid var(--line); border-radius: 13px; font: inherit; font-size: 0.92rem; }
-        input:focus { outline: 3px solid rgba(249, 115, 22, 0.24); border-color: var(--brand); }
-        button { width: 100%; margin-top: 1.6rem; padding: 0.88rem; color: #fff; background: var(--teal); border: 0; border-radius: 14px; font: inherit; font-weight: 700; font-size: 0.95rem; cursor: pointer; transition: background 0.15s; }
+        input { width: 100%; padding: 0.85rem 0.9rem; color: var(--ink); background: var(--surface-sunken); border: 1px solid var(--line); border-radius: 13px; font: inherit; font-size: 0.92rem; }
+        input:focus { outline: 3px solid rgba(var(--brand-rgb), 0.24); border-color: var(--brand); }
+        button { width: 100%; margin-top: 1.6rem; padding: 0.88rem; color: var(--white); background: var(--teal); border: 0; border-radius: 14px; font: inherit; font-weight: 700; font-size: 0.95rem; cursor: pointer; transition: background 0.15s; }
         button:hover { background: var(--teal-dark); }
         .error { min-height: 1.2rem; margin-top: 1rem; color: var(--danger); font-size: 0.82rem; text-align: center; }
         .admin-label { display: block; text-align: center; margin-top: 1.6rem; color: var(--muted); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }

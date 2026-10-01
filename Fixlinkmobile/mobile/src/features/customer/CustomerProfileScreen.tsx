@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView, TextInput, Alert, ActivityIndicator, Image, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { colors, fonts, themedStyles } from '../../theme';
+import { alpha, colors, fonts, themedStyles } from '../../theme';
 import Skeleton from '../../components/Skeleton';
 import HelpSheet from '../../components/HelpSheet';
 import ConfirmDialog from '../../components/ConfirmDialog';
@@ -257,8 +257,8 @@ const styles = themedStyles({
   email: { color: colors.subtle, fontSize: 13, fontFamily: fonts.regular, marginTop: 2 },
   statsRow: { flexDirection: 'row', gap: 24, marginTop: 16, minHeight: 38, alignItems: 'center' },
   stat: { alignItems: 'center' },
-  statSkeletonValue: { width: 34, height: 17, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.22)' },
-  statSkeletonLabel: { width: 52, height: 10, borderRadius: 5, marginTop: 5, backgroundColor: 'rgba(255,255,255,0.14)' },
+  statSkeletonValue: { width: 34, height: 17, borderRadius: 6, backgroundColor: alpha(colors.white, 0.22) },
+  statSkeletonLabel: { width: 52, height: 10, borderRadius: 5, marginTop: 5, backgroundColor: alpha(colors.white, 0.14) },
   statValue: { color: colors.onAccent, fontSize: 17, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
   statLabel: { color: colors.subtle, fontSize: 11, fontFamily: fonts.regular, marginTop: 2 },
   body: { paddingHorizontal: 20, paddingTop: 20, gap: 12 },

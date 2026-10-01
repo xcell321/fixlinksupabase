@@ -36,6 +36,7 @@ export const colors = {
   appBg: '#F9FAFB',
   canvas: '#F5F8FA',
   white: '#FFFFFF',
+  black: '#000000',
   elevated: '#FFFFFF',
   surfaceSunken: '#FBFDFE',
   cardBorder: '#F3F4F6',
@@ -153,6 +154,19 @@ export const colors = {
   // Local skeleton default tint (SubmitRequest shimmer).
   skeletonTint: '#E1E6EB',
 } as const;
+
+// Builds an rgba() from one of the palette colours plus an opacity, so screens
+// never carry a literal rgba() with hardcoded channels. The colour always comes
+// from `colors` above; only the opacity is passed inline (like a size). Values
+// are exactly the strings this replaced.
+export const alpha = (hex: string, opacity: number): string => {
+  const value = hex.replace('#', '');
+  const full = value.length === 3 ? value.split('').map((c) => c + c).join('') : value;
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${opacity})`;
+};
 
 export const fonts = {
   regular: 'Inter_400Regular',

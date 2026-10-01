@@ -18,7 +18,7 @@ import Skeleton from '../../components/Skeleton';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import PortfolioPhotoSheet, { type PortfolioPhotoItem } from '../../components/PortfolioPhotoSheet';
 import { PhotoLightbox } from '../../components/RequestPhoto';
-import { colors, fonts, themedStyles } from '../../theme';
+import { alpha, colors, fonts, themedStyles } from '../../theme';
 import type { TechnicianScheduleItem, TechnicianScheduleResponse } from '../../types/schedule';
 import {
   draftFromProfile,
@@ -927,8 +927,8 @@ elevation: 0 },
   coverRatingTextMutedDark: { color: colors.muted, fontSize: 12, fontFamily: fonts.medium },
   editProfileButtonDark: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.tech, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, marginTop: 10, alignSelf: 'flex-start' },
   editProfileButtonTextDark: { color: colors.onAccent, fontSize: 12, fontFamily: fonts.bold },
-  coverDividerDark: { height: 1, backgroundColor: 'rgba(255,255,255,0.12)', marginVertical: 14 },
-  coverContactIconDark: { width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.10)', alignItems: 'center', justifyContent: 'center' },
+  coverDividerDark: { height: 1, backgroundColor: alpha(colors.white, 0.12), marginVertical: 14 },
+  coverContactIconDark: { width: 32, height: 32, borderRadius: 10, backgroundColor: alpha(colors.white, 0.10), alignItems: 'center', justifyContent: 'center' },
   coverContactMetaDark: { color: colors.muted, fontSize: 10, fontFamily: fonts.bold, letterSpacing: 1 },
   coverContactTextDark: { color: colors.onAccent, fontSize: 13, fontFamily: fonts.semiBold, marginTop: 2 },
   // Prototype tab bar: info / skills / reviews / portfolio
@@ -979,7 +979,7 @@ elevation: 0 },
   headerStatCentered: { alignItems: 'center', minWidth: 60 },
   headerStatValue: { color: colors.onAccent, fontSize: 18, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
   headerStatLabel: { color: colors.subtle, fontSize: 11, fontFamily: fonts.medium, marginTop: 2 },
-  headerStatDivider: { width: 1, height: 28, backgroundColor: 'rgba(255,255,255,0.12)' },
+  headerStatDivider: { width: 1, height: 28, backgroundColor: alpha(colors.white, 0.12) },
   editProfileButtonDarkCentered: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.tech, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, marginTop: 12 },
   infoCardsContainer: { gap: 12, marginBottom: 16 },
   infoCardWhite: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.cardBorder, borderRadius: 16, padding: 14, elevation: 0 },

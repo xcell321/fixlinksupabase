@@ -3,7 +3,7 @@
 // chips, workloadStrip) whose former UI sections were removed upstream;
 // they are kept so no imported style key can go missing.
 import { StyleSheet } from 'react-native';
-import { colors, fonts, shadows, themedStyles } from '../../../theme';
+import { alpha, colors, fonts, shadows, themedStyles } from '../../../theme';
 
 export const styles = themedStyles({
   screen: { flex: 1, backgroundColor: colors.canvas },
@@ -15,7 +15,7 @@ alignSelf: 'center' },
   protoHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16, gap: 10 },
   protoKicker: { color: colors.muted, fontSize: 13, fontFamily: fonts.regular },
   protoName: { color: colors.onAccent, fontSize: 18, fontFamily: fonts.extraBold, letterSpacing: -0.4, marginTop: 2 },
-  protoBell: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.10)', alignItems: 'center', justifyContent: 'center', minHeight: 44, minWidth: 44 },
+  protoBell: { width: 44, height: 44, borderRadius: 22, backgroundColor: alpha(colors.white, 0.10), alignItems: 'center', justifyContent: 'center', minHeight: 44, minWidth: 44 },
   protoIdentity: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 10 },
   protoHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: 12, flexShrink: 0 },
   // Service area: label over value, both flush right so the column lines up
@@ -28,13 +28,13 @@ alignSelf: 'center' },
   protoAvatarText: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bold },
   // The two cards double as the Available/Assigned feed tabs.
   protoStatsRow: { flexDirection: 'row', gap: 12 },
-  protoStat: { flex: 1, flexDirection: 'row', gap: 7, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14, paddingVertical: 12, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  protoStat: { flex: 1, flexDirection: 'row', gap: 7, backgroundColor: alpha(colors.white, 0.08), borderRadius: 14, paddingVertical: 12, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   protoStatActive: { backgroundColor: colors.tech },
   protoStatValue: { color: colors.onAccent, fontSize: 22, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
   protoStatLabel: { color: colors.muted, fontSize: 13, fontFamily: fonts.semiBold },
   protoStatLabelActive: { color: colors.onAccent, fontFamily: fonts.bold },
   // Count chip next to the label: readable, but still lighter than the label.
-  protoStatBadge: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 6, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },
+  protoStatBadge: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 6, backgroundColor: alpha(colors.white, 0.14), alignItems: 'center', justifyContent: 'center' },
   protoStatBadgeActive: { backgroundColor: colors.white },
   protoStatBadgeText: { color: colors.gray300, fontSize: 11, fontFamily: fonts.bold, fontVariant: ['tabular-nums'] },
   protoStatBadgeTextActive: { color: colors.tech },
@@ -733,7 +733,7 @@ alignSelf: 'center' },
   offlineRetryText: { fontSize: 12, fontFamily: fonts.bold, color: colors.tech },
   acceptErrorBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.dangerSoft, borderWidth: 1, borderColor: colors.dangerBorder, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12, marginBottom: 12 },
   acceptErrorText: { flex: 1, fontSize: 12, fontFamily: fonts.semiBold, color: colors.dangerText, lineHeight: 17 },
-  confirmBackdrop: { flex: 1, backgroundColor: 'rgba(13,27,42,0.5)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  confirmBackdrop: { flex: 1, backgroundColor: colors.backdrop, alignItems: 'center', justifyContent: 'center', padding: 24 },
   confirmCard: { width: '100%', maxWidth: 360, backgroundColor: colors.white, borderRadius: 18, padding: 20 },
   confirmTitle: { fontSize: 16, fontFamily: fonts.bold, color: colors.ink },
   confirmCopy: { fontSize: 14, fontFamily: fonts.semiBold, color: colors.ink, marginTop: 8 },
@@ -746,7 +746,7 @@ alignSelf: 'center' },
 
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(16, 42, 67, 0.45)',
+    backgroundColor: alpha(colors.ink, 0.45),
     justifyContent: 'flex-end'
   },
   detailsSheet: {
