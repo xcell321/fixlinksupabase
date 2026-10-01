@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, Animated, StyleSheet, Platform, Vibration } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, fonts, themedStyles } from '../theme';
+import { alpha, colors, fonts, themedStyles } from '../theme';
 
 const useNative: boolean = Platform.OS !== 'web';
 
@@ -102,7 +102,7 @@ const styles = themedStyles({
     paddingVertical: 12,
     paddingLeft: 12,
     paddingRight: 10,
-    boxShadow: '0 8px 16px rgba(16,42,67,0.25)',
+    boxShadow: `0 8px 16px ${alpha(colors.ink, 0.25)}`,
   },
   bannerBody: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
   avatarWrap: { width: 40, height: 40, flexShrink: 0 },

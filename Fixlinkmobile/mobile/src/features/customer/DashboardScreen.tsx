@@ -3,7 +3,7 @@ import { StyleSheet, Text, View, TouchableOpacity, ScrollView, ActivityIndicator
 import { Ionicons } from '@expo/vector-icons';
 import { fetchCompletedJobs, fetchCustomerRequests, fetchPlatformCategories } from '../../services/api';
 import Skeleton from '../../components/Skeleton';
-import { colors, fonts, themedStyles } from '../../theme';
+import { alpha, colors, fonts, themedStyles } from '../../theme';
 import { getApplianceIcon, getStatusColor, getStatusIcon } from '../../utils/applianceIcons';
 import { getTimeGreeting } from '../../utils/timeFormat';
 import type { AssistantContext } from '../../components/AssistantSheet';
@@ -351,26 +351,26 @@ const styles = themedStyles({
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, gap: 10 },
   kicker: { color: colors.subtle, fontSize: 12, fontFamily: fonts.regular },
   greeting: { color: colors.onAccent, fontSize: 21, fontFamily: fonts.extraBold, letterSpacing: -0.3, marginTop: 2 },
-  bell: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.10)', alignItems: 'center', justifyContent: 'center' },
+  bell: { width: 40, height: 40, borderRadius: 20, backgroundColor: alpha(colors.white, 0.10), alignItems: 'center', justifyContent: 'center' },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerAvatar: { width: 36, height: 36, borderRadius: 18 },
   headerAvatarFallback: { backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center' },
   headerAvatarText: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bold },
   bellDot: { position: 'absolute', top: 8, right: 9, width: 8, height: 8, borderRadius: 4, backgroundColor: ORANGE, borderWidth: 2, borderColor: DARK },
   bellDotDim: { position: 'absolute', top: 8, right: 9, width: 8, height: 8, borderRadius: 4, backgroundColor: 'transparent' },
-  activeCard: { backgroundColor: 'rgba(255,255,255,0.10)', borderRadius: 16, padding: 16 },
+  activeCard: { backgroundColor: alpha(colors.white, 0.10), borderRadius: 16, padding: 16 },
   activeKicker: { color: colors.gray300, fontSize: 12, fontFamily: fonts.regular, marginBottom: 6 },
   activeRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   activeTitle: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bold },
   activeSub: { color: ORANGE, fontSize: 12, fontFamily: fonts.medium, marginTop: 2 },
   trackBtn: { backgroundColor: ORANGE, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 },
   trackBtnText: { color: colors.onAccent, fontSize: 12, fontFamily: fonts.bold },
-  progressTrack: { marginTop: 12, height: 6, backgroundColor: 'rgba(255,255,255,0.20)', borderRadius: 999, overflow: 'hidden' },
-  skelKicker: { width: 86, height: 12, borderRadius: 6, marginBottom: 6, backgroundColor: 'rgba(255,255,255,0.18)' },
-  skelTitle: { width: '88%', height: 14, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.18)' },
-  skelSub: { width: '55%', height: 12, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.12)' },
-  skelButton: { width: 62, height: 30, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.18)' },
-  skelTrack: { marginTop: 12, height: 6, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.12)' },
+  progressTrack: { marginTop: 12, height: 6, backgroundColor: alpha(colors.white, 0.20), borderRadius: 999, overflow: 'hidden' },
+  skelKicker: { width: 86, height: 12, borderRadius: 6, marginBottom: 6, backgroundColor: alpha(colors.white, 0.18) },
+  skelTitle: { width: '88%', height: 14, borderRadius: 6, backgroundColor: alpha(colors.white, 0.18) },
+  skelSub: { width: '55%', height: 12, borderRadius: 6, backgroundColor: alpha(colors.white, 0.12) },
+  skelButton: { width: 62, height: 30, borderRadius: 8, backgroundColor: alpha(colors.white, 0.18) },
+  skelTrack: { marginTop: 12, height: 6, borderRadius: 999, backgroundColor: alpha(colors.white, 0.12) },
   skelStat: { width: 40, height: 24, borderRadius: 8 },
   progressFill: { height: '100%', backgroundColor: ORANGE, borderRadius: 999 },
   body: { paddingHorizontal: 20, paddingTop: 20, gap: 12 },
@@ -402,6 +402,6 @@ const styles = themedStyles({
   tipDismiss: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   homeWrap: { flex: 1 },
   aiFabWrap: { position: 'absolute', right: 20, bottom: 90 },
-  aiFab: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 14px rgba(16,42,67,0.25)', overflow: 'hidden' },
+  aiFab: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', boxShadow: `0 6px 14px ${alpha(colors.ink, 0.25)}`, overflow: 'hidden' },
   aiFabImage: { width: 56, height: 56, borderRadius: 28 },
 });

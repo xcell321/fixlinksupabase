@@ -25,7 +25,7 @@ import { PhotoLightbox } from '../../components/RequestPhoto';
 import { fetchJobMessages, fetchMessageInbox, markJobMessagesRead, sendJobMessage } from '../../services/api';
 import { subscribeTyping, setTyping, type TypingPeer } from '../../utils/typingPresence';
 import { subscribeOnlineUids } from '../../utils/onlinePresence';
-import { colors, fonts, themedStyles } from '../../theme';
+import { alpha, colors, fonts, themedStyles } from '../../theme';
 import { getStatusColor, getStatusIcon } from '../../utils/applianceIcons';
 import type { ChatMessage, Conversation } from '../../types/message';
 
@@ -996,7 +996,7 @@ const styles = themedStyles({
   filterLabelActive: { color: colors.onAccent },
   filterCount: { minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' },
   filterCountIdle: { backgroundColor: colors.frost },
-  filterCountActive: { backgroundColor: 'rgba(255,255,255,0.22)' },
+  filterCountActive: { backgroundColor: alpha(colors.white, 0.22) },
   filterCountText: { fontSize: 11, fontFamily: fonts.extraBold, fontVariant: ['tabular-nums'] },
   filterCountTextIdle: { color: colors.muted },
   filterCountTextActive: { color: colors.onAccent },

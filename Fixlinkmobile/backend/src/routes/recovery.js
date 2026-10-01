@@ -14,8 +14,8 @@ const { verifyResetToken, hashResetToken } = require('../utils/resetToken');
 // This is what makes a link inaccessible once the password has been changed,
 // rather than only rejecting the second submit.
 //
-// The page mirrors the mobile app theme (mobile/src/theme.tsx): dark #0D1B2A
-// header, customer orange #F97316 primary action, Inter fallback stack, 12px
+// The page mirrors the mobile app theme (mobile/src/theme.tsx): the `dark`
+// header, `customer` orange primary action, Inter fallback stack, 12px
 // radii. Copy is intentionally minimal.
 const isResetLinkRedeemable = async ({ uid, email, token }) => {
   const payload = verifyResetToken(token);
@@ -62,29 +62,31 @@ router.get('/reset-password', async (req, res) => {
       --dark: #0D1B2A; --accent: #F97316; --accent-dark: #EA580C;
       --ink: #102A43; --muted: #6B7280; --line: #E5E7EB; --field: #F9FAFB;
       --bg: #F9FAFB; --danger: #DC2626; --success: #0F766E;
+      --white: #FFFFFF; --danger-soft: #FEF2F2; --success-soft: #E6F6F3;
+      --ink-rgb: 16,42,67;
     }
     * { box-sizing: border-box; }
     body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px;
       background: var(--bg); font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-    .card { width: 100%; max-width: 400px; background: #fff; border-radius: 24px; overflow: hidden; box-shadow: 0 12px 32px rgba(16,42,67,0.10); }
+    .card { width: 100%; max-width: 400px; background: var(--white); border-radius: 24px; overflow: hidden; box-shadow: 0 12px 32px rgba(var(--ink-rgb),0.10); }
     .head { background: var(--dark); padding: 28px 24px 24px; }
     .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
-    .logo { width: 40px; height: 40px; border-radius: 12px; background: var(--accent); color: #fff; font-weight: 800; font-size: 14px; display: flex; align-items: center; justify-content: center; }
-    .brand-name { color: #fff; font-size: 13px; font-weight: 800; letter-spacing: 1px; }
-    h1 { margin: 0; color: #fff; font-size: 22px; font-weight: 800; letter-spacing: -0.2px; }
+    .logo { width: 40px; height: 40px; border-radius: 12px; background: var(--accent); color: var(--white); font-weight: 800; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+    .brand-name { color: var(--white); font-size: 13px; font-weight: 800; letter-spacing: 1px; }
+    h1 { margin: 0; color: var(--white); font-size: 22px; font-weight: 800; letter-spacing: -0.2px; }
     .body { padding: 24px; }
     .field { margin-bottom: 14px; }
     label { display: block; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.8px; margin-bottom: 6px; }
     input { width: 100%; min-height: 52px; padding: 0 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--field); color: var(--ink); font-size: 15px; }
-    input:focus { outline: none; border-color: var(--accent); background: #fff; }
-    button { width: 100%; min-height: 52px; margin-top: 8px; border: none; border-radius: 12px; background: var(--accent); color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; }
+    input:focus { outline: none; border-color: var(--accent); background: var(--white); }
+    button { width: 100%; min-height: 52px; margin-top: 8px; border: none; border-radius: 12px; background: var(--accent); color: var(--white); font-size: 15px; font-weight: 700; cursor: pointer; }
     button:hover { background: var(--accent-dark); }
     button:disabled { opacity: 0.6; cursor: default; }
     .hint { margin: 12px 0 0; color: var(--muted); font-size: 11px; text-align: center; }
     .msg { margin: 0 0 14px; font-size: 13px; font-weight: 600; padding: 10px 12px; border-radius: 10px; display: none; }
     .msg.show { display: block; }
-    .msg.error { background: #FEF2F2; color: var(--danger); }
-    .msg.success { background: #E6F6F3; color: var(--success); }
+    .msg.error { background: var(--danger-soft); color: var(--danger); }
+    .msg.success { background: var(--success-soft); color: var(--success); }
     .empty { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
   </style>
 </head>

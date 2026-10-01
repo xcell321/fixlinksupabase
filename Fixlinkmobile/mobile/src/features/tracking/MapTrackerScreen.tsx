@@ -18,7 +18,7 @@ import {
   updateCustomerLocation
 } from '../../services/api';
 import { geocodeAddressPrecise, getDrivingRoute } from '../../services/locationIq';
-import { colors, fonts, themedStyles } from '../../theme';
+import { alpha, colors, fonts, themedStyles } from '../../theme';
 import { customerPinFromJob, distanceInKm } from './trackingGeometry';
 
 // The subset of a job this screen reads.
@@ -435,7 +435,7 @@ export default function MapTrackerScreen({ currentUser, selectedJob: initialJob,
 
 const styles = themedStyles({
   container: { flex: 1, backgroundColor: colors.canvas },
-  selectorBar: { position: 'absolute', right: 12, top: 12, zIndex: 10, backgroundColor: 'rgba(255,255,255,0.92)', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 8, boxShadow: '0 3px 8px rgba(16,42,67,0.15)' },
+  selectorBar: { position: 'absolute', right: 12, top: 12, zIndex: 10, backgroundColor: alpha(colors.white, 0.92), borderRadius: 14, paddingHorizontal: 10, paddingVertical: 8, boxShadow: `0 3px 8px ${alpha(colors.ink, 0.15)}` },
   selectorHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
   selectorKicker: { fontSize: 11, fontFamily: fonts.bold, color: colors.muted, letterSpacing: 0.6 },
   collapseBtn: { width: 24, height: 24, borderRadius: 12, backgroundColor: colors.collapseBtnBg, alignItems: 'center', justifyContent: 'center' },
@@ -450,7 +450,7 @@ const styles = themedStyles({
   jobChipTextActive: { color: colors.onAccent },
   mapArea: { flex: 1, minHeight: 250, position: 'relative' },
   map: { flex: 1 },
-  bottomPanel: { backgroundColor: colors.white, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16, borderTopLeftRadius: 20, borderTopRightRadius: 20, gap: 14, borderTopWidth: 1, borderTopColor: colors.lineSoft, boxShadow: '0 -4px 16px rgba(16,42,67,0.08)' },
+  bottomPanel: { backgroundColor: colors.white, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16, borderTopLeftRadius: 20, borderTopRightRadius: 20, gap: 14, borderTopWidth: 1, borderTopColor: colors.lineSoft, boxShadow: `0 -4px 16px ${alpha(colors.ink, 0.08)}` },
   tripRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.tripRowBg, borderRadius: 12, borderWidth: 1, borderColor: colors.lineSoft, paddingVertical: 10, paddingHorizontal: 8, gap: 0 },
   tripCell: { flex: 1, alignItems: 'center', gap: 4 },
   tripIconWrap: { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.lineSoft, alignItems: 'center', justifyContent: 'center' },
@@ -468,7 +468,7 @@ const styles = themedStyles({
   destinationKicker: { color: colors.customer, fontSize: 10, letterSpacing: 1.0, fontFamily: fonts.bold, marginBottom: 2, textTransform: 'uppercase' as const },
   destinationName: { color: colors.ink, fontSize: 15, fontFamily: fonts.bold, lineHeight: 18 },
   destinationMeta: { color: colors.muted, fontSize: 11, fontFamily: fonts.regular, lineHeight: 15, marginTop: 2 },
-  primaryCta: { height: 54, borderRadius: 13, backgroundColor: colors.customer, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 16, boxShadow: '0 4px 10px rgba(15,118,110,0.18)' },
+  primaryCta: { height: 54, borderRadius: 13, backgroundColor: colors.customer, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 16, boxShadow: `0 4px 10px ${alpha(colors.teal, 0.18)}` },
   primaryCtaText: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bold, letterSpacing: 0.1 },
   secondaryCta: { height: 46, borderRadius: 12, backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.customer, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 16 },
   secondaryCtaText: { color: colors.customer, fontSize: 13, fontFamily: fonts.bold },

@@ -5,6 +5,19 @@ const { getPublicBaseUrl } = require('../utils/network');
 
 const lookup = promisify(dns.lookup);
 
+// Inline email palette. Email clients only honour inline styles, so these
+// values live here (mirroring the mobile theme) rather than in CSS variables.
+const EMAIL_COLORS = {
+  ink: '#102A43',
+  muted: '#6B7280',
+  brand: '#F97316',
+  white: '#FFFFFF',
+  link: '#2563EB',
+  infoBg: '#EFF6FF',
+  infoBorder: '#BFDBFE',
+  infoText: '#1E40AF',
+};
+
 function withTimeout(promise, ms, message) {
   let timer;
   return Promise.race([
@@ -74,20 +87,20 @@ const sendPasswordResetEmail = async (to, link, requestHost, forwardedProto, for
   const landingUrlHref = String(landingUrl.toString()).replace(/&/g, '&amp;');
 
   // Minimal copy: heading, one-time/24h note, the button, a paste fallback, and
-  // a short ignore line. Colors follow the mobile theme (orange #F97316 accent).
+  // a short ignore line. Colors come from EMAIL_COLORS below.
   const mailOptions = {
     from: process.env.EMAIL_FROM || '"FixLink Support" <noreply@fixlink.com>',
     to,
     subject: 'Reset your FixLink password',
     html: `
-      <div style="font-family: 'Inter', 'Segoe UI', Roboto, Arial, sans-serif; color: #102A43; max-width: 440px;">
+      <div style="font-family: 'Inter', 'Segoe UI', Roboto, Arial, sans-serif; color: ${EMAIL_COLORS.ink}; max-width: 440px;">
         <h2 style="margin: 0 0 8px; font-size: 18px;">Reset your FixLink password</h2>
-        <p style="margin: 0 0 16px; color: #6B7280; font-size: 13px;">This one-time link expires in 24 hours.</p>
+        <p style="margin: 0 0 16px; color: ${EMAIL_COLORS.muted}; font-size: 13px;">This one-time link expires in 24 hours.</p>
         <p style="margin: 0 0 16px;">
-          <a href="${landingUrlHref}" style="background: #F97316; color: #ffffff; text-decoration: none; font-weight: 700; padding: 12px 22px; border-radius: 12px; display: inline-block;">Reset password</a>
+          <a href="${landingUrlHref}" style="background: ${EMAIL_COLORS.brand}; color: ${EMAIL_COLORS.white}; text-decoration: none; font-weight: 700; padding: 12px 22px; border-radius: 12px; display: inline-block;">Reset password</a>
         </p>
-        <p style="margin: 0 0 12px; font-size: 12px; color: #6B7280;">Or paste this link into your browser:<br><span style="word-break: break-all; color: #2563EB;">${landingUrlHref}</span></p>
-        <p style="margin: 0; font-size: 12px; color: #6B7280;">If you did not request this, ignore this email.</p>
+        <p style="margin: 0 0 12px; font-size: 12px; color: ${EMAIL_COLORS.muted};">Or paste this link into your browser:<br><span style="word-break: break-all; color: ${EMAIL_COLORS.link};">${landingUrlHref}</span></p>
+        <p style="margin: 0; font-size: 12px; color: ${EMAIL_COLORS.muted};">If you did not request this, ignore this email.</p>
       </div>
     `,
   };
@@ -124,19 +137,19 @@ const sendTechnicianApprovedEmail = async (to, name) => {
     to,
     subject: 'Your FixLink technician account is approved',
     html: `
-      <div style="font-family: 'Inter', 'Segoe UI', Roboto, Arial, sans-serif; color: #102A43; max-width: 440px;">
+      <div style="font-family: 'Inter', 'Segoe UI', Roboto, Arial, sans-serif; color: ${EMAIL_COLORS.ink}; max-width: 440px;">
         <h2 style="margin: 0 0 8px; font-size: 18px;">You're approved, ${firstName}</h2>
-        <p style="margin: 0 0 16px; color: #6B7280; font-size: 13px;">Your FixLink technician application passed review.</p>
+        <p style="margin: 0 0 16px; color: ${EMAIL_COLORS.muted}; font-size: 13px;">Your FixLink technician application passed review.</p>
         <p style="margin: 0 0 14px;">You are now an <strong>active FixLink technician</strong>. Your account is registered and ready to accept repair jobs.</p>
-        <div style="background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 12px; padding: 14px; margin: 0 0 16px;">
-          <p style="margin: 0 0 6px; font-size: 13px; font-weight: 700; color: #1E40AF;">What happens next</p>
-          <p style="margin: 0; font-size: 13px; color: #2563EB; line-height: 22px;">
+        <div style="background: ${EMAIL_COLORS.infoBg}; border: 1px solid ${EMAIL_COLORS.infoBorder}; border-radius: 12px; padding: 14px; margin: 0 0 16px;">
+          <p style="margin: 0 0 6px; font-size: 13px; font-weight: 700; color: ${EMAIL_COLORS.infoText};">What happens next</p>
+          <p style="margin: 0; font-size: 13px; color: ${EMAIL_COLORS.link}; line-height: 22px;">
             1. Open the FixLink app<br>
             2. Sign in as Technician with ${registeredEmail}<br>
             3. Turn on availability to receive repair leads
           </p>
         </div>
-        <p style="margin: 0; font-size: 12px; color: #6B7280;">If you did not apply to be a FixLink technician, please ignore this email.</p>
+        <p style="margin: 0; font-size: 12px; color: ${EMAIL_COLORS.muted};">If you did not apply to be a FixLink technician, please ignore this email.</p>
       </div>
     `,
   };

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import api, { setAuthToken } from '../../services/api';
-import { colors, fonts, themedStyles } from '../../theme';
+import { alpha, colors, fonts, themedStyles } from '../../theme';
 
 // Prototype: CustomerLogin — colors.dark header, colors.customer primary. Logic unchanged.
 const ORANGE = colors.customer;
@@ -68,7 +68,7 @@ export default function LoginScreen({ onLoginSuccess, switchToRegister, switchTo
          // The proxy or tunnel answered, but the API behind it is unreachable.
          setLoginError(errorMessage || 'Cannot reach the server. Check your connection and try again.');
        } else {
-         const messageByStatus: Record<number, string> = { 401: 'Incorrect email or password.',
+          const messageByStatus: Record<number, string> = { 401: errorMessage || 'Incorrect email or password.',
              403: errorMessage || 'Technician account pending approval.',
              404: 'Profile not found.' };
          setLoginError(messageByStatus[status] || errorMessage || 'Unable to log in.');
@@ -127,7 +127,7 @@ export default function LoginScreen({ onLoginSuccess, switchToRegister, switchTo
 const styles = themedStyles({ container: { flex: 1, backgroundColor: colors.white },
    scrollContent: { flexGrow: 1 },
    header: { backgroundColor: DARK, paddingHorizontal: 24, paddingTop: 56, paddingBottom: 40, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
-   modeToggle: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 12, padding: 4, gap: 4, marginBottom: 24 },
+   modeToggle: { flexDirection: 'row', backgroundColor: alpha(colors.white, 0.08), borderRadius: 12, padding: 4, gap: 4, marginBottom: 24 },
    modeTab: { flex: 1, paddingVertical: 10, borderRadius: 9, alignItems: 'center' },
    modeTabCustomer: { backgroundColor: colors.customer },
    modeTabTech: { backgroundColor: colors.tech },

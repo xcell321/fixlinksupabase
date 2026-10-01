@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Skeleton from '../../components/Skeleton';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { cancelRepairRequest, confirmRepairRequest, fetchCompletedJobs, fetchCustomerRequests, fetchTechnicianRecommendations, markCustomerReady, submitTechnicianReview } from '../../services/api';
-import { colors, fonts, shadows, themedStyles } from '../../theme';
+import { alpha, colors, fonts, shadows, themedStyles } from '../../theme';
 import { getApplianceIcon, getStatusColor, getStatusGuidance, getStatusIcon } from '../../utils/applianceIcons';
 import { splitJobDescription } from '../../utils/jobDescription';
 import type { ScheduleAvailability, TechnicianScheduleItem } from '../../types/schedule';
@@ -807,7 +807,7 @@ const styles = themedStyles({
   protoHeader: { backgroundColor: colors.dark, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 20, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, marginHorizontal: -20, marginTop: -20, marginBottom: 20 },
   protoTitle: { color: colors.onAccent, fontSize: 21, fontFamily: fonts.extraBold, letterSpacing: -0.3, marginBottom: 16 },
   protoTabs: { flexDirection: 'row', gap: 8 },
-  protoTab: { flex: 1, paddingVertical: 10, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.10)', alignItems: 'center' },
+  protoTab: { flex: 1, paddingVertical: 10, borderRadius: 12, backgroundColor: alpha(colors.white, 0.10), alignItems: 'center' },
   protoTabActive: { backgroundColor: colors.customer },
   protoTabText: { color: colors.subtle, fontSize: 14, fontFamily: fonts.semiBold },
   protoTabTextActive: { color: colors.onAccent },
@@ -828,7 +828,7 @@ const styles = themedStyles({
   segmentText: { color: colors.muted, fontSize: 11, fontFamily: fonts.semiBold, flexShrink: 1 },
   segmentTextActive: { color: colors.onAccent },
   segmentCount: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center' },
-  segmentCountActive: { backgroundColor: 'rgba(255,255,255,0.25)' },
+  segmentCountActive: { backgroundColor: alpha(colors.white, 0.25) },
   segmentCountText: { color: colors.muted, fontSize: 11, fontFamily: fonts.bold, fontVariant: ['tabular-nums'] },
   segmentCountTextActive: { color: colors.onAccent },
 

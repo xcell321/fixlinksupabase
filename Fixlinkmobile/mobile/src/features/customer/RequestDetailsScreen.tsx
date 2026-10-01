@@ -6,7 +6,7 @@ import { confirmRepairRequest, fetchTechnicianProfile, markCustomerReady } from 
 import { PhotoLightbox } from '../../components/RequestPhoto';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import RecommendedTechSheet from '../../components/RecommendedTechSheet';
-import { colors, fonts, themedStyles } from '../../theme';
+import { alpha, colors, fonts, themedStyles } from '../../theme';
 import { getStatusColor } from '../../utils/applianceIcons';
 import { splitJobDescription } from '../../utils/jobDescription';
 
@@ -431,7 +431,7 @@ export default function RequestDetailsScreen({ request, onBack, onMessageTechnic
 const styles = themedStyles({
   container: { flex: 1, backgroundColor: colors.appBg },
   // Same floating robot as the Home tab, so the AI entry point feels like one system.
-  aiFab: { position: 'absolute', right: 20, bottom: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 14px rgba(16,42,67,0.25)', overflow: 'hidden' },
+  aiFab: { position: 'absolute', right: 20, bottom: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', boxShadow: `0 6px 14px ${alpha(colors.ink, 0.25)}`, overflow: 'hidden' },
   aiFabImage: { width: 56, height: 56, borderRadius: 28 },
   backHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 16, backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.cardBorder },
   backBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
