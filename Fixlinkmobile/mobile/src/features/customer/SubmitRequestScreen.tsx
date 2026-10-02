@@ -10,8 +10,10 @@ import { geocodeAddress, geocodeAddressPrecise, geocodeAddressStructured, revers
 import { collectBestFix, distanceInMeters } from "./locationFix";
 import CustomerLocationMap from "../../components/CustomerLocationMap";
 import InfoModal from "../../components/InfoModal";
+import SubmitTermsModal from "../../components/SubmitTermsModal";
 import { alpha, colors, fonts, shadows, themedStyles } from '../../theme';
 import { getApplianceIcon, type IconName } from '../../utils/applianceIcons';
+import { termsDeclineNotice, termsRequired, termsVersion } from '../../utils/submitTerms';
 
 type CurrentUserRef = {
   uid?: string;
@@ -254,6 +256,12 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
   const [photoViewerVisible, setPhotoViewerVisible] = useState(false);
   const [photoMenuVisible, setPhotoMenuVisible] = useState(false);
   const [successVisible, setSuccessVisible] = useState(false);
+  // UAT #4: the regulation gate that stands between the appointment step and
+  // the location step. `termsAccepted` is session state on purpose - it is
+  // cleared after a successful submit so the next booking is gated again.
+  const [termsVisible, setTermsVisible] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [termsNotice, setTermsNotice] = useState('');
   const scrollRef = useRef<ScrollView | null>(null);
 
   const composedLocation = [street.trim(), city.trim(), zipCode.trim()].filter(Boolean).join(', ');
@@ -654,14 +662,42 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
     return true;
   };
 
-  const handleContinue = () => {
-    const ok = validateStep(currentStep);
-    if (!ok) return;
+  const advanceStep = () => {
     if (currentStep < TOTAL_STEPS) {
       setCurrentStep((s) => Math.min(TOTAL_STEPS, s + 1));
       // scroll to top for next step
       setTimeout(() => scrollRef.current?.scrollTo({ y: 0, animated: true }), 100);
     }
+  };
+
+  const handleContinue = () => {
+    const ok = validateStep(currentStep);
+    if (!ok) return;
+    // UAT #4: step 3 -> step 4 is gated by the booking regulations, so no GPS
+    // is ever acquired before the customer has agreed to them.
+    if (currentStep === 3 && termsRequired() && !termsAccepted) {
+      setTermsNotice('');
+      setTermsVisible(true);
+      return;
+    }
+    setTermsNotice('');
+    advanceStep();
+  };
+
+  // Agree: record the acceptance, then let the flow through to the map.
+  const handleTermsAgree = () => {
+    setTermsAccepted(true);
+    setTermsVisible(false);
+    setTermsNotice('');
+    advanceStep();
+  };
+
+  // Decline: the booking simply does not proceed. The customer stays on the
+  // appointment step and sees why.
+  const handleTermsDecline = () => {
+    setTermsVisible(false);
+    setTermsAccepted(false);
+    setTermsNotice(termsDeclineNotice());
   };
 
   const handleBack = () => {
@@ -686,6 +722,16 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
       if (s === 4 && !street.trim()) return false;
       return true;
     });
+    // UAT #4 defensive guard: the terms gate is enforced again here, so a path
+    // that reaches submit without an agreement cannot create the booking.
+    if (termsRequired() && !termsAccepted) {
+      setTermsAccepted(false);
+      setCurrentStep(3);
+      setTermsNotice(termsDeclineNotice());
+      setTermsVisible(true);
+      return;
+    }
+
     if (!allValid) {
       // surface inline errors and jump to first failing step
       const next: Record<string, string | boolean | undefined> = {};
@@ -754,6 +800,10 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
         preferredDate: formattedDate,
         preferredTime: finalPreferredTime,
         scheduledDate: date.toISOString(),
+        // UAT #4: the acceptance travels with the booking so the server can
+        // refuse a request that never agreed to the regulations.
+        termsAccepted: true,
+        termsVersion: termsVersion(),
         ...(photo?.uri ? { photo } : {}),
       });
       
@@ -779,6 +829,10 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
       setIsCustomTime(false);
       setCurrentStep(1);
       setStepErrors({});
+      // Re-arm the regulation gate for the next booking.
+      setTermsAccepted(false);
+      setTermsVisible(false);
+      setTermsNotice('');
     } catch (error: any) {
       const msg = error?.error || error?.message || (typeof error === 'string' ? error : JSON.stringify(error)) || 'Network Error - check backend 5050';
       console.log('Submit failed:', msg, error);
@@ -1057,6 +1111,14 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
             <Ionicons name="shield-checkmark" size={16} color={colors.customer} />
           </View>
           <Text style={styles.helperText}>The technician confirms the exact arrival window after accepting.</Text>
+
+          {/* UAT #4: shown when the customer declines the booking regulations. */}
+          {!!termsNotice && (
+            <View style={styles.termsNoticeBox} accessibilityLiveRegion="polite">
+              <Ionicons name="alert-circle-outline" size={16} color={colors.danger} />
+              <Text style={styles.termsNoticeText}>{termsNotice}</Text>
+            </View>
+          )}
 
           {showDatePicker && (
             Platform.OS === 'web' ? (
@@ -1447,6 +1509,12 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
         </View>
       </Modal>
 
+      <SubmitTermsModal
+        visible={termsVisible}
+        onAgree={handleTermsAgree}
+        onDecline={handleTermsDecline}
+      />
+
       <InfoModal
         visible={successVisible}
         title="Request Submitted!"
@@ -1519,6 +1587,9 @@ const styles = themedStyles({
   requiredMark: { color: colors.danger, fontSize: 12, fontFamily: fonts.bold },
   optionalLabel: { fontSize: 11, fontFamily: fonts.medium, color: colors.muted },
   helperText: { fontSize: 13, fontFamily: fonts.regular, color: colors.muted, lineHeight: 17, marginTop: 8 },
+  // UAT #4: shown in place when the customer declines the booking regulations.
+  termsNoticeBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: colors.dangerSoft, borderWidth: 1, borderColor: colors.dangerBorder, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12, marginTop: 12 },
+  termsNoticeText: { flex: 1, fontSize: 12, fontFamily: fonts.semiBold, color: colors.dangerText, lineHeight: 17 },
   errorText: { fontSize: 13, fontFamily: fonts.medium, color: colors.danger, lineHeight: 17, marginTop: 8 },
   inputError: { borderColor: colors.danger, borderWidth: 2 },
 

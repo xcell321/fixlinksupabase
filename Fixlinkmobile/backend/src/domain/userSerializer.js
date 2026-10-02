@@ -28,6 +28,23 @@ const serializeUser = (row) => {
   if (row.is_available != null) user.isAvailable = row.is_available;
   if (row.profile_image) user.profileImage = row.profile_image;
   if (row.no_show_count != null) user.noShowCount = row.no_show_count;
+
+  // UAT #8: repeat-scammer standing.
+  if (row.scam_count != null) user.scamCount = row.scam_count;
+
+  // UAT #9: credential screening result (advisory, admin-facing).
+  if (row.credential_risk_score != null) user.credentialRiskScore = row.credential_risk_score;
+  if (row.credential_risk_level) user.credentialRiskLevel = row.credential_risk_level;
+  if (row.credential_flags) user.credentialFlags = row.credential_flags;
+  if (row.credential_notes) user.credentialNotes = row.credential_notes;
+  if (row.credential_screened_at) user.credentialScreenedAt = new Date(row.credential_screened_at).toISOString();
+  if (row.verification_note) user.verificationNote = row.verification_note;
+
+  // UAT #10: facial verification at signup.
+  if (row.selfie_url) user.selfieUrl = row.selfie_url;
+  if (row.face_check_level) user.faceCheckLevel = row.face_check_level;
+  if (row.face_match_confidence != null) user.faceMatchConfidence = row.face_match_confidence;
+  if (row.face_liveness_risk != null) user.faceLivenessRisk = row.face_liveness_risk;
   return user;
 };
 

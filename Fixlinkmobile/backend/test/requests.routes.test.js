@@ -42,6 +42,8 @@ const EXPECTED_ROUTES = [
   'POST /:id/report-no-show',
   'GET /completed/:customerName',
   'POST /:id/review',
+  'POST /:id/rate-customer',
+  'POST /:id/report-scam',
   'PUT /:id/accept',
   'POST /:id/verify-completion',
 ];

@@ -28,6 +28,7 @@ const registrationUpload = multer({
 // Convert them to JSON so the register screen always shows a readable message
 // instead of spinning with no result.
 const registerUpload = registrationUpload.fields([
+  { name: 'facePhotoFile', maxCount: 1 },
   { name: 'governmentIdFile', maxCount: 1 },
   { name: 'certificateFile', maxCount: 1 },
 ]);

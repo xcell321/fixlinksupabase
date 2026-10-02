@@ -140,6 +140,26 @@ const submitReview = handleRequest(
   })
 );
 
+const rateCustomer = handleRequest(
+  { logLabel: 'Error submitting customer rating:', serverMessage: 'Unable to submit customer rating.', status: 201 },
+  (req) => jobService.rateCustomer({
+    jobId: req.params.id,
+    authUid: req.authUser.uid,
+    technicianUid: req.body?.technicianUid,
+    rating: req.body?.rating,
+    comment: req.body?.comment,
+  })
+);
+
+const reportScam = handleRequest(
+  { logLabel: 'Error filing scam report:', serverMessage: 'Unable to file the scam report.', status: 201 },
+  (req) => jobService.reportScam({
+    jobId: req.params.id,
+    authUid: req.authUser.uid,
+    reason: req.body?.reason,
+  })
+);
+
 module.exports = {
   submitRequest,
   listAvailableJobs,
@@ -157,4 +177,6 @@ module.exports = {
   verifyCompletion,
   reportNoShow,
   submitReview,
+  rateCustomer,
+  reportScam,
 };

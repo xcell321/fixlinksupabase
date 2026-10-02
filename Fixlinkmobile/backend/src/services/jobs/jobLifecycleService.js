@@ -11,7 +11,7 @@ const {
 } = require('../../domain/jobWorkflow');
 const { HttpError } = require('../../domain/httpError');
 const { assertTechnicianOwner } = require('../../middleware/identityGuards');
-const { getTechnicianActiveJobCount, getWorkloadStatus } = require('../workloadService');
+const { getTechnicianActiveJobCount, getWorkloadStatus, isAtJobLimit, getMaxActiveJobs } = require('../workloadService');
 const { notify } = require('../notificationService');
 const { assertUuid } = require('../../domain/ids');
 
@@ -25,18 +25,19 @@ const acceptJob = async ({ jobId, authUid, technicianUid, technicianName }) => {
   }
   assertTechnicianOwner(authUid, technicianUid);
 
-  // Authoritative workload validation: recalculate current active jobs before
-  // accepting, so a stale AI filter cannot let a technician exceed capacity.
+  // Authoritative capacity rule (UAT #7): recalculate current active jobs
+  // before accepting, so a stale AI filter cannot let a technician exceed the
+  // env-configured ceiling (TECHNICIAN_MAX_ACTIVE_JOBS, default 1).
   let atCapacity = null;
   try {
     const activeJobs = await getTechnicianActiveJobCount(technicianUid);
-    const workloadStatus = getWorkloadStatus(activeJobs);
-    if (workloadStatus === 'at_capacity') {
+    if (isAtJobLimit(activeJobs)) {
       atCapacity = {
         code: 'TECHNICIAN_AT_CAPACITY',
-        message: `You currently have ${activeJobs} active repair requests and cannot automatically accept another request.`,
+        message: `You already have ${activeJobs} active job${activeJobs === 1 ? '' : 's'} (limit ${getMaxActiveJobs()}). Finish it before accepting another request.`,
         activeJobs,
-        workloadStatus,
+        maxActiveJobs: getMaxActiveJobs(),
+        workloadStatus: getWorkloadStatus(activeJobs),
       };
     }
   } catch (workloadError) {

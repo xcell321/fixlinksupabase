@@ -7,7 +7,7 @@ export const registerUser = async (userData: Record<string, unknown>): Promise<u
   for (const [key, value] of Object.entries(userData)) {
     if (value !== undefined && value !== null && value !== '') {
       const v = value as { uri?: string; mimeType?: string; name?: string };
-      if ((key === 'governmentIdFile' || key === 'certificateFile') && v.uri) {
+      if ((key === 'governmentIdFile' || key === 'certificateFile' || key === 'facePhotoFile') && v.uri) {
         formData.append(
           key,
           (await buildUploadFile(v, 'verification-document', getMimeType(v))) as unknown as Blob,

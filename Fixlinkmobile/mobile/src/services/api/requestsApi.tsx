@@ -83,6 +83,29 @@ export const confirmRepairRequest = async (jobId: string): Promise<unknown> => {
   }
 };
 
+export const rateCustomer = async (
+  jobId: string,
+  technicianUid: string,
+  rating: number,
+  comment?: string,
+): Promise<unknown> =>
+  (
+    await api.post(`/requests/${encodeURIComponent(jobId)}/rate-customer`, {
+      technicianUid,
+      rating,
+      comment,
+    })
+  ).data;
+
+export const reportScam = async (jobId: string, reason: string): Promise<unknown> => {
+  try {
+    return (await api.post(`/requests/${encodeURIComponent(jobId)}/report-scam`, { reason })).data;
+  } catch (error: unknown) {
+    const err = error as { response?: { data?: unknown } };
+    throw err.response ? err.response.data : error;
+  }
+};
+
 export const markCustomerReady = async (jobId: string): Promise<unknown> => {
   try {
     return (await api.post(`/requests/${encodeURIComponent(jobId)}/customer-ready`)).data;

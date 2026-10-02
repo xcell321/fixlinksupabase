@@ -83,8 +83,15 @@ const KNOWLEDGE_SECTIONS = [
     id: 'reviews-ratings',
     title: 'Reviews and ratings',
     roles: 'all',
-    tags: ['review', 'rating', 'star', 'feedback', 'rate', 'reputation', 'comment', 'rate technician'],
-    content: `After a job is Completed, the customer can rate the technician from 1 to 5 stars and leave a comment. Ratings and review counts build the technician's reputation and influence how the technician ranks in recommendations, so customers should rate honestly.`,
+    tags: ['review', 'rating', 'star', 'feedback', 'rate', 'reputation', 'comment', 'rate technician', 'rate customer', 'two-way'],
+    content: `Ratings work both ways. After a job is Completed the customer can rate the technician, and the technician can rate the customer, each from 1 to 5 stars with an optional comment. Ratings and review counts build reputation and influence how technicians rank in recommendations, so both sides should rate honestly. A bad rating on its own never suspends an account.`,
+  },
+  {
+    id: 'scam-reports',
+    title: 'Reporting a scammer',
+    roles: ['customer', 'technician'],
+    tags: ['scam', 'scammer', 'report', 'fraud', 'fake', 'abuse', 'suspend', 'suspended', 'block', 'complain'],
+    content: `Once a repair request is In Progress or Completed, either party can report the other through the request as a scammer. Each report is logged, and when a customer accumulates the configured number of upheld scam reports their account is automatically suspended. Suspended accounts cannot log in. Report truthfully: false reports also count against the person who files them.`,
   },
   {
     id: 'notifications',

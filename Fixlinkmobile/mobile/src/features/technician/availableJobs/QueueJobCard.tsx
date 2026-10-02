@@ -7,7 +7,12 @@ import { colors } from '../../../theme';
 import { getApplianceIcon } from '../../../utils/applianceIcons';
 import { splitJobDescription } from '../../../utils/jobDescription';
 import { PhotoThumb } from '../../../components/RequestPhoto';
-import { formatJobSchedule, type JobItem } from '../availableJobsHelpers';
+import {
+  formatJobSchedule,
+  hasSafetyWarning,
+  safetyWarningText,
+  type JobItem,
+} from '../availableJobsHelpers';
 import { styles } from './availableJobsStyles';
 import type { IconName } from './types';
 
@@ -101,6 +106,14 @@ export const QueueJobCard = ({
         <PhotoThumb photoUrl={job.photoUrl} onPress={() => onPreviewPhoto(job.photoUrl ?? null)} />
       </View>
     )}
+
+    {/* UAT #5: warn before accepting, not only after travelling. */}
+    {hasSafetyWarning(job) ? (
+      <View style={styles.safetyWarnRow}>
+        <Ionicons name="location-outline" size={13} color={colors.warningText} />
+        <Text style={styles.safetyWarnText}>{safetyWarningText(job)}</Text>
+      </View>
+    ) : null}
 
     {/* Action Bar */}
     <View style={styles.cardActionRow}>

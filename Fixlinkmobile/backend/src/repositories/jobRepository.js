@@ -49,6 +49,18 @@ const findByOwnerField = async (field, uid) => {
   return data || [];
 };
 
+// Requests booked at (or near) an address. Used by the UAT #5 anti-harassment
+// check to spot many bookings aimed at the same place in one day.
+const findByLocationLike = async (location) => {
+  const needle = String(location || '').trim();
+  if (needle.length < 4) return [];
+  const { data } = await supabase
+    .from(TABLE)
+    .select('id, created_at, location, confirmed_service_location, customer_uid, status')
+    .ilike('confirmed_service_location', `%${needle}%`);
+  return data || [];
+};
+
 const findByCustomerNameLike = async (customerName) => {
   const { data } = await supabase.from(TABLE).select('*').ilike('customer_name', `%${customerName}%`);
   return data || [];
@@ -131,12 +143,25 @@ const recordNoShow = async ({ jobId, customerUid, technicianUid, stage, reason }
     p_reason: reason,
   });
 
+// Atomic scam-incident logging (UAT #8); returns the reported user's running
+// scam count so the caller can apply the auto-suspend policy.
+const recordScamIncident = async ({ jobId, reporterUid, reporterRole, reportedUid, reportedRole, reason }) =>
+  supabase.rpc('record_scam_incident', {
+    p_job_id: jobId,
+    p_reporter_uid: reporterUid,
+    p_reporter_role: reporterRole,
+    p_reported_uid: reportedUid,
+    p_reported_role: reportedRole,
+    p_reason: reason,
+  });
+
 module.exports = {
   findByIdOrOriginalId,
   findById,
   findPending,
   findByCustomerUid,
   findByOwnerField,
+  findByLocationLike,
   findByCustomerNameLike,
   findByTechnicianUid,
   findChatLabelsByField,
@@ -149,4 +174,5 @@ module.exports = {
   insertIncident,
   acceptJob,
   recordNoShow,
+  recordScamIncident,
 };

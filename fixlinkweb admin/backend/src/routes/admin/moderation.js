@@ -1,9 +1,10 @@
 // Admin moderation: request reassignment, review removal (with rating sync),
-// report resolution.
+// report resolution (with UAT #8 repeat-scammer auto-suspend).
 const express = require('express');
 
 const router = express.Router();
 const { supabase } = require('../../config/supabase');
+const { scamStrikeThreshold, shouldAutoSuspend } = require('../../domain/scamPolicy');
 
 router.patch('/requests/:id/reassign', async (req, res) => {
   try {
@@ -46,10 +47,40 @@ router.patch('/reports/:id/resolve', async (req, res) => {
     const { action = 'reviewed', userUid, userStatus } = req.body;
     const { error } = await supabase.from('reports').update({ status: 'resolved', resolution: action }).eq('id', req.params.id);
     if (error) throw error;
-    if (userUid && ['active', 'suspended', 'banned'].includes(userStatus)) {
-      await supabase.from('users').update({ status: userStatus }).eq('id', userUid);
+    let finalStatus = ['active', 'suspended', 'banned'].includes(userStatus) ? userStatus : null;
+    // UAT #8: three upheld reports against the same user auto-suspend, even
+    // when the admin only warned. A ban decision is never downgraded.
+    let targetUid = userUid || null;
+    if (!targetUid) {
+      try {
+        const { data: report } = await supabase
+          .from('reports')
+          .select('reported_user_uid')
+          .eq('id', req.params.id)
+          .maybeSingle();
+        targetUid = report?.reported_user_uid || null;
+      } catch (lookupError) {
+        console.warn('Could not load reported user:', lookupError.message);
+      }
     }
-    res.json({ message: 'Report resolved' });
+    if (targetUid && finalStatus !== 'banned') {
+      try {
+        const { data: strikes, error: strikeError } = await supabase
+          .from('reports')
+          .select('id')
+          .eq('reported_user_uid', targetUid)
+          .eq('status', 'resolved');
+        if (!strikeError && shouldAutoSuspend((strikes || []).length)) {
+          finalStatus = 'suspended';
+        }
+      } catch (strikeError) {
+        console.warn('Could not count scam strikes:', strikeError.message);
+      }
+    }
+    if (targetUid && finalStatus) {
+      await supabase.from('users').update({ status: finalStatus }).eq('id', targetUid);
+    }
+    res.json({ message: 'Report resolved', strikes: scamStrikeThreshold() });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

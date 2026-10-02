@@ -22,7 +22,23 @@ const findContactsByIds = async (uids) => {
   return data || [];
 };
 
-// Resolve a display name to a uid within a role (legacy name-based lookups).
+// Non-sensitive profile cards used when a technician rates a customer
+// (UAT #11): the verified badge and portfolio need only these fields.
+const findPublicProfilesByIds = async (uids) => {
+  const list = [...new Set((uids || []).filter(Boolean))];
+  if (list.length === 0) return [];
+  const { data } = await supabase
+    .from(TABLE)
+    .select('id, name, profile_image, portfolio, verification_status, government_id_file_url, credential_risk_level, rating, total_reviews')
+    .in('id', list);
+  return data || [];
+};
+
+// Status write used by automated trust actions (repeat-scammer suspend).
+const updateStatus = async (uid, status) => {
+  const { error } = await supabase.from(TABLE).update({ status }).eq('id', uid);
+  return { error };
+};
 const findByNameLike = async (name, role) => {
   const { data } = await supabase
     .from(TABLE)
@@ -32,4 +48,4 @@ const findByNameLike = async (name, role) => {
   return data || [];
 };
 
-module.exports = { findById, findRoleById, findContactsByIds, findByNameLike };
+module.exports = { findById, findRoleById, findContactsByIds, findByNameLike, findPublicProfilesByIds, updateStatus };

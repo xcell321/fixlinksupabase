@@ -21,7 +21,7 @@ const submitReview = async ({ jobId, authUid, customerName, rating, comment }) =
   }
   if (job.review_id) throw new HttpError(409, { error: 'This job has already been reviewed.' });
 
-  const { data: review, error: reviewError } = await reviewRepository.insertReview({
+  const row = {
     technician_uid: job.technician_uid,
     technician_name: job.technician_name,
     // The reviewer's uid lets the profile reviews tab resolve their current
@@ -31,8 +31,16 @@ const submitReview = async ({ jobId, authUid, customerName, rating, comment }) =
     rating: numericRating,
     comment: String(comment || '').trim(),
     request_id: job.id,
+    // UAT #11: marks this as the customer -> technician direction so the two
+    // rating flows can share the reviews table without colliding.
+    reviewer_role: 'customer',
     created_at: new Date().toISOString(),
-  });
+  };
+  let { data: review, error: reviewError } = await reviewRepository.insertReview(row);
+  if (reviewError && /reviewer_role|could not find.*column|PGRST204/i.test(String(reviewError.message || ''))) {
+    const { reviewer_role: _ignored, ...legacy } = row;
+    ({ data: review, error: reviewError } = await reviewRepository.insertReview(legacy));
+  }
   if (reviewError) {
     // A stale database (schema.sql migration not run) surfaces here as a
     // missing-column error for `customer_uid`. Log the fix, keep the client

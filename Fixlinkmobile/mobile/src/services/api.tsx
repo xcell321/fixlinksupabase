@@ -32,6 +32,8 @@ export {
   reportNoShow,
   verifyCompletionCode,
   submitTechnicianReview,
+  rateCustomer,
+  reportScam,
 } from './api/requestsApi';
 export {
   fetchJobMessages,

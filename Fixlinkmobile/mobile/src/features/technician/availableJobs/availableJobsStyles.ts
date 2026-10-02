@@ -475,6 +475,28 @@ alignSelf: 'center' },
     flex: 1
   },
 
+  // UAT #5: fake-address / harassment warning, shown before the job is accepted
+  // so the technician can decide not to travel to a flagged address.
+  safetyWarnRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    backgroundColor: colors.warningSoft,
+    borderWidth: 1,
+    borderColor: colors.warningBorder,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    marginBottom: 12
+  },
+  safetyWarnText: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: fonts.medium,
+    color: colors.warningText,
+    lineHeight: 15
+  },
+
   pillRow: {
     flexDirection: 'row',
     alignItems: 'center',
