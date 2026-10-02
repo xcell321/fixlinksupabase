@@ -216,12 +216,19 @@ create table if not exists public.reviews (
   rating int not null check (rating between 1 and 5),
   comment text,
   request_id uuid references public.jobs(id) on delete set null,
+  -- UAT #11: which side wrote this row ('customer' or 'technician').
+  reviewer_role text not null default 'customer',
   created_at timestamptz not null default now()
 );
 
 create index if not exists idx_reviews_technician on public.reviews (technician_uid);
 create index if not exists idx_reviews_technician_name on public.reviews (lower(technician_name));
 create index if not exists idx_reviews_customer on public.reviews (customer_uid);
+
+-- UAT #11: two-way ratings share the reviews table, separated by reviewer_role
+-- ('customer' = customer rates technician, 'technician' = technician rates the
+-- customer). The column is present in the create-table block above for fresh
+-- builds and added by the migration at the bottom for existing databases.
 
 -- ---------------------------------------------------------------------
 -- REPORTS (admin panel "Reports & disputes"; no mobile write path yet)
@@ -261,7 +268,9 @@ alter table public.notifications enable row level security;
 alter table public.reviews enable row level security;
 alter table public.reports enable row level security;
 alter table public.service_incidents enable row level security;
-alter table public.password_resets enable row level security;
+-- NOTE: password_resets is created further down (it depends on users), so its
+-- row-level-security statement lives right after its own create-table block
+-- instead of here. Having it here broke fresh builds with a relation error.
 
 -- =====================================================================
 -- RPC FUNCTIONS
@@ -368,6 +377,11 @@ create index if not exists password_resets_token_hash_idx on public.password_res
 create index if not exists password_resets_user_id_idx on public.password_resets (user_id);
 create index if not exists password_resets_expires_at_idx on public.password_resets (expires_at);
 
+-- The backend only ever reaches Postgres through the service_role key (which
+-- bypasses RLS), so enabling RLS with no policies locks the table down. This
+-- must run AFTER the table exists, or a fresh build fails.
+alter table public.password_resets enable row level security;
+
 -- ---------------------------------------------------------------------
 -- FUNCTIONS
 -- ---------------------------------------------------------------------
@@ -465,3 +479,108 @@ alter table public.messages add column if not exists image_url text;
 -- customer's current name and profile picture instead of a stored name only.
 alter table public.reviews add column if not exists customer_uid uuid references public.users(id) on delete set null;
 create index if not exists idx_reviews_customer on public.reviews (customer_uid);
+
+-- ---------------------------------------------------------------------
+-- UAT #8/#9/#10 MIGRATIONS
+-- Repeat-scammer standing, credential screening and facial verification.
+-- ---------------------------------------------------------------------
+
+-- UAT #6: fake / AI-generated device-photo screening on submitted jobs.
+alter table public.jobs add column if not exists photo_risk_score int;
+alter table public.jobs add column if not exists photo_risk_level text;
+alter table public.jobs add column if not exists photo_flags jsonb default '[]'::jsonb;
+alter table public.jobs add column if not exists photo_notes text;
+
+-- UAT #5: fake-address / harassment / spam-booking signals on the request.
+alter table public.jobs add column if not exists safety_flags jsonb default '[]'::jsonb;
+alter table public.jobs add column if not exists safety_level text;
+
+-- UAT #11: which side wrote each review.
+alter table public.reviews add column if not exists reviewer_role text not null default 'customer';
+create index if not exists idx_reviews_reviewer_role on public.reviews (reviewer_role);
+
+-- UAT #8: repeat-scammer standing and scam incidents.
+alter table public.users add column if not exists scam_count int not null default 0;
+alter table public.service_incidents drop constraint if exists service_incidents_type_check;
+alter table public.service_incidents add constraint service_incidents_type_check check (type in ('cancellation', 'no_show', 'scam'));
+-- Normalise the stage check so the scam incident's 'after_travel' stage is always allowed.
+alter table public.service_incidents drop constraint if exists service_incidents_stage_check;
+alter table public.service_incidents add constraint service_incidents_stage_check check (stage in ('before_accept', 'after_accept', 'after_confirmation', 'after_ready', 'after_travel'));
+alter table public.service_incidents add column if not exists reported_uid uuid references public.users(id) on delete set null;
+alter table public.service_incidents add column if not exists reporter_role text;
+
+-- UAT #9/#10: credential screening and facial verification (advisory).
+alter table public.users add column if not exists credential_risk_score int;
+alter table public.users add column if not exists credential_risk_level text;
+alter table public.users add column if not exists credential_flags jsonb default '[]'::jsonb;
+alter table public.users add column if not exists credential_notes text;
+alter table public.users add column if not exists credential_screened_at timestamptz;
+alter table public.users add column if not exists verification_note text;
+alter table public.users add column if not exists selfie_url text;
+alter table public.users add column if not exists face_check_level text;
+alter table public.users add column if not exists face_match_confidence numeric;
+alter table public.users add column if not exists face_liveness_risk numeric;
+
+-- Recompute a customer's average rating + review count (mirror of the
+-- technician roll-up, fed by the technician -> customer reviews).
+create or replace function public.recompute_customer_rating(p_customer_uid uuid)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  update public.users u
+    set rating = agg.avg_rating,
+        total_reviews = agg.review_count
+  from (
+    select
+      coalesce(avg(rating), 0)::double precision as avg_rating,
+      count(*)::int as review_count
+    from public.reviews
+    where customer_uid = p_customer_uid and reviewer_role = 'technician'
+  ) agg
+  where u.id = p_customer_uid;
+end;
+$$;
+
+-- Record a scam incident atomically and bump the reported user's running
+-- scam_count, so the auto-suspend policy and the incident log never drift.
+create or replace function public.record_scam_incident(
+  p_job_id uuid,
+  p_reporter_uid uuid,
+  p_reporter_role text,
+  p_reported_uid uuid,
+  p_reported_role text,
+  p_reason text
+) returns int
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_count int;
+begin
+  select scam_count into v_count
+  from public.users
+  where id = p_reported_uid
+  for update;
+
+  if v_count is null then
+    v_count := 0;
+  end if;
+
+  insert into public.service_incidents (job_id, customer_uid, technician_uid, type, stage, reason, status, reported_uid, reporter_role)
+  values (
+    p_job_id,
+    case when p_reported_role = 'customer' then p_reported_uid else p_reporter_uid end,
+    case when p_reported_role = 'technician' then p_reported_uid else p_reporter_uid end,
+    'scam', 'after_travel', p_reason, 'flagged', p_reported_uid, p_reporter_role
+  );
+
+  update public.users
+    set scam_count = v_count + 1,
+        updated_at = now()
+  where id = p_reported_uid;
+
+  return v_count + 1;
+end;
+$$;

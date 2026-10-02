@@ -144,8 +144,34 @@ const listCompletedJobs = async ({ customerName, customerUid, authUid }) => {
 const listTechnicianJobs = async ({ technicianUid, authUid }) => {
   assertTechnicianOwner(authUid, technicianUid);
   const rows = await jobRepository.findByTechnicianUid(technicianUid);
-  // Technician's own job list: the OTP is customer-held, never sent here.
-  return { body: rows.map((row) => serializeJob(row)) };
+
+  // UAT #11: the technician rates the customer, so attach the customer's
+  // verified badge + portfolio (non-sensitive fields only) for context.
+  const profiles = await userRepository.findPublicProfilesByIds(rows.map((row) => row.customer_uid));
+  const byId = new Map(profiles.map((profile) => [String(profile.id), profile]));
+
+  const enrich = (row) => {
+    // Technician's own job list: the OTP is customer-held, never sent here.
+    const job = serializeJob(row);
+    const profile = byId.get(String(row.customer_uid));
+    if (!profile) return job;
+    return {
+      ...job,
+      customerProfile: {
+        uid: profile.id,
+        name: profile.name || row.customer_name || null,
+        profileImage: profile.profile_image || null,
+        portfolio: Array.isArray(profile.portfolio) ? profile.portfolio : [],
+        verified: Boolean(profile.government_id_file_url)
+          || String(profile.verification_status || '').toLowerCase() === 'verified',
+        riskLevel: profile.credential_risk_level || null,
+        rating: profile.rating ?? null,
+        totalReviews: profile.total_reviews || 0,
+      },
+    };
+  };
+
+  return { body: rows.map(enrich) };
 };
 
 // GET /api/requests/technician/:technicianUid/workload

@@ -33,6 +33,14 @@ const serializeJob = (row, { viewerUid = null } = {}) => {
   if (row.preferred_time) job.preferredTime = row.preferred_time;
   if (row.scheduled_date) job.scheduledDate = row.scheduled_date;
   if (row.photo_url) job.photoUrl = row.photo_url;
+  // UAT #6: fake/AI device-photo warning for the technician.
+  if (row.photo_risk_score != null) job.photoRiskScore = row.photo_risk_score;
+  if (row.photo_risk_level) job.photoRiskLevel = row.photo_risk_level;
+  if (row.photo_flags) job.photoFlags = row.photo_flags;
+  if (row.photo_notes) job.photoNotes = row.photo_notes;
+  // UAT #5: address / harassment warning for the technician.
+  if (row.safety_flags) job.safetyFlags = row.safety_flags;
+  if (row.safety_level) job.safetyLevel = row.safety_level;
   if (row.declined_by) job.declinedBy = row.declined_by;
   if (row.verification_code && viewerUid && String(row.customer_uid) === String(viewerUid)) {
     job.verificationCode = row.verification_code;

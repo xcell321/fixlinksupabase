@@ -97,6 +97,9 @@ router.post('/:id/report-no-show', jobController.reportNoShow);
 // --- Completed history + review -------------------------------------------
 router.get('/completed/:customerName', jobController.listCompletedJobs);
 router.post('/:id/review', jobController.submitReview);
+router.post('/:id/rate-customer', jobController.rateCustomer);
+// UAT #8: report the other party as a scammer.
+router.post('/:id/report-scam', jobController.reportScam);
 
 // --- Accept a job ----------------------------------------------------------
 router.put('/:id/accept', jobController.acceptJob);

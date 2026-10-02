@@ -20,15 +20,25 @@ const cloneRow = (row) => (row ? { ...row } : null);
 //   update(...).eq(...)                          -> applies and resolves
 function createQueryBuilder(table, state, rows) {
   const matches = () =>
-    rows.filter(
-      (row) =>
+    rows.filter((row) => {
+      const base =
         Object.entries(state.filters).every(([column, value]) => String(row[column]) === String(value)) &&
         Object.entries(state.gtFilters || {}).every(([column, value]) => String(row[column]) > String(value)) &&
         Object.entries(state.inFilters || {}).every(([column, values]) =>
-          (values || []).map(String).includes(String(row[column])))
-    );
+          (values || []).map(String).includes(String(row[column]))) &&
+        Object.entries(state.ilikeFilters || {}).every(([column, value]) =>
+          String(row[column] ?? '').toLowerCase().includes(String(value || '').replace(/%/g, '').toLowerCase()));
+      if (!base) return false;
+      const orGroups = state.orFilters || [];
+      if (orGroups.length === 0) return true;
+      return orGroups.some((group) =>
+        group.every(([column, value]) => String(row[column]) === String(value)));
+    });
 
   const settle = () => {
+    if (state.head) {
+      return { data: [], error: null, count: matches().length };
+    }
     if (state.op === 'update') {
       for (const row of matches()) Object.assign(row, state.payload);
       return { data: null, error: null };
@@ -56,8 +66,9 @@ function createQueryBuilder(table, state, rows) {
   };
 
   const builder = {
-    select() {
+    select(...args) {
       if (state.op !== 'update' && state.op !== 'insert') state.op = 'select';
+      if (args[1] && args[1].head === true) state.head = true;
       return builder;
     },
     update(payload) {
@@ -84,6 +95,25 @@ function createQueryBuilder(table, state, rows) {
     },
     in(column, values) {
       state.inFilters[column] = values;
+      return builder;
+    },
+    // Minimal `.or()` for queries shaped like
+    // `id.eq.X,original_request_id.eq.Y` (comma = OR of AND-groups).
+    // Case-insensitive substring match, mirroring Supabase `.ilike()`.
+    ilike(column, value) {
+      state.ilikeFilters = state.ilikeFilters || {};
+      state.ilikeFilters[column] = value;
+      return builder;
+    },
+    or(expression) {
+      const groups = String(expression || '')
+        .split(',')
+        .map((part) => {
+          const match = part.trim().match(/^([^.]+)\.eq\.(.*)$/);
+          return match ? [[match[1], match[2]]] : null;
+        })
+        .filter(Boolean);
+      state.orFilters = (state.orFilters || []).concat(groups);
       return builder;
     },
     order() {
@@ -123,6 +153,31 @@ function installSupabaseStub({ users = [], tokens = {}, tables: extraTables = {}
       from() {
         return { upload: async () => ({ data: null, error: null }) };
       },
+    },
+    // Minimal RPC surface the guarded routes exercise. Kept small and explicit
+    // so a test failure points at the exact behavior that changed.
+    rpc(name, params = {}) {
+      if (name === 'accept_job') {
+        const job = (tables.jobs || []).find((j) => String(j.id) === String(params.p_job_id));
+        if (!job) return Promise.resolve({ data: null, error: { message: 'Repair request not found' } });
+        if (String(job.status).toLowerCase() !== 'pending') {
+          return Promise.resolve({ data: null, error: { message: 'This job is no longer pending' } });
+        }
+        job.status = 'Accepted';
+        job.technician_uid = params.p_technician_uid;
+        job.technician_name = params.p_technician_name;
+        return Promise.resolve({ data: job.id, error: null });
+      }
+      if (name === 'record_scam_incident') {
+        const reported = (tables.users || []).find((u) => String(u.id) === String(params.p_reported_uid));
+        const count = (Number(reported?.scam_count) || 0) + 1;
+        if (reported) reported.scam_count = count;
+        const incidents = tables.service_incidents || (tables.service_incidents = []);
+        incidents.push({ id: `incident-${incidents.length + 1}`, type: 'scam', ...params, created_at: new Date().toISOString() });
+        return Promise.resolve({ data: count, error: null });
+      }
+      // Rating roll-ups have no stub-side effect the tests depend on.
+      return Promise.resolve({ data: null, error: null });
     },
   };
 

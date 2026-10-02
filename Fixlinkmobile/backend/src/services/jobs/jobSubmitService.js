@@ -5,9 +5,12 @@
 const { uploadBuffer } = require('../../config/supabase');
 const jobRepository = require('../../repositories/jobRepository');
 const { buildSubmitFingerprint, submitDedupe } = require('../../domain/submitDedupe');
+const { maxDailyRequests, overDailyLimit } = require('../../domain/dailyRequestLimit');
 const { HttpError } = require('../../domain/httpError');
 const { resolveJobCoordinates } = require('../locationService');
 const { analyzeRepairDescription, isOmniRouteConfigured } = require('../repairAnalyzer');
+const { screenRepairPhoto } = require('../credential/photoScreeningService');
+const { assessRequest, isInvalidAddress } = require('./requestSafetyService');
 
 // POST /api/requests — submit a new repair request (customer side).
 const submitRequest = async ({ authUid, body, file }) => {
@@ -33,6 +36,16 @@ const submitRequest = async ({ authUid, body, file }) => {
     throw new HttpError(400, { error: 'Please fill out all required fields.' });
   }
 
+  // UAT #6: at most `maxDailyRequests()` requests per user per calendar day.
+  if (customerUid) {
+    const todaysJobs = await jobRepository.findByCustomerUid(customerUid);
+    if (overDailyLimit(todaysJobs || [])) {
+      throw new HttpError(429, {
+        error: `Daily limit reached: at most ${maxDailyRequests()} requests per day.`,
+      });
+    }
+  }
+
   // Duplicate-submit guard: a double tap or a retried request must not create
   // two jobs.
   const fingerprint = buildSubmitFingerprint({ customerUid, applianceType, description });
@@ -51,6 +64,24 @@ const submitRequest = async ({ authUid, body, file }) => {
       finalLat = resolved.latitude;
       finalLon = resolved.longitude;
     }
+  }
+
+  // UAT #5: fake-address / grudge-booking / spam-booking protection.
+  let safetyVerdict = { blocked: false, flags: [], level: 'low' };
+  try {
+    safetyVerdict = await assessRequest({
+      customerUid,
+      address: location,
+      description,
+      applianceType,
+      serviceLatitude: finalLat,
+      serviceLongitude: finalLon,
+    });
+  } catch (safetyError) {
+    console.warn('Request safety check skipped:', safetyError.message);
+  }
+  if (safetyVerdict.blocked) {
+    throw new HttpError(isInvalidAddress(safetyVerdict) ? 400 : 429, { error: safetyVerdict.reason });
   }
 
   let resolvedDate = preferredDate ? String(preferredDate).trim() : null;
@@ -104,6 +135,17 @@ const submitRequest = async ({ authUid, body, file }) => {
     }
   }
 
+  // UAT #6: screen the device photo so the technician is warned if it looks
+  // fake (AI-generated, edited, screenshot). Advisory only, never blocks.
+  let photoScreening = null;
+  if (file) {
+    try {
+      photoScreening = await screenRepairPhoto(file);
+    } catch (screeningError) {
+      console.warn('Repair photo screening skipped:', screeningError.message);
+    }
+  }
+
   // The confirmed service location is snapshotted at submit time and kept
   // separate from the customer's live GPS. The technician always travels to
   // this location even if the customer is physically somewhere else.
@@ -126,6 +168,16 @@ const submitRequest = async ({ authUid, body, file }) => {
     status: 'Pending',
     is_other: Boolean(isOther),
     ...(photoUrl && { photo_url: photoUrl }),
+    ...(photoScreening && {
+      photo_risk_score: photoScreening.riskScore,
+      photo_risk_level: photoScreening.riskLevel,
+      photo_flags: photoScreening.flags,
+      photo_notes: photoScreening.notes,
+    }),
+    ...(safetyVerdict.flags.length > 0 && {
+      safety_flags: safetyVerdict.flags,
+      safety_level: safetyVerdict.level,
+    }),
     created_at: nowIso,
   });
 

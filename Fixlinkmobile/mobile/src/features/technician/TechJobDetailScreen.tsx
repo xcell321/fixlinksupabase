@@ -1,6 +1,7 @@
 // Prototype TechJobDetail: pay card, customer card, live mini map, action rows.
-import React from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { rateCustomer, reportScam } from '../../services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { PhotoThumb } from '../../components/RequestPhoto';
 import TechnicianLocationMap from '../../components/TechnicianLocationMap';
@@ -40,6 +41,47 @@ export default function TechJobDetailScreen({
   const startEligible = canStartRepair(job);
   const isInProgress = job.status === 'In Progress';
   const busy = actionLoadingId === job.id || acceptingJobId === job.id;
+  const isCompleted = String(job.status || '').toLowerCase() === 'completed';
+  // UAT #11: rate the customer once per completed job. Stars + optional
+  // comment, submitted to the same endpoint the tests cover.
+  const [custStars, setCustStars] = useState(0);
+  const [custComment, setCustComment] = useState('');
+  const [custRatingBusy, setCustRatingBusy] = useState(false);
+  const [custRatingSent, setCustRatingSent] = useState(false);
+  const [custRatingError, setCustRatingError] = useState<string | null>(null);
+  // UAT #8: report the customer as a scammer (files a logged incident).
+  const [scamReason, setScamReason] = useState('');
+  const [scamBusy, setScamBusy] = useState(false);
+  const [scamSent, setScamSent] = useState(false);
+  const [scamError, setScamError] = useState<string | null>(null);
+  const submitCustomerRating = async (): Promise<void> => {
+    if (!custStars || custRatingBusy || !job.technicianUid) return;
+    setCustRatingBusy(true);
+    setCustRatingError(null);
+    try {
+      await rateCustomer(String(job.id), String(job.technicianUid), custStars, custComment.trim() || undefined);
+      setCustRatingSent(true);
+    } catch (error) {
+      const err = error as { error?: string; message?: string };
+      setCustRatingError(err?.error || err?.message || 'Failed to submit rating.');
+    } finally {
+      setCustRatingBusy(false);
+    }
+  };
+  const submitScamReport = async (): Promise<void> => {
+    if (scamBusy) return;
+    setScamBusy(true);
+    setScamError(null);
+    try {
+      await reportScam(String(job.id), scamReason.trim());
+      setScamSent(true);
+    } catch (error) {
+      const err = error as { error?: string; message?: string };
+      setScamError(err?.error || err?.message || 'Failed to file the report.');
+    } finally {
+      setScamBusy(false);
+    }
+  };
   // The description is stored as "[Brand] words", so the brand becomes a chip
   // and the words are shown once, instead of the raw bracketed string twice.
   const { brand, text: problemText } = splitJobDescription(job.description);
@@ -81,6 +123,22 @@ export default function TechJobDetailScreen({
           {job.photoUrl ? (
             <View style={{ marginTop: 12 }}>
               <PhotoThumb photoUrl={job.photoUrl} onPress={() => onPreviewPhoto(job.photoUrl as string)} />
+            </View>
+          ) : null}
+          {['flagged', 'high'].includes(String(job.photoRiskLevel || '')) ? (
+            <View style={styles.photoRisk}>
+              <Ionicons name="warning-outline" size={16} color={colors.warningText} />
+              <Text style={styles.photoRiskText}>
+                {job.photoNotes || 'This device photo may be fake or AI-generated. Verify it before travelling.'}
+              </Text>
+            </View>
+          ) : null}
+          {['flagged', 'high'].includes(String(job.safetyLevel || '')) ? (
+            <View style={styles.photoRisk}>
+              <Ionicons name="location-outline" size={16} color={colors.warningText} />
+              <Text style={styles.photoRiskText}>
+                Safety check: this booking was flagged ({(job.safetyFlags || []).join(', ').replace(/_/g, ' ') || 'possible fake address or repeated booking'}). Confirm the address before travelling.
+              </Text>
             </View>
           ) : null}
         </View>
@@ -165,6 +223,117 @@ export default function TechJobDetailScreen({
                 <Text style={styles.completeText}>Mark as Completed</Text>
               </Pressable>
             ) : null}
+            {isCompleted && !isQueue && !custRatingSent && (
+              <View style={styles.rateCard}>
+                <Text style={styles.rateTitle}>Rate this customer</Text>
+                {job.customerProfile ? (
+                  <View style={styles.custMeta}>
+                    {job.customerProfile.verified ? (
+                      <View style={styles.verifiedBadge}>
+                        <Ionicons name="shield-checkmark" size={12} color={colors.tech} />
+                        <Text style={styles.verifiedText}>ID Verified</Text>
+                      </View>
+                    ) : (
+                      <View style={styles.unverifiedBadge}>
+                        <Ionicons name="alert-circle-outline" size={12} color={colors.muted} />
+                        <Text style={styles.unverifiedText}>Not ID verified</Text>
+                      </View>
+                    )}
+                    {job.customerProfile.rating != null ? (
+                      <Text style={styles.custStat}>
+                        {Number(job.customerProfile.rating).toFixed(1)} ★ · {job.customerProfile.totalReviews ?? 0} reviews
+                      </Text>
+                    ) : null}
+                  </View>
+                ) : null}
+                {job.customerProfile?.portfolio?.length ? (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.custPortfolio}>
+                    {job.customerProfile.portfolio.slice(0, 8).map((uri, index) => (
+                      <Image
+                        key={`${uri}-${index}`}
+                        source={{ uri }}
+                        style={styles.custPortfolioImage}
+                        accessibilityLabel="Customer portfolio photo"
+                      />
+                    ))}
+                  </ScrollView>
+                ) : null}
+                <View style={styles.rateStars}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Pressable
+                      key={star}
+                      onPress={() => setCustStars(star)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Rate ${star} star${star === 1 ? '' : 's'}`}
+                      hitSlop={8}
+                    >
+                      <Ionicons
+                        name={star <= custStars ? 'star' : 'star-outline'}
+                        size={28}
+                        color={star <= custStars ? colors.gold : colors.line}
+                      />
+                    </Pressable>
+                  ))}
+                </View>
+                <TextInput
+                  style={styles.rateInput}
+                  placeholder="Comment (optional)"
+                  placeholderTextColor={colors.muted}
+                  value={custComment}
+                  onChangeText={(value) => { setCustComment(value); if (custRatingError) setCustRatingError(null); }}
+                  multiline
+                />
+                {custRatingError ? <Text style={styles.rateError}>{custRatingError}</Text> : null}
+                <Pressable
+                  onPress={() => { void submitCustomerRating(); }}
+                  disabled={!custStars || custRatingBusy}
+                  style={({ pressed }) => [styles.rateBtn, (!custStars || custRatingBusy) && styles.rateBtnDisabled, pressed && { opacity: 0.88 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Submit customer rating"
+                >
+                  {custRatingBusy
+                    ? <ActivityIndicator color={colors.onAccent} size="small" />
+                    : <Text style={styles.rateBtnText}>Submit Rating</Text>}
+                </Pressable>
+              </View>
+            )}
+            {isCompleted && !isQueue && custRatingSent && (
+              <View style={styles.rateDone}>
+                <Ionicons name="checkmark-circle" size={16} color={colors.green} />
+                <Text style={styles.rateDoneText}>Customer rated. Thank you.</Text>
+              </View>
+            )}
+            {(isCompleted || isInProgress) && !isQueue && !scamSent && (
+              <View style={styles.rateCard}>
+                <Text style={styles.rateTitle}>Report as scammer</Text>
+                <TextInput
+                  style={styles.rateInput}
+                  placeholder="What happened? (optional)"
+                  placeholderTextColor={colors.muted}
+                  value={scamReason}
+                  onChangeText={(value) => { setScamReason(value); if (scamError) setScamError(null); }}
+                  multiline
+                />
+                {scamError ? <Text style={styles.rateError}>{scamError}</Text> : null}
+                <Pressable
+                  onPress={() => { void submitScamReport(); }}
+                  disabled={scamBusy}
+                  style={({ pressed }) => [styles.reportBtn, scamBusy && styles.rateBtnDisabled, pressed && { opacity: 0.88 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Report customer as scammer"
+                >
+                  {scamBusy
+                    ? <ActivityIndicator color={colors.onAccent} size="small" />
+                    : <Text style={styles.rateBtnText}>Report Scam</Text>}
+                </Pressable>
+              </View>
+            )}
+            {(isCompleted || isInProgress) && !isQueue && scamSent && (
+              <View style={styles.rateDone}>
+                <Ionicons name="flag" size={16} color={colors.danger} />
+                <Text style={styles.rateDoneText}>Report filed. Our team will review it.</Text>
+              </View>
+            )}
           </View>
         ) : null}
       </ScrollView>
@@ -218,4 +387,92 @@ const styles = themedStyles({
   primaryBlueText: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bold },
   completeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.tech, borderRadius: 14, minHeight: 48, ...shadows.card },
   completeText: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bold },
+  // UAT #11: technician rates the customer. Tokenized, 44px targets.
+  rateCard: {
+    backgroundColor: colors.white,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.line,
+    padding: 16,
+    gap: 10,
+    marginTop: 4
+  },
+  rateTitle: { color: colors.ink, fontSize: 14, fontFamily: fonts.bold },
+  rateStars: { flexDirection: 'row', gap: 8 },
+  rateInput: {
+    minHeight: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.canvas,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
+    fontFamily: fonts.regular,
+    color: colors.ink
+  },
+  rateError: { color: colors.danger, fontSize: 12, fontFamily: fonts.medium },
+  rateBtn: {
+    minHeight: 48,
+    borderRadius: 12,
+    backgroundColor: colors.tech,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  rateBtnDisabled: { opacity: 0.5 },
+  rateBtnText: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bold },
+  rateDone: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: colors.successSoft,
+    borderWidth: 1,
+    borderColor: colors.successBorder,
+    borderRadius: 12,
+    padding: 12
+  },
+  rateDoneText: { color: colors.successText, fontSize: 13, fontFamily: fonts.bold },
+  reportBtn: { minHeight: 48, borderRadius: 12, backgroundColor: colors.danger, alignItems: 'center', justifyContent: 'center' },
+  // UAT #6: fake-photo warning chip.
+  photoRisk: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: colors.warningSoft,
+    borderWidth: 1,
+    borderColor: colors.warningBorder,
+  },
+  photoRiskText: { flex: 1, color: colors.warningText, fontSize: 12, fontFamily: fonts.medium },
+  // UAT #11: verified badge + portfolio on the customer rating card.
+  custMeta: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
+  verifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: colors.techSoft,
+    borderWidth: 1,
+    borderColor: colors.badgeBlueBorder,
+  },
+  verifiedText: { color: colors.tech, fontSize: 11, fontFamily: fonts.bold },
+  unverifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: colors.canvas,
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
+  unverifiedText: { color: colors.muted, fontSize: 11, fontFamily: fonts.medium },
+  custStat: { color: colors.muted, fontSize: 12, fontFamily: fonts.medium },
+  custPortfolio: { gap: 8, paddingVertical: 2 },
+  custPortfolioImage: { width: 56, height: 56, borderRadius: 10, backgroundColor: colors.canvas },
 });

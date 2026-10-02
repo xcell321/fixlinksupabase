@@ -15,6 +15,25 @@ export interface JobItem {
   technicianUid?: string;
   technicianName?: string;
   photoUrl?: string | null;
+  // UAT #6: fake / AI-generated device-photo warning.
+  photoRiskScore?: number | null;
+  photoRiskLevel?: string | null;
+  photoFlags?: string[] | null;
+  photoNotes?: string | null;
+  // UAT #5: fake-address / harassment warning.
+  safetyFlags?: string[] | null;
+  safetyLevel?: string | null;
+  // UAT #11: customer context shown on the rating card.
+  customerProfile?: {
+    uid?: string;
+    name?: string | null;
+    profileImage?: string | null;
+    portfolio?: string[];
+    verified?: boolean;
+    riskLevel?: string | null;
+    rating?: number | null;
+    totalReviews?: number | null;
+  } | null;
   urgency?: 'urgent' | 'normal' | 'scheduled';
   estimatedPayout?: string;
 }

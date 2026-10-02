@@ -14,6 +14,17 @@ const TECHNICIAN_EN_ROUTE_STATUSES = ['accepted', 'confirmed', 'customer ready']
 // Statuses in which a no-show can be reported (adds "in progress").
 const NO_SHOW_REPORTABLE_STATUSES = ['accepted', 'confirmed', 'customer ready', 'in progress'];
 
+// Statuses in which a party may report the other as a scammer (UAT #8): once
+// real work has started, or after it has finished. Env-driven so the window can
+// be widened without a deploy.
+const DEFAULT_SCAM_REPORTABLE_STATUSES = ['in progress', 'completed'];
+const scamReportableStatuses = () => {
+  const raw = process.env.SCAM_REPORTABLE_STATUSES;
+  if (!raw) return DEFAULT_SCAM_REPORTABLE_STATUSES;
+  const list = String(raw).split(',').map((status) => status.trim().toLowerCase()).filter(Boolean);
+  return list.length > 0 ? list : DEFAULT_SCAM_REPORTABLE_STATUSES;
+};
+
 // Statuses that permit live tracking. Compared case-sensitively against the
 // stored DB status, exactly as before.
 const LIVE_TRACKING_STATUSES = ['Accepted', 'Confirmed', 'Customer Ready', 'In Progress'];
@@ -28,6 +39,8 @@ const isCustomerCancellable = (status) => CUSTOMER_CANCELLABLE_STATUSES.includes
 const isTechnicianEnRoute = (status) => TECHNICIAN_EN_ROUTE_STATUSES.includes(normalizeStatus(status));
 
 const isNoShowReportable = (status) => NO_SHOW_REPORTABLE_STATUSES.includes(normalizeStatus(status));
+
+const isScamReportable = (status) => scamReportableStatuses().includes(normalizeStatus(status));
 
 const isLiveTrackable = (status) => LIVE_TRACKING_STATUSES.includes(status);
 
@@ -47,12 +60,15 @@ module.exports = {
   CUSTOMER_CANCELLABLE_STATUSES,
   TECHNICIAN_EN_ROUTE_STATUSES,
   NO_SHOW_REPORTABLE_STATUSES,
+  DEFAULT_SCAM_REPORTABLE_STATUSES,
+  scamReportableStatuses,
   LIVE_TRACKING_STATUSES,
   TECHNICIAN_SETTABLE_STATUSES,
   normalizeStatus,
   isCustomerCancellable,
   isTechnicianEnRoute,
   isNoShowReportable,
+  isScamReportable,
   isLiveTrackable,
   stageOf,
 };

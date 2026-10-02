@@ -4,6 +4,16 @@ const getBaseUrl = () => (process.env.OMNIROUTE_BASE_URL || DEFAULT_BASE_URL).re
 const getModel = () => process.env.OMNIROUTE_MODEL || 'auto';
 const getTimeoutMs = () => Number(process.env.OMNIROUTE_TIMEOUT_MS) || 15000;
 
+// Text models power the assistant, the repair analyzer and technician ranking.
+// Vision is a separate axis: image screening needs a multimodal model. Both
+// lists are env-driven so the gateway's model names can change without a code
+// change.
+const getVisionModel = () => process.env.OMNIROUTE_VISION_MODEL || getModel();
+const getVisionFallbackModels = () => String(process.env.OMNIROUTE_VISION_FALLBACK_MODELS || '')
+  .split(',')
+  .map((model) => model.trim())
+  .filter(Boolean);
+
 // True when a base URL AND an API key are configured (gateway enabled).
 const isOmniRouteConfigured = () => Boolean(process.env.OMNIROUTE_BASE_URL && process.env.OMNIROUTE_API_KEY);
 
@@ -96,4 +106,94 @@ const chatComplete = async ({ system, user, temperature = 0.2, json = true, maxT
   }
 };
 
-module.exports = { chatComplete, isOmniRouteConfigured, getBaseUrl, getModel };
+const parseVisionJson = (data) => {
+  const content = data?.choices?.[0]?.message?.content;
+  if (typeof content !== 'string' || !content.trim()) {
+    throw new Error('OmniRoute returned an empty vision completion.');
+  }
+  try {
+    return JSON.parse(content);
+  } catch (_) {
+    const parsed = extractJson(content);
+    if (parsed !== undefined) return parsed;
+    throw new Error('OmniRoute returned invalid JSON from the vision model.');
+  }
+};
+
+// Multimodal completion: one or more images plus a text instruction, returning
+// parsed JSON. Tries OMNIROUTE_VISION_MODEL first, then each entry of
+// OMNIROUTE_VISION_FALLBACK_MODELS, so one misbehaving model cannot take
+// credential screening offline. Throws only when every model fails.
+const visionComplete = async ({ system, user, images = [], temperature = 0.1, maxTokens = 800, timeoutMs }) => {
+  const apiKey = process.env.OMNIROUTE_API_KEY;
+  if (!apiKey) throw new Error('OMNIROUTE_API_KEY is not configured.');
+  if (!Array.isArray(images) || images.length === 0) throw new Error('visionComplete needs at least one image.');
+
+  const models = [getVisionModel(), ...getVisionFallbackModels()];
+  const budget = Number(timeoutMs) > 0 ? Number(timeoutMs) : getTimeoutMs();
+  let lastError = null;
+
+  for (const model of models) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), budget);
+    let response;
+    try {
+      response = await fetch(`${getBaseUrl()}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          temperature,
+          max_tokens: maxTokens,
+          messages: [
+            { role: 'system', content: system },
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: user },
+                ...images.map((image) => ({
+                  type: 'image_url',
+                  image_url: { url: `data:${image.mimeType || 'image/jpeg'};base64,${image.base64}` },
+                })),
+              ],
+            },
+          ],
+          response_format: { type: 'json_object' },
+        }),
+        signal: controller.signal,
+      });
+    } catch (error) {
+      lastError = error;
+      continue;
+    } finally {
+      clearTimeout(timer);
+    }
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      lastError = new Error(`OmniRoute vision failed (${response.status}): ${body.slice(0, 200)}`);
+      continue;
+    }
+    try {
+      const data = await response.json();
+      return { parsed: parseVisionJson(data), raw: data, model };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error('Vision completion failed.');
+};
+
+module.exports = {
+  chatComplete,
+  visionComplete,
+  isOmniRouteConfigured,
+  getBaseUrl,
+  getModel,
+  getVisionModel,
+  getVisionFallbackModels,
+};

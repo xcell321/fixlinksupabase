@@ -40,6 +40,8 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
   const [governmentIdNumber, setGovernmentIdNumber] = useState('');
   const [governmentIdFile, setGovernmentIdFile] = useState<CredentialFile | null>(null);
   const [certificateFile, setCertificateFile] = useState<CredentialFile | null>(null);
+  // Identity on record for every role (UAT #10): face photo plus government ID.
+  const [facePhotoFile, setFacePhotoFile] = useState<CredentialFile | null>(null);
   const [role, setRole] = useState<RegisterRole>(initialRole); // 'customer' or 'technician'
   const [loading, setLoading] = useState(false);
   const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([]);
@@ -111,6 +113,10 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
       if (!governmentIdNumber.trim()) nextErrors.governmentIdNumber = 'Government ID is required';
       if (!governmentIdFile) nextErrors.governmentIdFile = 'Government ID file is required';
       if (!certificateFile) nextErrors.certificateFile = 'Certificate is required';
+      if (!facePhotoFile) nextErrors.facePhotoFile = 'Face photo is required';
+    } else {
+      if (!governmentIdFile) nextErrors.governmentIdFile = 'Government ID file is required';
+      if (!facePhotoFile) nextErrors.facePhotoFile = 'Face photo is required';
     }
     if (Object.keys(nextErrors).length > 0) {
       setFieldErrors(nextErrors);
@@ -132,7 +138,8 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
         skills: role === 'technician' ? skills.trim() : undefined,
         yearsExperience: role === 'technician' ? yearsExperience.trim() : undefined,
         governmentIdNumber: role === 'technician' ? governmentIdNumber.trim() : undefined,
-        governmentIdFile: role === 'technician' ? governmentIdFile : undefined,
+        governmentIdFile,
+        facePhotoFile,
         certificateFile: role === 'technician' ? certificateFile : undefined,
       });
 
@@ -379,6 +386,35 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
                 <Text style={styles.docButtonText} numberOfLines={1}>{certificateFile ? certificateFile.name : 'Choose certificate file'}</Text>
               </TouchableOpacity>
               {fieldErrors.certificateFile ? <Text style={styles.errorText}>{fieldErrors.certificateFile}</Text> : null}
+            </View>
+            <View style={styles.field}>
+              <Text style={styles.label}>Face Photo</Text>
+              <TouchableOpacity style={[styles.input, styles.docButton, fieldErrors.facePhotoFile && styles.inputError]} onPress={() => chooseCredential(setFacePhotoFile, 'facePhotoFile', 'Face photo')} accessibilityRole="button" accessibilityLabel="Choose face photo">
+                <Ionicons name="camera-outline" size={18} color={accent} />
+                <Text style={styles.docButtonText} numberOfLines={1}>{facePhotoFile ? facePhotoFile.name : 'Choose face photo'}</Text>
+              </TouchableOpacity>
+              {fieldErrors.facePhotoFile ? <Text style={styles.errorText}>{fieldErrors.facePhotoFile}</Text> : null}
+            </View>
+          </>
+        )}
+
+        {!isTechRole && (
+          <>
+            <View style={styles.field}>
+              <Text style={styles.label}>Government ID File</Text>
+              <TouchableOpacity style={[styles.input, styles.docButton, fieldErrors.governmentIdFile && styles.inputError]} onPress={() => chooseCredential(setGovernmentIdFile, 'governmentIdFile', 'Government ID file')} accessibilityRole="button" accessibilityLabel="Choose Government ID file">
+                <Ionicons name="cloud-upload-outline" size={18} color={accent} />
+                <Text style={styles.docButtonText} numberOfLines={1}>{governmentIdFile ? governmentIdFile.name : 'Choose Government ID file'}</Text>
+              </TouchableOpacity>
+              {fieldErrors.governmentIdFile ? <Text style={styles.errorText}>{fieldErrors.governmentIdFile}</Text> : null}
+            </View>
+            <View style={styles.field}>
+              <Text style={styles.label}>Face Photo</Text>
+              <TouchableOpacity style={[styles.input, styles.docButton, fieldErrors.facePhotoFile && styles.inputError]} onPress={() => chooseCredential(setFacePhotoFile, 'facePhotoFile', 'Face photo')} accessibilityRole="button" accessibilityLabel="Choose face photo">
+                <Ionicons name="camera-outline" size={18} color={accent} />
+                <Text style={styles.docButtonText} numberOfLines={1}>{facePhotoFile ? facePhotoFile.name : 'Choose face photo'}</Text>
+              </TouchableOpacity>
+              {fieldErrors.facePhotoFile ? <Text style={styles.errorText}>{fieldErrors.facePhotoFile}</Text> : null}
             </View>
           </>
         )}
