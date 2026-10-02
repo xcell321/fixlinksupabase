@@ -8,7 +8,15 @@ import TechnicianLocationMap from '../../components/TechnicianLocationMap';
 import { colors, fonts, shadows, themedStyles } from '../../theme';
 import { getApplianceIcon } from '../../utils/applianceIcons';
 import { splitJobDescription } from '../../utils/jobDescription';
-import { formatJobSchedule, canMarkArrival, canStartRepair, type JobItem } from './availableJobsHelpers';
+import {
+  formatJobSchedule,
+  canMarkArrival,
+  canStartRepair,
+  hasPhotoWarning,
+  hasSafetyWarning,
+  safetyWarningText,
+  type JobItem,
+} from './availableJobsHelpers';
 
 const BLUE = colors.tech;
 
@@ -125,7 +133,7 @@ export default function TechJobDetailScreen({
               <PhotoThumb photoUrl={job.photoUrl} onPress={() => onPreviewPhoto(job.photoUrl as string)} />
             </View>
           ) : null}
-          {['flagged', 'high'].includes(String(job.photoRiskLevel || '')) ? (
+          {hasPhotoWarning(job) ? (
             <View style={styles.photoRisk}>
               <Ionicons name="warning-outline" size={16} color={colors.warningText} />
               <Text style={styles.photoRiskText}>
@@ -133,12 +141,10 @@ export default function TechJobDetailScreen({
               </Text>
             </View>
           ) : null}
-          {['flagged', 'high'].includes(String(job.safetyLevel || '')) ? (
+          {hasSafetyWarning(job) ? (
             <View style={styles.photoRisk}>
               <Ionicons name="location-outline" size={16} color={colors.warningText} />
-              <Text style={styles.photoRiskText}>
-                Safety check: this booking was flagged ({(job.safetyFlags || []).join(', ').replace(/_/g, ' ') || 'possible fake address or repeated booking'}). Confirm the address before travelling.
-              </Text>
+              <Text style={styles.photoRiskText}>{safetyWarningText(job)}</Text>
             </View>
           ) : null}
         </View>

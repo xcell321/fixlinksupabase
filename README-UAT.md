@@ -89,6 +89,7 @@ All variables live in `Fixlinkmobile/backend/.env`. See
 | `SPAM_SIMILARITY_THRESHOLD` | `0.8` | Jaccard similarity that counts as "the same request" |
 | `SPAM_MAX_MATCHES` | `2` | Similar requests before a new one is refused |
 | `MAX_BOOKINGS_PER_ADDRESS_PER_DAY` | `3` | Bookings at one address that raise the targeting flag |
+| `REQUEST_SAFETY_UTC_OFFSET_HOURS` | falls back to `DAILY_LIMIT_UTC_OFFSET_HOURS`, then `8` | Offset that defines "today" for the address-targeting check (PH = UTC+8) |
 
 ### #6 — daily request cap + photo screening
 

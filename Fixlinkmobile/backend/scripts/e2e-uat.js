@@ -265,6 +265,7 @@ const run = async () => {
     ['SPAM_WINDOW_HOURS', { SPAM_WINDOW_HOURS: '6' }, () => require('../src/domain/requestSafety').spamWindowHours() === 6],
     ['SPAM_SIMILARITY_THRESHOLD', { SPAM_SIMILARITY_THRESHOLD: '0.5' }, () => require('../src/domain/requestSafety').spamSimilarityThreshold() === 0.5],
     ['MAX_BOOKINGS_PER_ADDRESS_PER_DAY', { MAX_BOOKINGS_PER_ADDRESS_PER_DAY: '7' }, () => require('../src/domain/requestSafety').addressDailyCap() === 7],
+    ['REQUEST_SAFETY_UTC_OFFSET_HOURS', { REQUEST_SAFETY_UTC_OFFSET_HOURS: '3' }, () => require('../src/domain/requestSafety').safetyUtcOffsetHours() === 3],
   ];
   for (const [key, vars, assertion] of tokenChecks) {
     await withEnv(vars, async () => {

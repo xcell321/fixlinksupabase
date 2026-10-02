@@ -58,6 +58,27 @@ test('address rules are env-driven', () => {
   });
 });
 
+test('the day boundary follows the configured UTC offset, not the server timezone', () => {
+  withEnv({ REQUEST_SAFETY_UTC_OFFSET_HOURS: '8' }, () => {
+    assert.equal(safety.safetyUtcOffsetHours(), 8);
+    // 17:00Z is already the next calendar day in UTC+8.
+    assert.equal(safety.dayKey('2026-01-01T17:00:00Z'), safety.dayKey('2026-01-02T01:00:00Z'));
+    assert.notEqual(safety.dayKey('2026-01-01T17:00:00Z'), safety.dayKey('2026-01-01T10:00:00Z'));
+  });
+  withEnv({ REQUEST_SAFETY_UTC_OFFSET_HOURS: '0', DAILY_LIMIT_UTC_OFFSET_HOURS: '8' }, () => {
+    assert.notEqual(safety.dayKey('2026-01-01T17:00:00Z'), safety.dayKey('2026-01-02T01:00:00Z'));
+  });
+});
+
+test('the offset falls back to the daily-limit offset, then to the default', () => {
+  withEnv({ REQUEST_SAFETY_UTC_OFFSET_HOURS: undefined, DAILY_LIMIT_UTC_OFFSET_HOURS: '2' }, () => {
+    assert.equal(safety.safetyUtcOffsetHours(), 2);
+  });
+  withEnv({ REQUEST_SAFETY_UTC_OFFSET_HOURS: undefined, DAILY_LIMIT_UTC_OFFSET_HOURS: undefined }, () => {
+    assert.equal(safety.safetyUtcOffsetHours(), 8);
+  });
+});
+
 // ---------------- pure: similarity ----------------
 test('similarity is 1 for identical text and 0 for unrelated text', () => {
   assert.equal(safety.similarity('ref not cooling', 'ref not cooling'), 1);

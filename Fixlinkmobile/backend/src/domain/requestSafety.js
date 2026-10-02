@@ -48,6 +48,17 @@ const spamSimilarityThreshold = () => asFloat(process.env.SPAM_SIMILARITY_THRESH
 const spamMaxMatches = () => asInt(process.env.SPAM_MAX_MATCHES, 2);
 const addressDailyCap = () => asInt(process.env.MAX_BOOKINGS_PER_ADDRESS_PER_DAY, 3);
 
+// Which calendar day "today" is, so the anti-harassment window lines up with the
+// customer's local midnight instead of the server's timezone. Reuses the daily
+// limit offset unless overridden, keeping one definition of "today" app-wide.
+const DEFAULT_UTC_OFFSET_HOURS = 8;
+const safetyUtcOffsetHours = () => {
+  const raw = process.env.REQUEST_SAFETY_UTC_OFFSET_HOURS
+    ?? process.env.DAILY_LIMIT_UTC_OFFSET_HOURS;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : DEFAULT_UTC_OFFSET_HOURS;
+};
+
 // --- Pure helpers ---------------------------------------------------------
 const normalizeAddress = (value) => String(value || '')
   .toLowerCase()
@@ -104,12 +115,14 @@ const levelForFlags = (flags) => {
   return list.length > 0 ? LEVELS.FLAGGED : LEVELS.LOW;
 };
 
-// Local calendar-day key, matching the daily-limit convention.
-const dayKey = (value) => {
+// Calendar-day key in the configured offset (same convention as
+// domain/dailyRequestLimit), so the same booking lands on the same day no
+// matter where the server runs.
+const dayKey = (value, offsetHours = safetyUtcOffsetHours()) => {
   const time = value ? new Date(value).getTime() : NaN;
   if (!Number.isFinite(time)) return null;
-  const date = new Date(time);
-  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+  const shifted = new Date(time + offsetHours * 3600 * 1000);
+  return `${shifted.getUTCFullYear()}-${shifted.getUTCMonth()}-${shifted.getUTCDate()}`;
 };
 
 module.exports = {
@@ -126,6 +139,7 @@ module.exports = {
   spamSimilarityThreshold,
   spamMaxMatches,
   addressDailyCap,
+  safetyUtcOffsetHours,
   normalizeAddress,
   tokenize,
   similarity,

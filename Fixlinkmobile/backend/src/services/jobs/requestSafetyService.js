@@ -97,9 +97,11 @@ const assessRequest = async ({
   // 3b. Many bookings aimed at the same address today (advisory).
   try {
     const atAddress = await jobRepository.findByLocationLike(address);
-    const today = safety.dayKey(now);
+    // Resolve the offset once so "today" is identical on both sides of the filter.
+    const offsetHours = safety.safetyUtcOffsetHours();
+    const today = safety.dayKey(now, offsetHours);
     const normalized = safety.normalizeAddress(address);
-    const todayAtAddress = (atAddress || []).filter((job) => safety.dayKey(job.created_at) === today
+    const todayAtAddress = (atAddress || []).filter((job) => safety.dayKey(job.created_at, offsetHours) === today
       && safety.normalizeAddress(job.confirmed_service_location || job.location) === normalized);
     if (todayAtAddress.length >= safety.addressDailyCap()) flags.push(safety.FLAGS.ADDRESS_TARGETED_TODAY);
   } catch (error) {

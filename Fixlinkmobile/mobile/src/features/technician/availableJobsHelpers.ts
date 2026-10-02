@@ -251,4 +251,56 @@ export function getTechnicianCredentialBadgeInfo(technician?: {
   };
 }
 
+// ---------------------------------------------------------------------------
+// UAT #5 — fake-address / harassment warnings.
+//
+// `domain/requestSafety` and `domain/photoScreening` on the backend classify a
+// booking as 'flagged' or 'high'. These helpers are the single source of truth
+// for how that verdict is rendered, so the queue card and the detail sheet
+// cannot drift apart.
+// ---------------------------------------------------------------------------
+
+/** Risk levels that warrant a visible warning chip. */
+export const WARNING_RISK_LEVELS: readonly string[] = ['flagged', 'high'];
+
+// Mirrors domain/requestSafety FLAGS. Unknown flags still render (underscores
+// become spaces) so a newly added backend flag degrades instead of disappearing.
+const SAFETY_FLAG_LABELS: Readonly<Record<string, string>> = {
+  address_too_short: 'incomplete address',
+  address_gibberish: 'address looks fake',
+  address_repeated_chars: 'address looks fake',
+  customer_not_near_address: 'customer is not near the address',
+  address_targeted_today: 'many bookings at this address today',
+  duplicate_request: 'repeated request',
+};
+
+export function safetyFlagLabel(flag: string): string {
+  const key = String(flag || '').trim().toLowerCase();
+  if (!key) return '';
+  return SAFETY_FLAG_LABELS[key] || key.replace(/_/g, ' ');
+}
+
+/** Reasons joined for display, e.g. "address looks fake, repeated request". */
+export function safetyFlagSummary(job: Pick<JobItem, 'safetyFlags'>): string {
+  const labels = Array.from(
+    new Set((job?.safetyFlags || []).map(safetyFlagLabel).filter(Boolean))
+  );
+  return labels.join(', ');
+}
+
+export function hasSafetyWarning(job: Pick<JobItem, 'safetyLevel'>): boolean {
+  return WARNING_RISK_LEVELS.includes(String(job?.safetyLevel || '').trim().toLowerCase());
+}
+
+export function hasPhotoWarning(job: Pick<JobItem, 'photoRiskLevel'>): boolean {
+  return WARNING_RISK_LEVELS.includes(String(job?.photoRiskLevel || '').trim().toLowerCase());
+}
+
+/** One-line warning for the queue card, shown before the job is accepted. */
+export function safetyWarningText(job: Pick<JobItem, 'safetyFlags'>): string {
+  const reasons = safetyFlagSummary(job);
+  return reasons
+    ? `Safety check flagged this booking: ${reasons}. Confirm the address before travelling.`
+    : 'Safety check flagged this booking as a possible fake address or repeated request. Confirm the address before travelling.';
+}
 
