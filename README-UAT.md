@@ -1,6 +1,6 @@
-# FixLink — UAT Features #6–#11
+# FixLink — UAT Features #4–#11
 
-Implementation, configuration and testing guide for the six UAT requirements.
+Implementation, configuration and testing guide for the UAT requirements.
 
 > **Design rule:** nothing is hardcoded. Every tunable is read from
 > `process.env` on each call, with a documented fallback so an empty `.env`
@@ -13,6 +13,7 @@ Implementation, configuration and testing guide for the six UAT requirements.
 
 | # | Requirement | Behaviour |
 |---|---|---|
+| **4** | Terms modal before the location step | Tapping **Continue** on step 3 (appointment) opens a strict regulations modal (1-day rule, 5-hour rule, same-day charge). The confirmation box starts unticked and **Agree and continue** stays disabled until it is ticked. Agreeing unlocks step 4 and the map appears; declining leaves the customer on step 3 and the booking does not proceed. The server refuses a submission that never accepted the terms. |
 | **5** | Fake / spam threat | Fake or gibberish addresses are refused. A booking far from the customer's own location is flagged for the technician (optionally blocked). Repeated near-identical bookings by the same customer are refused; many bookings aimed at one address in a day are flagged. |
 | **6** | 3 requests/day limit + fake-photo detection | Max `MAX_REQUESTS_PER_DAY` job requests per customer per day. Repair photos are screened for AI/edited/screenshot content and the technician sees a warning chip. |
 | **7** | 1 active job per technician | Accepting a job is refused with `409 TECHNICIAN_AT_CAPACITY` once the technician holds `TECHNICIAN_MAX_ACTIVE_JOBS` active jobs. |
@@ -28,6 +29,7 @@ Implementation, configuration and testing guide for the six UAT requirements.
 ```
 backend/src/
   domain/
+    submitTerms.js              #4  regulation gate + version stamp
     requestSafety.js            #5  address sanity, similarity, spam policy
     dailyRequestLimit.js        #6  env-driven daily cap
     photoScreening.js           #6  device-photo policy + prompts
@@ -45,19 +47,27 @@ backend/src/
     jobs/requestSafetyService.js         #5  fake address / spam / harassment
     jobs/scamReportService.js            #8  report + auto-suspend
     jobs/customerRatingService.js        #11 technician -> customer
-    jobs/jobSubmitService.js             #6  daily cap + photo screening
+    jobs/jobSubmitService.js             #4/#5/#6 terms gate + daily cap + photo screening + safety
     jobs/jobFeedService.js               #11 customer badge/portfolio enrichment
     workloadService.js                   #7  capacity thresholds
     omniRoute.js                         #9/#10 visionComplete() fallback chain
   routes/requests.js                     # POST /:id/rate-customer, POST /:id/report-scam
 ```
 
+```
+mobile/src/
+  utils/submitTerms.ts                   #4  regulation copy + thresholds (EXPO_PUBLIC_*)
+  components/SubmitTermsModal.tsx        #4  strict acknowledgement modal
+  features/customer/SubmitRequestScreen.tsx  #4  gates step 3 -> step 4
+```
+
 ---
 
 ## Environment variables
 
-All variables live in `Fixlinkmobile/backend/.env`. See
-`Fixlinkmobile/backend/.env.example` for a copy-paste template.
+Backend variables live in `Fixlinkmobile/backend/.env`; the modal copy lives in
+`Fixlinkmobile/mobile/.env`. See the matching `.env.example` files for
+copy-paste templates.
 
 ### AI gateway (required for the AI parts of #6/#9/#10)
 
@@ -73,6 +83,37 @@ All variables live in `Fixlinkmobile/backend/.env`. See
 > ⚠️ If `OMNIROUTE_VISION_MODEL` is not set, vision calls fall back to the text
 > model and fail (e.g. a Copilot CLI 466 error). Screening then degrades to
 > local forensics only — it never blocks registration.
+
+### #4 — booking regulations before the location step
+
+Backend (`Fixlinkmobile/backend/.env`):
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `SUBMIT_TERMS_REQUIRED` | `true` | Refuse a submission that never accepted the regulations |
+| `SUBMIT_TERMS_VERSION` | `2026-10-01` | Version stamp stored on the job (`terms_version`) |
+| `SUBMIT_TERMS_REJECTION` | `You must accept the booking regulations…` | Message returned with the `400` |
+
+Mobile (`Fixlinkmobile/mobile/.env`) — the modal copy, so the regulation can be
+reworded without a rebuild:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `EXPO_PUBLIC_SUBMIT_TERMS_REQUIRED` | `true` | Show the modal at all |
+| `EXPO_PUBLIC_TERMS_VERSION` | `2026-10-01` | Version shown in the modal header |
+| `EXPO_PUBLIC_TERMS_TITLE` | `Booking regulations` | Modal title |
+| `EXPO_PUBLIC_TERMS_INTRO` | see `submitTerms.ts` | Intro paragraph |
+| `EXPO_PUBLIC_TERMS_MIN_LEAD_DAYS` | `1` | Number used by the **1-day rule** copy |
+| `EXPO_PUBLIC_TERMS_CANCEL_WINDOW_HOURS` | `5` | Number used by the **5-hour rule** copy |
+| `EXPO_PUBLIC_TERMS_LEAD_LABEL` / `_LEAD_RULE` | derived from the two above | Override the first rule's heading/body |
+| `EXPO_PUBLIC_TERMS_CANCEL_LABEL` / `_CANCEL_RULE` | derived | Override the second rule |
+| `EXPO_PUBLIC_TERMS_SAME_DAY_LABEL` / `_SAME_DAY_RULE` | same-day charge copy | Override the third rule |
+| `EXPO_PUBLIC_TERMS_AGREE_LABEL` / `_CONTINUE_LABEL` / `_DECLINE_LABEL` | see `submitTerms.ts` | Button and checkbox labels |
+| `EXPO_PUBLIC_TERMS_DECLINE_NOTICE` | see `submitTerms.ts` | Shown on step 3 after declining |
+
+> Both sides read their own copy of the switch. Turning the modal off in the app
+> no longer disables the server check, and vice versa — set both if you really
+> want to remove the gate.
 
 ### #5 — fake address / harassment / spam bookings
 

@@ -1,5 +1,5 @@
 /**
- * FixLink — consolidated E2E for UAT #6-#11.
+ * FixLink — consolidated E2E for UAT #4-#11.
  *
  * Boots the REAL Express app against the in-memory Supabase stub and drives it
  * over HTTP (no live database, no writes outside the test process). It also
@@ -16,6 +16,7 @@ const CUSTOMER_LIMIT = 'c0000000-0000-0000-0000-000000000002';
 const CUSTOMER_SCAM = 'c0000000-0000-0000-0000-000000000003';
 const CUSTOMER_RATE = 'c0000000-0000-0000-0000-000000000004';
 const CUSTOMER_SAFETY = 'c0000000-0000-0000-0000-000000000005';
+const CUSTOMER_TERMS = 'c0000000-0000-0000-0000-000000000006';
 const TECH_A = 'e0000000-0000-0000-0000-000000000001';
 const TECH_SCAM = 'e0000000-0000-0000-0000-000000000002';
 const TECH_RATE = 'e0000000-0000-0000-0000-000000000003';
@@ -35,6 +36,7 @@ const T_TECH_RATE = 'rate-tech-token';
 const T_TECH_A = 'tech-a-token';
 const T_STRANGER = 'stranger-token';
 const T_CUSTOMER_SAFETY = 'safety-token';
+const T_CUSTOMER_TERMS = 'terms-token';
 
 const completed = (id, techUid, techName, custUid, custName) => ({
   id, status: 'Completed', technician_uid: techUid, technician_name: techName, customer_uid: custUid, customer_name: custName,
@@ -46,6 +48,7 @@ installSupabaseStub({
     { id: CUSTOMER_LIMIT, role: 'customer', email: 'limit@fixlink.test', status: 'active' },
     { id: CUSTOMER_SCAM, role: 'customer', email: 'scam@fixlink.test', status: 'active', scam_count: 0 },
     { id: CUSTOMER_SAFETY, role: 'customer', email: 'safety@fixlink.test', status: 'active' },
+    { id: CUSTOMER_TERMS, role: 'customer', email: 'terms@fixlink.test', status: 'active' },
     {
       id: CUSTOMER_RATE,
       role: 'customer',
@@ -64,7 +67,7 @@ installSupabaseStub({
   tokens: {
     [T_CUSTOMER_DAILY]: CUSTOMER_DAILY, [T_CUSTOMER_LIMIT]: CUSTOMER_LIMIT,
     [T_TECH_SCAM]: TECH_SCAM, [T_TECH_RATE]: TECH_RATE, [T_TECH_A]: TECH_A, [T_STRANGER]: STRANGER,
-    [T_CUSTOMER_SAFETY]: CUSTOMER_SAFETY,
+    [T_CUSTOMER_SAFETY]: CUSTOMER_SAFETY, [T_CUSTOMER_TERMS]: CUSTOMER_TERMS,
   },
   tables: {
     jobs: [
@@ -145,12 +148,28 @@ const put = async (path, token, body) => {
   return { status: response.status, body: json };
 };
 
+// UAT #4: every booking carries the regulation acceptance, so these checks reach
+// the behaviour under test instead of the terms gate.
 const submit = (token, description, uid) => post('/api/requests', token, {
   customerName: 'Test Customer', customerUid: uid, applianceType: 'Fan', description, location: 'Bogo City',
+  termsAccepted: true,
 });
 
 const run = async () => {
-  console.log('\n=== FixLink consolidated E2E — UAT #6-#11 ===\n');
+  console.log('\n=== FixLink consolidated E2E — UAT #4-#11 ===\n');
+
+  // ---------------- #4 booking regulations before the location step ----------------
+  const noTerms = await post('/api/requests', T_CUSTOMER_TERMS, {
+    customerName: 'Terms Tester', customerUid: CUSTOMER_TERMS, applianceType: 'Fan',
+    description: '[Brand] no terms', location: 'Bogo City',
+  });
+  record('#4', 'a booking without the regulations is rejected (400)', noTerms.status === 400, `status ${noTerms.status}`);
+
+  const withTerms = await post('/api/requests', T_CUSTOMER_TERMS, {
+    customerName: 'Terms Tester', customerUid: CUSTOMER_TERMS, applianceType: 'Fan',
+    description: '[Brand] with terms', location: 'Bogo City', termsAccepted: true,
+  });
+  record('#4', 'accepting the regulations lets the booking through (201)', withTerms.status === 201, `status ${withTerms.status}`);
 
   // ---------------- #6 max 3 requests/day ----------------
   let s1 = await submit(T_CUSTOMER_DAILY, '[Brand] request one', CUSTOMER_DAILY);
@@ -178,6 +197,7 @@ const run = async () => {
   // ---------------- #5 fake address / harassment / spam booking ----------------
   const booking = (description, location) => post('/api/requests', T_CUSTOMER_SAFETY, {
     customerName: 'Safety Tester', customerUid: CUSTOMER_SAFETY, applianceType: 'Refrigerator', description, location,
+    termsAccepted: true,
   });
 
   const gibberish = await booking('[Brand] not cooling', 'aaaaaaaa');
@@ -266,6 +286,9 @@ const run = async () => {
     ['SPAM_SIMILARITY_THRESHOLD', { SPAM_SIMILARITY_THRESHOLD: '0.5' }, () => require('../src/domain/requestSafety').spamSimilarityThreshold() === 0.5],
     ['MAX_BOOKINGS_PER_ADDRESS_PER_DAY', { MAX_BOOKINGS_PER_ADDRESS_PER_DAY: '7' }, () => require('../src/domain/requestSafety').addressDailyCap() === 7],
     ['REQUEST_SAFETY_UTC_OFFSET_HOURS', { REQUEST_SAFETY_UTC_OFFSET_HOURS: '3' }, () => require('../src/domain/requestSafety').safetyUtcOffsetHours() === 3],
+    ['SUBMIT_TERMS_REQUIRED', { SUBMIT_TERMS_REQUIRED: 'false' }, () => require('../src/domain/submitTerms').isTermsRequired() === false],
+    ['SUBMIT_TERMS_VERSION', { SUBMIT_TERMS_VERSION: '2027-05-05' }, () => require('../src/domain/submitTerms').termsVersion() === '2027-05-05'],
+    ['SUBMIT_TERMS_REJECTION', { SUBMIT_TERMS_REJECTION: 'Read the rules.' }, () => require('../src/domain/submitTerms').verifyTerms({}).reason === 'Read the rules.'],
   ];
   for (const [key, vars, assertion] of tokenChecks) {
     await withEnv(vars, async () => {

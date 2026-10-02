@@ -35,6 +35,8 @@ const run = async () => {
   await check('#6 jobs.photo_risk_score/level/flags/notes', selectOne('jobs', 'photo_risk_score, photo_risk_level, photo_flags, photo_notes'));
   // #5 fake-address / harassment signals
   await check('#5 jobs.safety_flags/safety_level', selectOne('jobs', 'safety_flags, safety_level'));
+  // #4 booking regulations accepted before the location step
+  await check('#4 jobs.terms_accepted_at/terms_version', selectOne('jobs', 'terms_accepted_at, terms_version'));
   // #7 technician capacity inputs
   await check('#7 jobs.technician_uid/status', selectOne('jobs', 'technician_uid, status'));
   // #8 repeat scammer

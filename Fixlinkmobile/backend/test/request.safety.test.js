@@ -133,7 +133,8 @@ const submit = (token, uid, body) =>
   fetch(`${baseUrl}/api/requests`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-    body: JSON.stringify({ customerName: 'Safety Tester', customerUid: uid, applianceType: 'Refrigerator', ...body }),
+    // UAT #4: every booking must accept the regulations before it is accepted.
+    body: JSON.stringify({ customerName: 'Safety Tester', customerUid: uid, applianceType: 'Refrigerator', termsAccepted: true, ...body }),
   });
 
 test('a gibberish address is rejected with 400', async () => {

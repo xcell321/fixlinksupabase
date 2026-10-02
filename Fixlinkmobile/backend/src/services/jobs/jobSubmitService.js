@@ -6,6 +6,7 @@ const { uploadBuffer } = require('../../config/supabase');
 const jobRepository = require('../../repositories/jobRepository');
 const { buildSubmitFingerprint, submitDedupe } = require('../../domain/submitDedupe');
 const { maxDailyRequests, overDailyLimit } = require('../../domain/dailyRequestLimit');
+const { termsVersion, verifyTerms } = require('../../domain/submitTerms');
 const { HttpError } = require('../../domain/httpError');
 const { resolveJobCoordinates } = require('../locationService');
 const { analyzeRepairDescription, isOmniRouteConfigured } = require('../repairAnalyzer');
@@ -34,6 +35,14 @@ const submitRequest = async ({ authUid, body, file }) => {
   }
   if (!customerName || !applianceType || !description || !location) {
     throw new HttpError(400, { error: 'Please fill out all required fields.' });
+  }
+
+  // UAT #4: the booking regulations (1-day rule, 5-hour rule, same-day charge)
+  // must be accepted. The app gates step 3 -> step 4 with a modal, and this is
+  // the same rule enforced for any client that reaches the endpoint directly.
+  const termsVerdict = verifyTerms(body);
+  if (!termsVerdict.ok) {
+    throw new HttpError(400, { error: termsVerdict.reason });
   }
 
   // UAT #6: at most `maxDailyRequests()` requests per user per calendar day.
@@ -150,7 +159,7 @@ const submitRequest = async ({ authUid, body, file }) => {
   // separate from the customer's live GPS. The technician always travels to
   // this location even if the customer is physically somewhere else.
   const nowIso = new Date().toISOString();
-  const { id: requestId, error: insertError } = await jobRepository.insertJob({
+  const jobRow = {
     customer_name: customerName,
     ...(customerUid && { customer_uid: customerUid }),
     appliance_type: applianceType,
@@ -178,8 +187,21 @@ const submitRequest = async ({ authUid, body, file }) => {
       safety_flags: safetyVerdict.flags,
       safety_level: safetyVerdict.level,
     }),
+    // UAT #4: audit trail for the accepted regulations.
+    ...(termsVerdict.ok && { terms_accepted_at: nowIso, terms_version: termsVersion() }),
     created_at: nowIso,
-  });
+  };
+
+  let { id: requestId, error: insertError } = await jobRepository.insertJob(jobRow);
+  // Tolerate a database that has not run the newest migration yet: the terms
+  // columns are the most recent on `jobs`, so drop them and retry rather than
+  // losing the booking.
+  if (insertError && /terms_accepted_at|terms_version/.test(String(insertError.message || ''))) {
+    console.warn('Skipping missing terms columns on jobs during submit (run the schema migration).');
+    delete jobRow.terms_accepted_at;
+    delete jobRow.terms_version;
+    ({ id: requestId, error: insertError } = await jobRepository.insertJob(jobRow));
+  }
 
   if (insertError) {
     console.error('Error saving repair request:', insertError);

@@ -495,6 +495,11 @@ alter table public.jobs add column if not exists photo_notes text;
 alter table public.jobs add column if not exists safety_flags jsonb default '[]'::jsonb;
 alter table public.jobs add column if not exists safety_level text;
 
+-- UAT #4: audit trail for the booking regulations the customer accepted before
+-- the location step (1-day rule, 5-hour rule, same-day charge).
+alter table public.jobs add column if not exists terms_accepted_at timestamptz;
+alter table public.jobs add column if not exists terms_version text;
+
 -- UAT #11: which side wrote each review.
 alter table public.reviews add column if not exists reviewer_role text not null default 'customer';
 create index if not exists idx_reviews_reviewer_role on public.reviews (reviewer_role);

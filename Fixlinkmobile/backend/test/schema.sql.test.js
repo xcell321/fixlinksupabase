@@ -137,6 +137,8 @@ test('the UAT migrations are all present', () => {
     'photo_risk_score',
     'safety_flags',
     'safety_level',
+    'terms_accepted_at',
+    'terms_version',
     'credential_risk_score',
     'credential_risk_level',
     'selfie_url',
