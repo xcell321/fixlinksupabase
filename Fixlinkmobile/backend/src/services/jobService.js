@@ -29,7 +29,7 @@ const {
 } = require('./jobs/jobLifecycleService');
 const { verifyCompletion, reportNoShow } = require('./jobs/jobCompletionService');
 const { submitReview } = require('./jobs/reviewService');
-const { rateCustomer } = require('./jobs/customerRatingService');
+const { rateCustomer, listCustomerReviews } = require('./jobs/customerRatingService');
 const { reportScam } = require('./jobs/scamReportService');
 
 module.exports = {
@@ -50,5 +50,6 @@ module.exports = {
   reportNoShow,
   submitReview,
   rateCustomer,
+  listCustomerReviews,
   reportScam,
 };

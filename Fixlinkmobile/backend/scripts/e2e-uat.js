@@ -1,5 +1,5 @@
 /**
- * FixLink — consolidated E2E for UAT #4-#11.
+ * FixLink — consolidated E2E for UAT #2-#11.
  *
  * Boots the REAL Express app against the in-memory Supabase stub and drives it
  * over HTTP (no live database, no writes outside the test process). It also
@@ -17,6 +17,9 @@ const CUSTOMER_SCAM = 'c0000000-0000-0000-0000-000000000003';
 const CUSTOMER_RATE = 'c0000000-0000-0000-0000-000000000004';
 const CUSTOMER_SAFETY = 'c0000000-0000-0000-0000-000000000005';
 const CUSTOMER_TERMS = 'c0000000-0000-0000-0000-000000000006';
+const CUSTOMER_NOSHOW = 'c0000000-0000-0000-0000-000000000007';
+const CUSTOMER_LATE_CANCEL = 'c0000000-0000-0000-0000-000000000008';
+const CUSTOMER_EARLY_CANCEL = 'c0000000-0000-0000-0000-000000000009';
 const TECH_A = 'e0000000-0000-0000-0000-000000000001';
 const TECH_SCAM = 'e0000000-0000-0000-0000-000000000002';
 const TECH_RATE = 'e0000000-0000-0000-0000-000000000003';
@@ -28,6 +31,12 @@ const J_PENDING_OK = 'a0000000-0000-0000-0000-000000000003';
 const J_SCAM = ['a0000000-0000-0000-0000-000000000011', 'a0000000-0000-0000-0000-000000000012', 'a0000000-0000-0000-0000-000000000013'];
 const J_RATE_OK = 'a0000000-0000-0000-0000-000000000021';
 const J_RATE_BAD = 'a0000000-0000-0000-0000-000000000022';
+const J_NOSHOW = 'a0000000-0000-0000-0000-000000000031';
+const J_LATE_CANCEL = 'a0000000-0000-0000-0000-000000000032';
+const J_EARLY_CANCEL = 'a0000000-0000-0000-0000-000000000033';
+
+// UAT #2 measures a wait window, so the fixtures carry an arrival stamp.
+const minutesAgo = (minutes) => new Date(Date.now() - minutes * 60 * 1000).toISOString();
 
 const T_CUSTOMER_DAILY = 'daily-token';
 const T_CUSTOMER_LIMIT = 'limit-token';
@@ -37,6 +46,8 @@ const T_TECH_A = 'tech-a-token';
 const T_STRANGER = 'stranger-token';
 const T_CUSTOMER_SAFETY = 'safety-token';
 const T_CUSTOMER_TERMS = 'terms-token';
+const T_CUSTOMER_LATE_CANCEL = 'late-cancel-token';
+const T_CUSTOMER_EARLY_CANCEL = 'early-cancel-token';
 
 const completed = (id, techUid, techName, custUid, custName) => ({
   id, status: 'Completed', technician_uid: techUid, technician_name: techName, customer_uid: custUid, customer_name: custName,
@@ -49,6 +60,9 @@ installSupabaseStub({
     { id: CUSTOMER_SCAM, role: 'customer', email: 'scam@fixlink.test', status: 'active', scam_count: 0 },
     { id: CUSTOMER_SAFETY, role: 'customer', email: 'safety@fixlink.test', status: 'active' },
     { id: CUSTOMER_TERMS, role: 'customer', email: 'terms@fixlink.test', status: 'active' },
+    { id: CUSTOMER_NOSHOW, role: 'customer', email: 'noshow@fixlink.test', status: 'active', no_show_count: 0 },
+    { id: CUSTOMER_LATE_CANCEL, role: 'customer', email: 'latecancel@fixlink.test', status: 'active' },
+    { id: CUSTOMER_EARLY_CANCEL, role: 'customer', email: 'earlycancel@fixlink.test', status: 'active' },
     {
       id: CUSTOMER_RATE,
       role: 'customer',
@@ -68,6 +82,7 @@ installSupabaseStub({
     [T_CUSTOMER_DAILY]: CUSTOMER_DAILY, [T_CUSTOMER_LIMIT]: CUSTOMER_LIMIT,
     [T_TECH_SCAM]: TECH_SCAM, [T_TECH_RATE]: TECH_RATE, [T_TECH_A]: TECH_A, [T_STRANGER]: STRANGER,
     [T_CUSTOMER_SAFETY]: CUSTOMER_SAFETY, [T_CUSTOMER_TERMS]: CUSTOMER_TERMS,
+    [T_CUSTOMER_LATE_CANCEL]: CUSTOMER_LATE_CANCEL, [T_CUSTOMER_EARLY_CANCEL]: CUSTOMER_EARLY_CANCEL,
   },
   tables: {
     jobs: [
@@ -77,11 +92,32 @@ installSupabaseStub({
       ...J_SCAM.map((id) => completed(id, TECH_SCAM, 'Tech Scam', CUSTOMER_SCAM, 'Scam Cust')),
       completed(J_RATE_OK, TECH_RATE, 'Tech Rate', CUSTOMER_RATE, 'Rate Cust'),
       completed(J_RATE_BAD, TECH_RATE, 'Tech Rate', CUSTOMER_RATE, 'Rate Cust'),
+      // UAT #2: the technician is on site and has been waiting.
+      {
+        id: J_NOSHOW, status: 'In Progress', appliance_type: 'Fan',
+        technician_uid: TECH_A, technician_name: 'Tech A',
+        customer_uid: CUSTOMER_NOSHOW, customer_name: 'NoShow Cust',
+        technician_arrival_timestamp: minutesAgo(45),
+      },
+      {
+        id: J_LATE_CANCEL, status: 'Customer Ready', appliance_type: 'Fan',
+        technician_uid: TECH_A, technician_name: 'Tech A',
+        customer_uid: CUSTOMER_LATE_CANCEL, customer_name: 'Late Cust',
+        technician_arrival_timestamp: minutesAgo(15),
+      },
+      // Customer Ready with no arrival stamp: an ordinary cancellation, and a
+      // no-show report the technician is not allowed to file yet.
+      {
+        id: J_EARLY_CANCEL, status: 'Customer Ready', appliance_type: 'Fan',
+        technician_uid: TECH_A, technician_name: 'Tech A',
+        customer_uid: CUSTOMER_EARLY_CANCEL, customer_name: 'Early Cust',
+      },
     ],
     reviews: [
       { id: 'r1', customer_uid: CUSTOMER_RATE, reviewer_role: 'technician', rating: 1, request_id: 'x1' },
       { id: 'r2', customer_uid: CUSTOMER_RATE, reviewer_role: 'technician', rating: 2, request_id: 'x2' },
     ],
+    service_incidents: [],
   },
 });
 
@@ -156,7 +192,7 @@ const submit = (token, description, uid) => post('/api/requests', token, {
 });
 
 const run = async () => {
-  console.log('\n=== FixLink consolidated E2E — UAT #4-#11 ===\n');
+  console.log('\n=== FixLink consolidated E2E — UAT #2-#11 ===\n');
 
   // ---------------- #4 booking regulations before the location step ----------------
   const noTerms = await post('/api/requests', T_CUSTOMER_TERMS, {
@@ -170,6 +206,41 @@ const run = async () => {
     description: '[Brand] with terms', location: 'Bogo City', termsAccepted: true,
   });
   record('#4', 'accepting the regulations lets the booking through (201)', withTerms.status === 201, `status ${withTerms.status}`);
+
+  // ---------------- #2 auto-suspend after a wasted technician trip ----------------
+  // Outside the wait window the report is refused, so nobody can suspend a
+  // customer the moment they knock on the door.
+  const tooEarly = await withEnv({ CUSTOMER_NOSHOW_WAIT_MINUTES: '60' }, () =>
+    post(`/api/requests/${J_NOSHOW}/report-no-show`, T_TECH_A, { technicianUid: TECH_A, reason: 'No one here' }));
+  record('#2', 'a no-show inside the wait window is refused (409)',
+    tooEarly.status === 409 && tooEarly.body?.code === 'CUSTOMER_NO_SHOW_WAIT',
+    `status ${tooEarly.status} remaining=${tooEarly.body?.remainingMinutes}m`);
+
+  const noShow = await withEnv({ CUSTOMER_NOSHOW_WAIT_MINUTES: '30' }, () =>
+    post(`/api/requests/${J_NOSHOW}/report-no-show`, T_TECH_A, { technicianUid: TECH_A, reason: 'No one here' }));
+  record('#2', 'a no-show after the wait window suspends the customer',
+    noShow.status === 200 && noShow.body?.customerSuspended === true,
+    `waited=${noShow.body?.waitedMinutes}m count=${noShow.body?.noShowCount}`);
+
+  const noArrival = await post(`/api/requests/${J_EARLY_CANCEL}/report-no-show`, T_TECH_A, {
+    technicianUid: TECH_A, reason: 'No one here',
+  });
+  record('#2', 'a no-show without a recorded arrival is refused (409)',
+    noArrival.status === 409 && noArrival.body?.code === 'ARRIVAL_REQUIRED', `status ${noArrival.status}`);
+
+  const lateCancel = await put(`/api/requests/${J_LATE_CANCEL}/cancel`, T_CUSTOMER_LATE_CANCEL, {
+    cancellationReason: 'Changed my mind',
+  });
+  record('#2', 'cancelling after the technician arrived suspends the customer',
+    lateCancel.status === 200 && lateCancel.body?.customerSuspended === true,
+    `stage=${lateCancel.body?.cancellationStage}`);
+
+  const earlyCancel = await put(`/api/requests/${J_EARLY_CANCEL}/cancel`, T_CUSTOMER_EARLY_CANCEL, {
+    cancellationReason: 'Changed my mind',
+  });
+  record('#2', 'cancelling before the technician arrives only cancels',
+    earlyCancel.status === 200 && earlyCancel.body?.customerSuspended === false,
+    `stage=${earlyCancel.body?.cancellationStage}`);
 
   // ---------------- #6 max 3 requests/day ----------------
   let s1 = await submit(T_CUSTOMER_DAILY, '[Brand] request one', CUSTOMER_DAILY);
@@ -262,6 +333,14 @@ const run = async () => {
   });
 
   // ---------------- tokenization audit ----------------
+  // Every AI key variable, cleared. A key-list assertion then sees only the
+  // variable under test and not whatever backend/.env already contains.
+  const NO_AI_KEYS = {
+    AI_API_KEY: undefined, AI_API_KEYS: undefined,
+    AI_VISION_API_KEY: undefined, AI_VISION_API_KEYS: undefined,
+    GEMINI_API_KEY: undefined, GEMINI_API_KEYS: undefined, GEMINI_API_KEY_BACKUP: undefined,
+    OMNIROUTE_API_KEY: undefined, OMNIROUTE_API_KEYS: undefined,
+  };
   const tokenChecks = [
     ['MAX_REQUESTS_PER_DAY', { MAX_REQUESTS_PER_DAY: '7' }, () => require('../src/domain/dailyRequestLimit').maxDailyRequests() === 7],
     ['TECHNICIAN_MAX_ACTIVE_JOBS', { TECHNICIAN_MAX_ACTIVE_JOBS: '4' }, () => require('../src/services/workloadService').getMaxActiveJobs() === 4],
@@ -289,6 +368,32 @@ const run = async () => {
     ['SUBMIT_TERMS_REQUIRED', { SUBMIT_TERMS_REQUIRED: 'false' }, () => require('../src/domain/submitTerms').isTermsRequired() === false],
     ['SUBMIT_TERMS_VERSION', { SUBMIT_TERMS_VERSION: '2027-05-05' }, () => require('../src/domain/submitTerms').termsVersion() === '2027-05-05'],
     ['SUBMIT_TERMS_REJECTION', { SUBMIT_TERMS_REJECTION: 'Read the rules.' }, () => require('../src/domain/submitTerms').verifyTerms({}).reason === 'Read the rules.'],
+    ['CUSTOMER_NOSHOW_WAIT_MINUTES', { CUSTOMER_NOSHOW_WAIT_MINUTES: '45' }, () => require('../src/domain/autoSuspendPolicy').customerNoShowWaitMinutes() === 45],
+    ['CUSTOMER_NOSHOW_WAIT_MINUTES floor', { CUSTOMER_NOSHOW_WAIT_MINUTES: '10' }, () => require('../src/domain/autoSuspendPolicy').customerNoShowWaitMinutes() === 30],
+    ['CUSTOMER_NOSHOW_WAIT_MINUTES ceiling', { CUSTOMER_NOSHOW_WAIT_MINUTES: '600' }, () => require('../src/domain/autoSuspendPolicy').customerNoShowWaitMinutes() === 60],
+    ['CUSTOMER_NOSHOW_LIMIT', { CUSTOMER_NOSHOW_LIMIT: '4' }, () => require('../src/domain/autoSuspendPolicy').customerNoShowLimit() === 4],
+    ['CUSTOMER_NOSHOW_AUTO_SUSPEND', { CUSTOMER_NOSHOW_AUTO_SUSPEND: 'false' }, () => require('../src/domain/autoSuspendPolicy').shouldSuspendForNoShow(9) === false],
+    ['CUSTOMER_LATE_CANCEL_LIMIT', { CUSTOMER_LATE_CANCEL_LIMIT: '3' }, () => require('../src/domain/autoSuspendPolicy').shouldSuspendForLateCancel(2) === false],
+    ['CUSTOMER_LATE_CANCEL_AUTO_SUSPEND', { CUSTOMER_LATE_CANCEL_AUTO_SUSPEND: 'false' }, () => require('../src/domain/autoSuspendPolicy').shouldSuspendForLateCancel(9) === false],
+    ['AI_PROVIDER', { AI_PROVIDER: 'gemini' }, () => require('../src/domain/aiProvider').textProviderName() === 'gemini'],
+    ['AI_BASE_URL', { AI_BASE_URL: 'https://example.test/v1/' }, () => require('../src/domain/aiProvider').aiBaseUrl() === 'https://example.test/v1'],
+    ['AI_MODEL', { AI_MODEL: 'custom-model' }, () => require('../src/domain/aiProvider').aiModel() === 'custom-model'],
+    ['AI_VISION_PROVIDER', { AI_VISION_PROVIDER: 'gemini' }, () => require('../src/domain/aiProvider').visionProviderName() === 'gemini'],
+    ['AI_VISION_BASE_URL', { AI_VISION_BASE_URL: 'https://vision.test/v1/' }, () => require('../src/domain/aiProvider').aiVisionBaseUrl() === 'https://vision.test/v1'],
+    ['AI_VISION_MODEL', { AI_MODEL: 'text-model', AI_VISION_MODEL: 'vision-model' }, () => require('../src/domain/aiProvider').aiVisionModel() === 'vision-model'],
+    ['AI_VISION_FALLBACK_MODELS', { AI_VISION_FALLBACK_MODELS: 'a, b ,c' }, () => require('../src/domain/aiProvider').aiVisionFallbackModels().join('|') === 'a|b|c'],
+    ['AI_MAX_TOKENS', { AI_MAX_TOKENS: '1234' }, () => require('../src/domain/aiProvider').aiMaxTokens() === 1234],
+    ['AI_VISION_MAX_TOKENS', { AI_VISION_MAX_TOKENS: '4321' }, () => require('../src/domain/aiProvider').aiVisionMaxTokens() === 4321],
+    ['AI_TIMEOUT_MS', { AI_TIMEOUT_MS: '9000' }, () => require('../src/domain/aiProvider').aiTimeoutMs() === 9000],
+    ['AI_VISION_TIMEOUT_MS', { AI_VISION_TIMEOUT_MS: '45000' }, () => require('../src/domain/aiProvider').aiVisionTimeoutMs() === 45000],
+    ['AI_REASONING_EFFORT', { AI_REASONING_EFFORT: 'medium' }, () => require('../src/domain/aiProvider').aiReasoningEffort() === 'medium'],
+    ['AI_REASONING_EFFORT validation', { AI_REASONING_EFFORT: 'nonsense' }, () => require('../src/domain/aiProvider').aiReasoningEffort() === ''],
+    ['AI_API_KEYS list', { ...NO_AI_KEYS, AI_PROVIDER: 'gemini', AI_API_KEYS: 'a, b ,c' }, () => require('../src/domain/aiProvider').aiApiKeys().join('|') === 'a|b|c'],
+    ['AI_VISION_API_KEYS list', { ...NO_AI_KEYS, AI_VISION_API_KEYS: 'v1, v2' }, () => require('../src/domain/aiProvider').aiVisionApiKeys().join('|') === 'v1|v2'],
+    ['GEMINI_API_KEY', { ...NO_AI_KEYS, AI_PROVIDER: 'gemini', GEMINI_API_KEY: 'k' }, () => require('../src/domain/aiProvider').aiApiKeys().join('|') === 'k'],
+    ['GEMINI_API_KEY_BACKUP', { ...NO_AI_KEYS, AI_PROVIDER: 'gemini', GEMINI_API_KEY: 'first', GEMINI_API_KEY_BACKUP: 'second' }, () => require('../src/domain/aiProvider').aiApiKeys().join('|') === 'first|second'],
+    ['OMNIROUTE_API_KEY alias', { ...NO_AI_KEYS, AI_PROVIDER: 'omniroute', OMNIROUTE_API_KEY: 'legacy' }, () => require('../src/domain/aiProvider').aiApiKeys().join('|') === 'legacy'],
+    ['OMNIROUTE_MODEL alias', { AI_MODEL: undefined, AI_PROVIDER: undefined, OMNIROUTE_MODEL: 'legacy-model' }, () => require('../src/domain/aiProvider').aiModel() === 'legacy-model'],
   ];
   for (const [key, vars, assertion] of tokenChecks) {
     await withEnv(vars, async () => {
@@ -298,6 +403,102 @@ const run = async () => {
       record('tokenized', `${key} is env-driven`, ok, detail);
     });
   }
+
+  // ---------------- env inventory coverage ----------------
+  // The strongest form of "nothing is hardcoded": every environment variable
+  // the backend reads has to be listed in scripts/check-uat-env.js, so that one
+  // file is the complete inventory of knobs. A new variable that skips the
+  // inventory fails here.
+  const fs = require('node:fs');
+  const path = require('node:path');
+
+  // These two build the key at runtime (`process.env[envKey]`), which no source
+  // scan can resolve, so they are pinned by hand. A third file that starts
+  // doing the same thing fails the check below until it is pinned too.
+  const DYNAMIC_ENV_READERS = {
+    'domain/verificationRequirements.js': ['TECHNICIAN_REQUIRED_DOCS', 'CUSTOMER_REQUIRED_DOCS'],
+    'services/credential/documentForensics.js': ['CREDENTIAL_AI_MARKERS', 'CREDENTIAL_EDITOR_MARKERS'],
+  };
+
+  const SRC_DIR = path.join(__dirname, '..', 'src');
+  const walkJs = (dir, found = []) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        if (entry.name !== 'node_modules') walkJs(path.join(dir, entry.name), found);
+        continue;
+      }
+      if (entry.name.endsWith('.js')) found.push(path.join(dir, entry.name));
+    }
+    return found;
+  };
+
+  // Comments are blanked out (same length, so line numbers survive) because the
+  // files explain these rules in prose — and that prose must not trip them.
+  const stripComments = (source) => source
+    .replace(/\/\*[\s\S]*?\*\//g, (match) => match.replace(/[^\n]/g, ' '))
+    .replace(/\/\/[^\n]*/g, (match) => ' '.repeat(match.length));
+
+  const staticReads = new Set();
+  const dynamicReaders = new Set();
+  for (const file of walkJs(SRC_DIR)) {
+    const source = stripComments(fs.readFileSync(file, 'utf8'));
+    for (const match of source.matchAll(/process\.env\.([A-Z][A-Z0-9_]*)/g)) staticReads.add(match[1]);
+    for (const match of source.matchAll(/process\.env\[\s*['"]([A-Z][A-Z0-9_]*)['"]\s*\]/g)) {
+      staticReads.add(match[1]);
+    }
+    // A bracket read with a quoted literal is static-safe and already collected;
+    // the pattern below only matches the computed-key form.
+    if (/process\.env\[\s*(?!['"])/.test(source)) {
+      dynamicReaders.add(path.relative(SRC_DIR, file).split(path.sep).join('/'));
+    }
+  }
+
+  let auditSource = '';
+  try {
+    auditSource = fs.readFileSync(path.join(__dirname, 'check-uat-env.js'), 'utf8');
+  } catch (error) {
+    auditSource = '';
+  }
+  const inventoried = new Set([...auditSource.matchAll(/'([A-Z][A-Z0-9_]+)'/g)].map((m) => m[1]));
+
+  // No inline literal fallbacks. `asInt(process.env.X, 60)` puts a magic value
+  // back in the code; every default has to be named (DEFAULT_*, DEFAULTS.x). An
+  // empty string is allowed because it literally means "unset", and the `, 10`
+  // in `parseInt(process.env.X, 10)` is a radix, not a fallback.
+  const LITERAL_FALLBACK =
+    /process\.env\.([A-Z][A-Z0-9_]*)\s*(,|\?\?|\|\|)\s*('[^']*'|"[^"]*"|true|false|-?\d[\d.]*)/g;
+  const literalFallbacks = [];
+  for (const file of walkJs(SRC_DIR)) {
+    const source = stripComments(fs.readFileSync(file, 'utf8'));
+    for (const match of source.matchAll(LITERAL_FALLBACK)) {
+      const [full, , connector, literal] = match;
+      if (literal === "''" || literal === '""') continue;
+      const before = source.slice(Math.max(0, match.index - 40), match.index);
+      if (connector === ',' && /parseInt\(\s*$/.test(before)) continue;
+      const line = source.slice(0, match.index).split('\n').length;
+      literalFallbacks.push(`${path.relative(SRC_DIR, file).split(path.sep).join('/')}:${line} ${full.trim()}`);
+    }
+  }
+  record('tokenized', 'no inline literal fallbacks — every default is a named constant',
+    literalFallbacks.length === 0,
+    literalFallbacks.length ? literalFallbacks.join(' | ') : `${staticReads.size} reads use named defaults`);
+
+  const missingFromInventory = [...staticReads].filter((key) => !inventoried.has(key)).sort();
+  record('tokenized', 'every backend env read is listed in check-uat-env.js',
+    missingFromInventory.length === 0,
+    missingFromInventory.length ? `missing: ${missingFromInventory.join(', ')}` : `${staticReads.size} static reads covered`);
+
+  const expectedDynamic = Object.keys(DYNAMIC_ENV_READERS).sort();
+  const foundDynamic = [...dynamicReaders].sort();
+  record('tokenized', 'computed-key env readers are all pinned in the audit',
+    JSON.stringify(expectedDynamic) === JSON.stringify(foundDynamic),
+    foundDynamic.length ? foundDynamic.join(', ') : 'none');
+
+  const dynamicKeys = Object.values(DYNAMIC_ENV_READERS).flat();
+  const missingDynamic = dynamicKeys.filter((key) => !inventoried.has(key)).sort();
+  record('tokenized', 'computed-key env variables are listed in check-uat-env.js',
+    missingDynamic.length === 0,
+    missingDynamic.length ? `missing: ${missingDynamic.join(', ')}` : dynamicKeys.join(', '));
 
   // ---------------- report ----------------
   let lastFeature = null;

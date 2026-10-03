@@ -25,8 +25,10 @@ import { colors } from '../../theme';
 import {
   calculateWorkloadSummary,
   filterJobs,
+  noShowState,
   type JobItem
 } from './availableJobsHelpers';
+import { noShowConfirmMessage, noShowWaitMinutes } from '../../utils/noShowPolicy';
 import { useTechnicianJobs } from './availableJobs/useTechnicianJobs';
 import { useJobActions } from './availableJobs/useJobActions';
 import { QueueHeader } from './availableJobs/QueueHeader';
@@ -50,6 +52,7 @@ export default function AvailableJobsScreen({
   const {
     jobs,
     acceptedJobs,
+    completedJobs,
     loading,
     refreshing,
     fetchError,
@@ -70,7 +73,8 @@ export default function AvailableJobsScreen({
   const [selectedJobForDetails, setSelectedJobForDetails] = useState<JobItem | null>(null);
 
   // Feed Tab navigation: 'queue' (Available Leads) vs 'active' (My Active Jobs)
-  const [feedTab, setFeedTab] = useState<'queue' | 'active'>('queue');
+  // vs 'completed' (Finished History, kept so customers stay ratable).
+  const [feedTab, setFeedTab] = useState<'queue' | 'active' | 'completed'>('queue');
 
   const actions = useJobActions({
     technician,
@@ -98,6 +102,8 @@ export default function AvailableJobsScreen({
     setAcceptedNotice,
     startedNotice,
     setStartedNotice,
+    completedNotice,
+    setCompletedNotice,
     otpModalVisible,
     setOtpModalVisible,
     otpCode,
@@ -149,10 +155,12 @@ export default function AvailableJobsScreen({
     const hid = String(highlightedJobId);
     if (acceptedJobs.some((j) => String(j.id) === hid)) {
       setFeedTab('active');
+    } else if (completedJobs.some((j) => String(j.id) === hid)) {
+      setFeedTab('completed');
     } else if (jobs.some((j) => String(j.id) === hid)) {
       setFeedTab('queue');
     }
-  }, [highlightedJobId, acceptedJobs, jobs]);
+  }, [highlightedJobId, acceptedJobs, completedJobs, jobs]);
 
   const toggleDutyStatus = async (): Promise<void> => {
     const nextState = !isOnline;
@@ -184,11 +192,14 @@ export default function AvailableJobsScreen({
   }
 
   // Live detail job: refresh from feed state so arrival/start update the screen.
-  const allJobs = [...acceptedJobs, ...jobs];
+  const allJobs = [...acceptedJobs, ...completedJobs, ...jobs];
   const liveDetailJob = selectedJobForDetails
     ? (allJobs.find((j) => String(j.id) === String(selectedJobForDetails.id)) ?? selectedJobForDetails)
     : null;
-  const detailIsAssigned = liveDetailJob ? acceptedJobs.some((j) => String(j.id) === String(liveDetailJob.id)) : false;
+  const detailIsAssigned = liveDetailJob
+    ? acceptedJobs.some((j) => String(j.id) === String(liveDetailJob.id))
+      || completedJobs.some((j) => String(j.id) === String(liveDetailJob.id))
+    : false;
 
   return (
     <ScrollView
@@ -231,13 +242,14 @@ export default function AvailableJobsScreen({
           onOpenNotifications={onOpenNotifications}
           pendingCount={pendingCount}
           activeCount={activeCount}
+          completedCount={completedJobs.length}
           feedTab={feedTab}
           onSelectTab={setFeedTab}
         />
 
         <FeedBanners
           fetchError={fetchError}
-          hasJobs={jobs.length > 0 || acceptedJobs.length > 0}
+          hasJobs={jobs.length > 0 || acceptedJobs.length > 0 || completedJobs.length > 0}
           acceptError={acceptError}
           onRetry={handleRefresh}
         />
@@ -280,6 +292,58 @@ export default function AvailableJobsScreen({
                   onNavigateToChat={onNavigateToChat}
                   onPreviewPhoto={setPreviewUrl}
                 />
+              ))
+            )}
+          </View>
+        )}
+
+        {/* Finished History Feed Content: completed jobs stay openable so the
+            technician can still rate the customer afterwards. */}
+        {feedTab === 'completed' && (
+          <View style={styles.feedListContainer}>
+            {completedJobs.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <View style={styles.emptyIcon}>
+                  <Ionicons name="checkmark-done-circle-outline" size={28} color={colors.tech} />
+                </View>
+                <View style={styles.emptyTextContainer}>
+                  <Text style={styles.emptyTitle}>No Finished Jobs Yet</Text>
+                  <Text style={styles.emptyCopy}>
+                    Completed repairs land here, where you can reopen them to rate the customer.
+                  </Text>
+                </View>
+              </View>
+            ) : (
+              completedJobs.map((job) => (
+                <Pressable
+                  key={job.id}
+                  onPress={() => setSelectedJobForDetails(job)}
+                  style={({ pressed }) => [styles.jobCard, pressed && styles.pressedSoft]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open finished job for ${job.applianceType || 'repair request'}`}
+                >
+                  <View style={styles.cardHeader}>
+                    <View style={styles.cardTitleWrap}>
+                      <View style={styles.cardTitleTop}>
+                        <Text style={styles.cardTitle} numberOfLines={1}>
+                          {job.applianceType || 'Repair Request'}
+                        </Text>
+                      </View>
+                      <Text style={styles.customerNameText} numberOfLines={1}>
+                        {job.customerName || 'Verified Homeowner'}
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color={colors.subtle} />
+                  </View>
+                  <View style={styles.pillRow}>
+                    <View style={styles.schedulePill}>
+                      <Ionicons name="checkmark-circle" size={12} color={colors.tech} />
+                      <Text style={styles.schedulePillText} numberOfLines={1}>
+                        Completed
+                      </Text>
+                    </View>
+                  </View>
+                </Pressable>
               ))
             )}
           </View>
@@ -343,7 +407,7 @@ export default function AvailableJobsScreen({
       <ConfirmDialog
         visible={noShowJob !== null}
         title="Report customer no-show?"
-        message="This records that the customer or appliance was not accessible at the specified service address."
+        message={noShowConfirmMessage(noShowJob ? noShowState(noShowJob).waitedMinutes : noShowWaitMinutes())}
         confirmLabel="Confirm Report"
         danger
         busy={actionLoadingId !== null}
@@ -399,6 +463,14 @@ export default function AvailableJobsScreen({
         buttonLabel="Got It"
         accentColor={colors.tech}
         onClose={() => setStartedNotice(false)}
+      />
+      <InfoModal
+        visible={completedNotice}
+        title="Job Completed"
+        message="Repair verified and finalized. The customer has been notified and can now leave a rating."
+        buttonLabel="Got It"
+        accentColor={colors.tech}
+        onClose={() => setCompletedNotice(false)}
       />
     </ScrollView>
   );

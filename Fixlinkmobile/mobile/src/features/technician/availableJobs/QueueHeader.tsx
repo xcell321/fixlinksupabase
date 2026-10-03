@@ -18,8 +18,9 @@ interface QueueHeaderProps {
   onOpenNotifications?: () => void;
   pendingCount: number;
   activeCount: number;
-  feedTab: 'queue' | 'active';
-  onSelectTab: (tab: 'queue' | 'active') => void;
+  completedCount: number;
+  feedTab: 'queue' | 'active' | 'completed';
+  onSelectTab: (tab: 'queue' | 'active' | 'completed') => void;
 }
 
 export const QueueHeader = ({
@@ -30,6 +31,7 @@ export const QueueHeader = ({
   onOpenNotifications,
   pendingCount,
   activeCount,
+  completedCount,
   feedTab,
   onSelectTab,
 }: QueueHeaderProps): React.JSX.Element => {
@@ -126,6 +128,27 @@ export const QueueHeader = ({
           <View style={[styles.protoStatBadge, feedTab === 'active' && styles.protoStatBadgeActive]}>
             <Text style={[styles.protoStatBadgeText, feedTab === 'active' && styles.protoStatBadgeTextActive]}>
               {activeCount > 99 ? '99+' : activeCount}
+            </Text>
+          </View>
+        </Pressable>
+
+        <Pressable
+          style={({ pressed }) => [
+            styles.protoStat,
+            feedTab === 'completed' && styles.protoStatActive,
+            pressed && styles.pressedSoft
+          ]}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: feedTab === 'completed' }}
+          accessibilityLabel={`Completed job history, ${completedCount} jobs`}
+          onPress={() => onSelectTab('completed')}
+        >
+          <Text style={[styles.protoStatLabel, feedTab === 'completed' && styles.protoStatLabelActive]}>
+            History
+          </Text>
+          <View style={[styles.protoStatBadge, feedTab === 'completed' && styles.protoStatBadgeActive]}>
+            <Text style={[styles.protoStatBadgeText, feedTab === 'completed' && styles.protoStatBadgeTextActive]}>
+              {completedCount > 99 ? '99+' : completedCount}
             </Text>
           </View>
         </Pressable>

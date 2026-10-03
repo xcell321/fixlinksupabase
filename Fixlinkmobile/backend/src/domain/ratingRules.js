@@ -47,8 +47,11 @@ const isNegativeRating = (rating) => {
   return Number.isFinite(numeric) && numeric <= negativeRatingMax();
 };
 
+const DEFAULT_NEGATIVE_AUTO_SUSPEND = 'true';
+
 const autoSuspendOnNegativeRatingsEnabled = () =>
-  String(process.env.CUSTOMER_NEGATIVE_RATING_AUTO_SUSPEND ?? 'true').toLowerCase() !== 'false';
+  String(process.env.CUSTOMER_NEGATIVE_RATING_AUTO_SUSPEND ?? DEFAULT_NEGATIVE_AUTO_SUSPEND)
+    .toLowerCase() !== 'false';
 
 const shouldSuspendForNegativeRatings = (count) =>
   autoSuspendOnNegativeRatingsEnabled() && Number(count) >= negativeRatingLimit();

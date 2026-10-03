@@ -1,7 +1,7 @@
 /**
  * FixLink — credential screening + facial verification E2E (UAT #9/#10).
  *
- * Exercises the deterministic layers locally and, when the OmniRoute gateway is
+ * Exercises the deterministic layers locally and, when an AI provider is
  * configured, makes ONE real multimodal call to prove the vision path works.
  * Read-only: it never touches the database.
  *
@@ -13,7 +13,7 @@ const zlib = require('zlib');
 const domain = require('../src/domain/credentialScreening');
 const { analyzeDocument } = require('../src/services/credential/documentForensics');
 const { screenCredential } = require('../src/services/credential/credentialScreeningService');
-const omniRoute = require('../src/services/omniRoute');
+const aiClient = require('../src/services/aiClient');
 
 // --- A real, decodable PNG so the vision model has something valid ---------
 const crcTable = (() => {
@@ -38,12 +38,17 @@ const chunk = (type, data) => {
   crc.writeUInt32BE(crc32(Buffer.concat([typeBuf, data])), 0);
   return Buffer.concat([length, typeBuf, data, crc]);
 };
+// A structurally VALID 8-bit RGB PNG: each scanline starts with filter type 0,
+// which is what a real decoder requires. The pixel data is flat grey, and the
+// optional `pad`/`tail` bytes are appended after IEND where the local forensic
+// scanner (not a decoder) is meant to find them.
 const makePng = (width, height, { pad = 0, tail = '' } = {}) => {
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(width, 0);
   ihdr.writeUInt32BE(height, 4);
   ihdr[8] = 8; ihdr[9] = 2; ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;
   const raw = Buffer.alloc((width * 3 + 1) * height, 0x80);
+  for (let row = 0; row < height; row += 1) raw[row * (width * 3 + 1)] = 0;
   const idat = zlib.deflateSync(raw);
   const parts = [
     Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
@@ -114,14 +119,14 @@ const run = async () => {
   }
 
   // --- Part 4: one live AI vision call ------------------------------------
-  console.log('\nPart 4 — live AI vision call (OmniRoute)');
-  if (!omniRoute.isOmniRouteConfigured()) {
-    console.log('  skipped — OMNIROUTE_BASE_URL / OMNIROUTE_API_KEY not configured');
+  console.log('\nPart 4 — live AI vision call (configured provider)');
+  if (!aiClient.isVisionConfigured()) {
+    console.log('  skipped — no vision provider configured (see check-uat-env.js)');
     record('live vision call', true, 'skipped (gateway off)');
   } else {
     try {
       const started = Date.now();
-      const { parsed, model } = await omniRoute.visionComplete({
+      const { parsed, model } = await aiClient.visionComplete({
         system: 'You analyse images and reply with strict JSON only.',
         user: 'Return JSON: {"facePresent": boolean, "idFacePresent": boolean, "livenessRisk": number 0..1, "matchConfidence": number 0..1, "level": "match"|"mismatch"|"unknown", "notes": "short English sentence"}',
         images: [{ base64: makePng(256, 256).toString('base64'), mimeType: 'image/png' }],

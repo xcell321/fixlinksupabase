@@ -6,7 +6,7 @@ const express = require('express');
 
 const router = express.Router();
 const { supabase } = require('../../config/supabase');
-const { chatComplete, isOmniRouteConfigured } = require('../../services/omniRoute');
+const { chatComplete, isAiConfigured } = require('../../services/aiClient');
 const { resolveAssistantLanguage } = require('../../services/ai/assistantLanguage');
 const { retrieveKnowledge } = require('../../services/ai/knowledgeRetriever');
 
@@ -17,7 +17,7 @@ router.post('/assistant', async (req, res) => {
     if (!text) {
       return res.status(400).json({ error: 'A message is required.' });
     }
-    if (!isOmniRouteConfigured()) {
+    if (!isAiConfigured()) {
       return res.status(502).json({ error: 'AI service is not configured.', ai: 'degraded' });
     }
     const c = context && typeof context === 'object' ? context : {};

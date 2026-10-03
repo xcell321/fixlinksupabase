@@ -50,7 +50,7 @@ const concretize = (path) =>
 
 test('every /api/requests endpoint rejects unauthenticated calls with 401', async () => {
   const routes = routeKeys(require('../src/routes/requests'));
-  assert.equal(routes.length, 29);
+  assert.equal(routes.length, 30);
 
   const failures = [];
   for (const key of routes) {

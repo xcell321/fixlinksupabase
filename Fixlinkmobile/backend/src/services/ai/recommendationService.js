@@ -10,7 +10,7 @@ const {
   rankObjective,
   buildCandidatePayload,
 } = require('../technicianMatching');
-const { chatComplete, isOmniRouteConfigured } = require('../omniRoute');
+const { chatComplete, isAiConfigured } = require('../aiClient');
 const { getSchedulesForTechnicians, dayKeyOf, availabilityForDay } = require('../techScheduleService');
 const { getActiveJobCountsForTechnicians, getWorkloadStatus } = require('../workloadService');
 const { serializeCandidate } = require('../../domain/candidateSerializer');
@@ -40,7 +40,7 @@ const recommendTechnicians = async ({ jobId }) => {
   // R1: interpret the request; the extracted skills broaden candidate matching.
   let interpretation = null;
   let requiredSkills = [];
-  if (isOmniRouteConfigured()) {
+  if (isAiConfigured()) {
     try {
       interpretation = await analyzeRepairDescription({
         description: job.description,
@@ -113,7 +113,7 @@ const recommendTechnicians = async ({ jobId }) => {
 
   const serializeFromObjective = (slice) => slice.map((c) => serializeCandidate(c));
 
-  if (isOmniRouteConfigured()) {
+  if (isAiConfigured()) {
     try {
       const system = [
         "You are FixLink's technician recommendation assistant.",

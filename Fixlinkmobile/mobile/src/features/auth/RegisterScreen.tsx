@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, ActivityIndicator, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import { fetchPlatformCategories, registerUser } from '../../services/api';
 import { colors, fonts, themedStyles } from '../../theme';
 
@@ -199,6 +200,39 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
     setter(asset);
   };
 
+  // Face photos are live front-camera captures only, for every role. No
+  // gallery or file option exists, so a saved or AI-generated portrait cannot
+  // enter through signup. Government ID and certificate stay on the document
+  // picker since those are existing physical papers.
+  const takeFacePhoto = async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (permission.status !== 'granted') {
+      setFieldErrors((prev) => ({ ...prev, facePhotoFile: 'Allow camera access to take your face photo.' }));
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      cameraType: ImagePicker.CameraType.front,
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (result.canceled || !result.assets?.[0]?.uri) return;
+    const asset = result.assets[0];
+    const file: CredentialFile = {
+      uri: asset.uri,
+      name: asset.fileName || 'face-photo.jpg',
+      mimeType: asset.mimeType || 'image/jpeg',
+      size: asset.fileSize ?? undefined,
+      lastModified: Date.now(),
+    };
+    setFieldErrors((prev) => {
+      if (!prev.facePhotoFile) return prev;
+      const next = { ...prev };
+      delete next.facePhotoFile;
+      return next;
+    });
+    setFacePhotoFile(file);
+  };
+
   // `prefix` renders a fixed, non-editable leading label inside the field box
   // (used for the +63 country code on the phone number).
   const renderField = (
@@ -388,10 +422,10 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
               {fieldErrors.certificateFile ? <Text style={styles.errorText}>{fieldErrors.certificateFile}</Text> : null}
             </View>
             <View style={styles.field}>
-              <Text style={styles.label}>Face Photo</Text>
-              <TouchableOpacity style={[styles.input, styles.docButton, fieldErrors.facePhotoFile && styles.inputError]} onPress={() => chooseCredential(setFacePhotoFile, 'facePhotoFile', 'Face photo')} accessibilityRole="button" accessibilityLabel="Choose face photo">
+              <Text style={styles.label}>Face Photo (front camera only)</Text>
+              <TouchableOpacity style={[styles.input, styles.docButton, fieldErrors.facePhotoFile && styles.inputError]} onPress={() => { void takeFacePhoto(); }} accessibilityRole="button" accessibilityLabel="Take face photo with front camera">
                 <Ionicons name="camera-outline" size={18} color={accent} />
-                <Text style={styles.docButtonText} numberOfLines={1}>{facePhotoFile ? facePhotoFile.name : 'Choose face photo'}</Text>
+                <Text style={styles.docButtonText} numberOfLines={1}>{facePhotoFile ? facePhotoFile.name : 'Take face photo'}</Text>
               </TouchableOpacity>
               {fieldErrors.facePhotoFile ? <Text style={styles.errorText}>{fieldErrors.facePhotoFile}</Text> : null}
             </View>
@@ -409,10 +443,10 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
               {fieldErrors.governmentIdFile ? <Text style={styles.errorText}>{fieldErrors.governmentIdFile}</Text> : null}
             </View>
             <View style={styles.field}>
-              <Text style={styles.label}>Face Photo</Text>
-              <TouchableOpacity style={[styles.input, styles.docButton, fieldErrors.facePhotoFile && styles.inputError]} onPress={() => chooseCredential(setFacePhotoFile, 'facePhotoFile', 'Face photo')} accessibilityRole="button" accessibilityLabel="Choose face photo">
+              <Text style={styles.label}>Face Photo (front camera only)</Text>
+              <TouchableOpacity style={[styles.input, styles.docButton, fieldErrors.facePhotoFile && styles.inputError]} onPress={() => { void takeFacePhoto(); }} accessibilityRole="button" accessibilityLabel="Take face photo with front camera">
                 <Ionicons name="camera-outline" size={18} color={accent} />
-                <Text style={styles.docButtonText} numberOfLines={1}>{facePhotoFile ? facePhotoFile.name : 'Choose face photo'}</Text>
+                <Text style={styles.docButtonText} numberOfLines={1}>{facePhotoFile ? facePhotoFile.name : 'Take face photo'}</Text>
               </TouchableOpacity>
               {fieldErrors.facePhotoFile ? <Text style={styles.errorText}>{fieldErrors.facePhotoFile}</Text> : null}
             </View>

@@ -40,6 +40,11 @@ const isTechnicianEnRoute = (status) => TECHNICIAN_EN_ROUTE_STATUSES.includes(no
 
 const isNoShowReportable = (status) => NO_SHOW_REPORTABLE_STATUSES.includes(normalizeStatus(status));
 
+// UAT #2: the technician's arrival stamp is the fact that makes a later
+// customer cancellation — or a reported no-show — the customer's
+// responsibility rather than a scheduling change.
+const isTechnicianArrived = (job) => Boolean(job && job.technician_arrival_timestamp);
+
 const isScamReportable = (status) => scamReportableStatuses().includes(normalizeStatus(status));
 
 const isLiveTrackable = (status) => LIVE_TRACKING_STATUSES.includes(status);
@@ -68,6 +73,7 @@ module.exports = {
   isCustomerCancellable,
   isTechnicianEnRoute,
   isNoShowReportable,
+  isTechnicianArrived,
   isScamReportable,
   isLiveTrackable,
   stageOf,

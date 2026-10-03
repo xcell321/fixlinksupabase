@@ -11,6 +11,9 @@
 // for a local run with an empty .env.
 
 const DEFAULT_TERMS_VERSION = '2026-10-01';
+const DEFAULT_TERMS_REQUIRED = true;
+const DEFAULT_TERMS_REJECTION =
+  'You must accept the booking regulations before submitting a repair request.';
 
 const asBool = (value, fallback) => {
   if (value === undefined || value === null || String(value).trim() === '') return fallback;
@@ -19,7 +22,7 @@ const asBool = (value, fallback) => {
 
 // On by default: letting a booking through without an explicit agreement has to
 // be a deliberate, configured choice — never an accident.
-const isTermsRequired = () => asBool(process.env.SUBMIT_TERMS_REQUIRED, true);
+const isTermsRequired = () => asBool(process.env.SUBMIT_TERMS_REQUIRED, DEFAULT_TERMS_REQUIRED);
 
 const termsVersion = () => String(process.env.SUBMIT_TERMS_VERSION || DEFAULT_TERMS_VERSION).trim();
 
@@ -38,8 +41,7 @@ const asAccepted = (value) => {
 const hasAcceptedTerms = (body = {}) => asAccepted(body.termsAccepted) || asAccepted(body.terms_accepted);
 
 const rejectionMessage = () => String(
-  process.env.SUBMIT_TERMS_REJECTION
-    || 'You must accept the booking regulations before submitting a repair request.'
+  process.env.SUBMIT_TERMS_REJECTION || DEFAULT_TERMS_REJECTION
 ).trim();
 
 // Returns { ok, reason }. A failed check is a hard validation error (400).

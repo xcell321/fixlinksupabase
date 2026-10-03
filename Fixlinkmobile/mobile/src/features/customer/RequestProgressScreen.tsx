@@ -7,6 +7,7 @@ import { cancelRepairRequest, confirmRepairRequest, fetchCompletedJobs, fetchCus
 import { alpha, colors, fonts, shadows, themedStyles } from '../../theme';
 import { getApplianceIcon, getStatusColor, getStatusGuidance, getStatusIcon } from '../../utils/applianceIcons';
 import { splitJobDescription } from '../../utils/jobDescription';
+import { lateCancelWarning } from '../../utils/noShowPolicy';
 import type { ScheduleAvailability, TechnicianScheduleItem } from '../../types/schedule';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -26,6 +27,8 @@ interface ServiceRequest {
   preferredTime?: string;
   scheduledDate?: string;
   photoUrl?: string | null;
+  /** UAT #2: set once the technician records an arrival on site. */
+  technicianArrivalAt?: string | null;
 }
 
 interface CompletedJob {
@@ -76,6 +79,8 @@ interface RequestProgressScreenProps {
 }
 
 const ACTIVE_STATUSES = ['accepted', 'confirmed', 'customer ready', 'in progress'];
+// Statuses the backend still lets the customer cancel (domain/jobWorkflow.js).
+const CANCELLABLE_STATUSES = ['pending', 'accepted', 'confirmed', 'customer ready'];
 const PROGRESS_STEPS = ['Accepted', 'Confirmed', 'Ready', 'In Progress'];
 
 const progressIndexOf = (status: string | undefined): number => {
@@ -348,6 +353,18 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
     });
   };
 
+  // UAT #2: cancelling after the technician has arrived is no longer a free
+  // action — the account is suspended for it — so the confirmation has to warn
+  // instead of reading like an ordinary queue exit.
+  const cancelMessageFor = (req: ServiceRequest): string => {
+    if (req.technicianArrivalAt) return lateCancelWarning();
+    const status = String(req.status || '').toLowerCase();
+    if (status === 'pending') {
+      return 'No technician has accepted this request yet. Cancelling removes it from the queue.';
+    }
+    return 'The technician is on the way. Cancelling now will notify them.';
+  };
+
   const cancelWithMessage = (req: ServiceRequest, message: string): void => {
     setActionError(null);
     setPendingAction({
@@ -381,7 +398,6 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
     // alone) so the raw brackets never reach the screen.
     const { brand, text: issueText } = splitJobDescription(req.description);
     const statusKey = String(req.status || '').toLowerCase();
-    const isPending = statusKey === 'pending';
     const progress = STATUS_PROGRESS[statusKey] ?? 15;
     const isFocused = focusedJobId && String(focusedJobId) === String(req.id);
     return (
@@ -418,11 +434,11 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
             <Text style={styles.refFooterText} numberOfLines={1}>ETA: {etaLabel(req)}</Text>
           </View>
         </View>
-        {isPending && (
+        {CANCELLABLE_STATUSES.includes(statusKey) && (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Cancel request for ${req.applianceType ?? 'this request'}`}
-            onPress={() => cancelWithMessage(req, 'This can only be done before a technician accepts the request.')}
+            onPress={() => cancelWithMessage(req, cancelMessageFor(req))}
             style={({ pressed }) => [styles.refCancelBtn, pressed && { opacity: 0.8 }]}
           >
             <Text style={styles.refCancelText}>Cancel request</Text>

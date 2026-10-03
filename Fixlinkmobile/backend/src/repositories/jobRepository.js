@@ -100,10 +100,13 @@ const findAssignmentSummary = async (id) => {
 };
 
 // Minimal projection used to validate a cancellation before writing.
+// `technician_arrival_timestamp` is part of the projection because UAT #2 makes
+// "the technician is already there" the difference between a scheduling change
+// and a suspendable late cancellation.
 const findCancellationContext = async (id) => {
   const { data, error } = await supabase
     .from(TABLE)
-    .select('id, customer_uid, technician_uid, technician_name, status')
+    .select('id, customer_uid, technician_uid, technician_name, status, technician_arrival_timestamp')
     .eq('id', id)
     .maybeSingle();
   if (error || !data) return null;
@@ -124,6 +127,22 @@ const updateByIdReturningIds = async (id, updates) =>
   supabase.from(TABLE).update(updates).eq('id', id).select('id');
 
 const insertIncident = async (row) => supabase.from('service_incidents').insert(row);
+
+// UAT #2: how many times this customer has already cancelled after the
+// technician arrived. Every such cancellation is logged as a
+// `service_incidents` row at stage `after_travel`, so the incident log doubles
+// as the counter and the two can never drift apart.
+const countLateCancellations = async (customerUid) => {
+  if (!customerUid) return 0;
+  const { count, error } = await supabase
+    .from('service_incidents')
+    .select('id', { count: 'exact', head: true })
+    .eq('customer_uid', customerUid)
+    .eq('type', 'cancellation')
+    .eq('stage', 'after_travel');
+  if (error) return 0;
+  return Number(count) || 0;
+};
 
 // Atomic accept (guards against two technicians taking the same job).
 const acceptJob = async ({ jobId, technicianUid, technicianName }) =>
@@ -172,6 +191,7 @@ module.exports = {
   updateById,
   updateByIdReturningIds,
   insertIncident,
+  countLateCancellations,
   acceptJob,
   recordNoShow,
   recordScamIncident,

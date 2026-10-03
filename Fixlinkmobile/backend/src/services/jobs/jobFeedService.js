@@ -94,13 +94,26 @@ const listCustomerJobs = async ({ customerName, customerUid, authUid }) => {
   });
 
   // Customer-owned list (uid-verified above) — the completion OTP is theirs.
+  // Technician cards and their reviews load in two batched queries up front,
+  // so the list costs the same whether it holds one job or fifty.
+  const assignedUids = [...new Set(jobs.map((job) => job.technician_uid).filter(Boolean))];
+  const [techCards, techReviews] = await Promise.all([
+    userRepository.findTechnicianCardsByIds(assignedUids),
+    reviewRepository.findByTechnicianUids(assignedUids),
+  ]);
+  const techById = new Map((techCards || []).map((row) => [String(row.id), row]));
+  const reviewsByTech = new Map();
+  for (const row of techReviews || []) {
+    const key = String(row.technician_uid);
+    if (!reviewsByTech.has(key)) reviewsByTech.set(key, []);
+    reviewsByTech.get(key).push(row);
+  }
   const withTechnician = await Promise.all(jobs.map(async (job) => {
     if (!job.technician_uid && !job.technician_name) return serializeJob(job, { viewerUid: requestedUid });
 
-    const technician = (job.technician_uid && await userRepository.findById(job.technician_uid)) || {};
+    const technician = techById.get(String(job.technician_uid)) || {};
 
-    let reviews = [];
-    if (job.technician_uid) reviews = await reviewRepository.findByTechnicianUid(job.technician_uid);
+    let reviews = reviewsByTech.get(String(job.technician_uid)) || [];
     if (reviews.length === 0 && (job.technician_name || technician.name)) {
       reviews = await reviewRepository.findByTechnicianName(job.technician_name || technician.name);
     }

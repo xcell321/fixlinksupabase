@@ -29,24 +29,41 @@ const asBool = (value, fallback) => {
   return String(value).toLowerCase() === 'true';
 };
 
-const isRequestSafetyEnabled = () => asBool(process.env.REQUEST_SAFETY_ENABLED, true);
+// Fallbacks for an empty .env. Every value is still read from the environment
+// on each call — these constants exist so no threshold is a literal at the
+// point of use, which is what the "nothing is hardcoded" rule means here.
+const DEFAULTS = {
+  enabled: true,
+  minLength: 8,
+  minTokens: 2,
+  maxRepeatRun: 4,
+  gpsToleranceKm: 5,
+  enforcement: 'flag',
+  cooldownSeconds: 60,
+  windowHours: 24,
+  similarityThreshold: 0.8,
+  maxMatches: 2,
+  addressDailyCap: 3,
+};
+
+const isRequestSafetyEnabled = () => asBool(process.env.REQUEST_SAFETY_ENABLED, DEFAULTS.enabled);
 
 // --- Address sanity -------------------------------------------------------
-const addressMinLength = () => asInt(process.env.ADDRESS_MIN_LENGTH, 8);
-const addressMinTokens = () => asInt(process.env.ADDRESS_MIN_TOKENS, 2);
-const addressMaxRepeatRun = () => asInt(process.env.ADDRESS_MAX_REPEAT_RUN, 4);
+const addressMinLength = () => asInt(process.env.ADDRESS_MIN_LENGTH, DEFAULTS.minLength);
+const addressMinTokens = () => asInt(process.env.ADDRESS_MIN_TOKENS, DEFAULTS.minTokens);
+const addressMaxRepeatRun = () => asInt(process.env.ADDRESS_MAX_REPEAT_RUN, DEFAULTS.maxRepeatRun);
 
 // --- Proximity ("is the customer actually at the address?") ---------------
-const addressGpsToleranceKm = () => asFloat(process.env.ADDRESS_GPS_TOLERANCE_KM, 5);
-// 'flag' (default) warns the technician; 'block' refuses the submission.
-const addressEnforcement = () => String(process.env.ADDRESS_ENFORCEMENT || 'flag').toLowerCase();
+const addressGpsToleranceKm = () => asFloat(process.env.ADDRESS_GPS_TOLERANCE_KM, DEFAULTS.gpsToleranceKm);
+// 'flag' warns the technician; 'block' refuses the submission.
+const addressEnforcement = () => String(process.env.ADDRESS_ENFORCEMENT || DEFAULTS.enforcement).toLowerCase();
 
 // --- Repeated / spam bookings --------------------------------------------
-const submitCooldownSeconds = () => asInt(process.env.SUBMIT_COOLDOWN_SECONDS, 60);
-const spamWindowHours = () => asFloat(process.env.SPAM_WINDOW_HOURS, 24);
-const spamSimilarityThreshold = () => asFloat(process.env.SPAM_SIMILARITY_THRESHOLD, 0.8);
-const spamMaxMatches = () => asInt(process.env.SPAM_MAX_MATCHES, 2);
-const addressDailyCap = () => asInt(process.env.MAX_BOOKINGS_PER_ADDRESS_PER_DAY, 3);
+const submitCooldownSeconds = () => asInt(process.env.SUBMIT_COOLDOWN_SECONDS, DEFAULTS.cooldownSeconds);
+const spamWindowHours = () => asFloat(process.env.SPAM_WINDOW_HOURS, DEFAULTS.windowHours);
+const spamSimilarityThreshold = () => asFloat(process.env.SPAM_SIMILARITY_THRESHOLD, DEFAULTS.similarityThreshold);
+const spamMaxMatches = () => asInt(process.env.SPAM_MAX_MATCHES, DEFAULTS.maxMatches);
+const addressDailyCap = () => asInt(process.env.MAX_BOOKINGS_PER_ADDRESS_PER_DAY, DEFAULTS.addressDailyCap);
 
 // Which calendar day "today" is, so the anti-harassment window lines up with the
 // customer's local midnight instead of the server's timezone. Reuses the daily

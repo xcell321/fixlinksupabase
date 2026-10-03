@@ -13,6 +13,15 @@ const findByTechnicianUid = async (technicianUid) => {
   return data || [];
 };
 
+// Batched variant for feed enrichment: one query for every assigned
+// technician on the list instead of one query per job.
+const findByTechnicianUids = async (technicianUids) => {
+  const list = [...new Set((technicianUids || []).filter(Boolean))];
+  if (list.length === 0) return [];
+  const { data } = await supabase.from(TABLE).select('*').in('technician_uid', list);
+  return data || [];
+};
+
 // Legacy reviews were keyed by display name only.
 // Every technician -> customer review for one customer. Used to count negative
 // ratings for the UAT #11 auto-suspend rule.
@@ -51,6 +60,7 @@ const recomputeCustomerRating = async (customerUid) =>
 
 module.exports = {
   findByTechnicianUid,
+  findByTechnicianUids,
   findTechnicianReviewsForCustomer,
   findByTechnicianName,
   findByRequestAndReviewerRole,

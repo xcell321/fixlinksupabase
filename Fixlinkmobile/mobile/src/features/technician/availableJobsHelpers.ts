@@ -1,3 +1,5 @@
+import { noShowWaitState, type NoShowWaitState } from '../../utils/noShowPolicy';
+
 export interface JobItem {
   id: string;
   status?: string;
@@ -203,6 +205,21 @@ export function canMarkArrival(job: { status?: string; technicianArrivalAt?: str
 }
 
 /**
+ * UAT #2: how far through the no-show wait window a job is. Reporting a
+ * customer no-show is refused by the server until the technician has recorded
+ * an arrival and waited the window, so the card uses this to show a countdown
+ * instead of letting a request fail.
+ */
+export function noShowState(job: { technicianArrivalAt?: string | null }): NoShowWaitState {
+  return noShowWaitState(job);
+}
+
+/** Whether the technician may file a customer no-show right now. */
+export function canReportNoShow(job: { technicianArrivalAt?: string | null }): boolean {
+  return noShowWaitState(job).ready;
+}
+
+/**
  * Checks if the technician can start the repair for a given job.
  */
 export function canStartRepair(job: { status?: string; technicianArrivalAt?: string | null }): boolean {
@@ -292,8 +309,14 @@ export function hasSafetyWarning(job: Pick<JobItem, 'safetyLevel'>): boolean {
   return WARNING_RISK_LEVELS.includes(String(job?.safetyLevel || '').trim().toLowerCase());
 }
 
-export function hasPhotoWarning(job: Pick<JobItem, 'photoRiskLevel'>): boolean {
-  return WARNING_RISK_LEVELS.includes(String(job?.photoRiskLevel || '').trim().toLowerCase());
+/** Photo flags that prove AI involvement on their own, even at a low merged score. */
+const AI_PHOTO_FLAGS: readonly string[] = ['ai_generated', 'ai_tool_marker'];
+
+export function hasPhotoWarning(job: Pick<JobItem, 'photoRiskLevel' | 'photoFlags'>): boolean {
+  if (WARNING_RISK_LEVELS.includes(String(job?.photoRiskLevel || '').trim().toLowerCase())) return true;
+  const raw: unknown = job?.photoFlags;
+  const list: unknown[] = Array.isArray(raw) ? raw : (typeof raw === 'string' ? [raw] : []);
+  return list.some((flag) => AI_PHOTO_FLAGS.includes(String(flag ?? '').trim().toLowerCase()));
 }
 
 /** One-line warning for the queue card, shown before the job is accepted. */

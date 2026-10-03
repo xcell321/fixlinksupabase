@@ -15,7 +15,7 @@
  *   node scripts/rescreen-credentials.js --apply --force   # re-screen EVERYONE with an ID
  *   node scripts/rescreen-credentials.js --apply --limit=20
  *
- * --force is the upgrade path: run it again after OMNIROUTE_VISION_MODEL is
+ * --force is the upgrade path: run it again after AI_VISION_MODEL is
  * configured so already-scored users get the AI vision verdict too.
  */
 require('dotenv').config();
@@ -107,7 +107,7 @@ const run = async () => {
       const visionRan = screening.vision !== null;
       const notes = visionRan
         ? screening.notes
-        : [screening.notes, 'Local forensics only — AI vision unavailable at re-screen time. Re-run with --force once OMNIROUTE_VISION_MODEL is set.'].filter(Boolean).join(' ');
+        : [screening.notes, 'Local forensics only — AI vision unavailable at re-screen time. Re-run with --force once AI_VISION_MODEL is set.'].filter(Boolean).join(' ');
 
       const updates = {
         credential_risk_score: screening.riskScore,

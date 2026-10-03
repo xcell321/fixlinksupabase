@@ -254,7 +254,6 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
   const [photo, setPhoto] = useState<PhotoAsset | null>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoViewerVisible, setPhotoViewerVisible] = useState(false);
-  const [photoMenuVisible, setPhotoMenuVisible] = useState(false);
   const [successVisible, setSuccessVisible] = useState(false);
   // UAT #4: the regulation gate that stands between the appointment step and
   // the location step. `termsAccepted` is session state on purpose - it is
@@ -510,8 +509,10 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
     return () => { cancelled = true; clearTimeout(t); };
   }, [composedLocation, currentStep, street, city, zipCode, addressFromPin]);
 
-  // Optional problem photo: helps the technician see the issue before
-  // accepting. Kept local until submit; uploaded as multipart `photo`.
+  // Required live-capture problem photo: the customer must photograph the issue
+  // with the camera at submit time. No gallery upload exists, so a saved or
+  // AI-generated file cannot enter through this screen. Kept local until
+  // submit; uploaded as multipart `photo`.
   const normalizePhotoAsset = (asset?: ImagePicker.ImagePickerAsset | null) => {
     if (!asset?.uri) return null;
     if (asset.fileSize && asset.fileSize > 5 * 1024 * 1024) {
@@ -525,31 +526,29 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
     };
   };
 
-  const pickFromLibrary = async () => {
-    setPhotoBusy(true);
-    try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (permission.status !== 'granted') {
-        Alert.alert('Photo permission needed', 'Allow photo access to attach a picture of the problem.');
-        return;
-      }
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        quality: 0.7,
-      });
-      if (!result.canceled && result.assets?.length > 0) {
-        const normalized = normalizePhotoAsset(result.assets?.[0]);
-        if (normalized) setPhoto(normalized);
-      }
-    } finally {
-      setPhotoBusy(false);
-    }
-  };
-
   const takePhoto = async () => {
     setPhotoBusy(true);
     try {
+      // Web has no forced camera capture: a desktop browser turns the camera
+      // call into a file dialog. A device without camera hardware can never
+      // do a live capture, so the picker never opens there at all.
+      if (Platform.OS === 'web') {
+        const mediaDevices = (globalThis.navigator as Navigator | undefined)?.mediaDevices;
+        let hasCamera = false;
+        try {
+          const devices = mediaDevices?.enumerateDevices ? await mediaDevices.enumerateDevices() : [];
+          hasCamera = devices.some((device) => device.kind === 'videoinput');
+        } catch {
+          hasCamera = false;
+        }
+        if (!hasCamera) {
+          Alert.alert(
+            'Camera required',
+            'Live photo capture needs a camera. Please submit this request from the mobile app.'
+          );
+          return;
+        }
+      }
       const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (permission.status !== 'granted') {
         Alert.alert('Camera permission needed', 'Allow camera access to take a picture of the problem.');
@@ -558,26 +557,20 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
       const result = await ImagePicker.launchCameraAsync({ quality: 0.7, allowsEditing: true });
       if (!result.canceled && result.assets?.length > 0) {
         const normalized = normalizePhotoAsset(result.assets?.[0]);
-        if (normalized) setPhoto(normalized);
+        if (normalized) {
+          setPhoto(normalized);
+          if (stepErrors.photo) setStepErrors((p) => { const n = { ...p }; delete n.photo; return n; });
+        }
       }
     } finally {
       setPhotoBusy(false);
     }
   };
 
-  const handlePhotoAction = () => {
+  // Camera only: tapping the picker opens the live camera directly.
+  const handlePhotoAction = async () => {
     if (photoBusy) return;
-    setPhotoMenuVisible(true);
-  };
-
-  const handleTakePhoto = async () => {
-    setPhotoMenuVisible(false);
     await takePhoto();
-  };
-
-  const handlePickFromLibrary = async () => {
-    setPhotoMenuVisible(false);
-    await pickFromLibrary();
   };
 
   const handleDateValue = (selectedDate?: Date | null) => {
@@ -627,6 +620,12 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
       } else {
         delete next.description;
       }
+      if (!photo?.uri) {
+        next.photo = 'Take a live photo of the problem with your camera to continue.';
+        valid = false;
+      } else {
+        delete next.photo;
+      }
     }
     if (step === 3) {
       const today = new Date(); today.setHours(0,0,0,0);
@@ -652,7 +651,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
 
   const canContinueForStep = (step: number) => {
     if (step === 1) return !!selectedCategoryName.trim();
-    if (step === 2) return !!description.trim() && !!brandModel.trim();
+    if (step === 2) return !!description.trim() && !!brandModel.trim() && !!photo?.uri;
     if (step === 3) {
       const today = new Date(); today.setHours(0,0,0,0);
       const d = new Date(date); d.setHours(0,0,0,0);
@@ -964,7 +963,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
 
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
-              <Text style={styles.inputLabel}>Problem photo <Text style={styles.optionalLabel}>(optional)</Text></Text>
+              <Text style={styles.inputLabel}>Problem photo <Text style={styles.optionalLabel}>(required · camera only)</Text></Text>
               <View style={styles.photoBadge}>
                 <Ionicons name="shield-checkmark-outline" size={10} color={colors.customer} />
                 <Text style={styles.photoBadgeText}>Seen before accept</Text>
@@ -981,9 +980,9 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
                     <Text style={styles.photoReadyText}>Photo ready</Text>
                   </View>
                   <View style={styles.photoPreviewActions}>
-                    <TouchableOpacity style={styles.photoSecondaryButton} onPress={handlePhotoAction} activeOpacity={0.7} disabled={photoBusy} accessibilityRole="button" accessibilityLabel="Replace photo" hitSlop={6}>
+                    <TouchableOpacity style={styles.photoSecondaryButton} onPress={handlePhotoAction} activeOpacity={0.7} disabled={photoBusy} accessibilityRole="button" accessibilityLabel="Retake photo" hitSlop={6}>
                       <Ionicons name="refresh-outline" size={14} color={colors.customer} />
-                      <Text style={styles.photoSecondaryText}>Replace</Text>
+                      <Text style={styles.photoSecondaryText}>Retake</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.photoSecondaryButton} onPress={() => setPhoto(null)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Remove photo" hitSlop={6}>
                       <Ionicons name="trash-outline" size={14} color={colors.muted} />
@@ -993,7 +992,7 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
                 </View>
               </View>
             ) : (
-              <TouchableOpacity style={styles.photoPicker} onPress={handlePhotoAction} activeOpacity={0.7} disabled={photoBusy} accessibilityRole="button" accessibilityLabel="Add a photo of the problem" hitSlop={8}>
+              <TouchableOpacity style={styles.photoPicker} onPress={handlePhotoAction} activeOpacity={0.7} disabled={photoBusy} accessibilityRole="button" accessibilityLabel="Take a live photo of the problem" hitSlop={8}>
                 {photoBusy ? (
                   <ActivityIndicator size="small" color={colors.customer} />
                 ) : (
@@ -1002,13 +1001,16 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
                       <Ionicons name="camera-outline" size={20} color={colors.customer} />
                     </View>
                     <View style={styles.photoPickerCopy}>
-                      <Text style={styles.photoPickerTitle}>Add a photo of the problem</Text>
-                      <Text style={styles.photoPickerSub}>Camera or gallery - JPG / PNG up to 5MB</Text>
+                      <Text style={styles.photoPickerTitle}>Take a live photo of the problem</Text>
+                      <Text style={styles.photoPickerSub}>Camera only - JPG / PNG up to 5MB</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={16} color={colors.muted} />
                   </>
                 )}
               </TouchableOpacity>
+            )}
+            {!!stepErrors.photo && (
+              <Text style={styles.errorText} accessibilityLiveRegion="polite">{stepErrors.photo}</Text>
             )}
           </View>
         </View>
@@ -1488,26 +1490,6 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
         subtitle="Preview before submitting"
         onClose={() => setPhotoViewerVisible(false)}
       />
-
-      <Modal visible={photoMenuVisible} transparent animationType="fade" onRequestClose={() => setPhotoMenuVisible(false)}>
-        <View style={styles.photoMenuBackdrop}>
-          <View style={styles.photoMenuCard}>
-            <Text style={styles.photoMenuTitle}>Add a photo</Text>
-            <Text style={styles.photoMenuSub}>Show the technician what needs fixing.</Text>
-            <TouchableOpacity style={styles.photoMenuButton} onPress={handleTakePhoto} accessibilityRole="button" accessibilityLabel="Take photo">
-              <Ionicons name="camera-outline" size={18} color={colors.customer} />
-              <Text style={styles.photoMenuButtonText}>Take photo</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.photoMenuButton} onPress={handlePickFromLibrary} accessibilityRole="button" accessibilityLabel="Choose from gallery">
-              <Ionicons name="image-outline" size={18} color={colors.customer} />
-              <Text style={styles.photoMenuButtonText}>Choose from gallery</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.photoMenuCancel} onPress={() => setPhotoMenuVisible(false)} accessibilityRole="button" accessibilityLabel="Cancel photo picker">
-              <Text style={styles.photoMenuCancelText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
 
       <SubmitTermsModal
         visible={termsVisible}

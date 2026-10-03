@@ -15,18 +15,27 @@ const asBool = (value, fallback) => {
   return String(value).toLowerCase() === 'true';
 };
 
+// Fallbacks for an empty .env, so no threshold is a literal at the point of use.
+const DEFAULTS = {
+  screeningEnabled: true,
+  visionEnabled: true,
+  flagThreshold: 60,
+  highThreshold: 80,
+  aiThreshold: 0.6,
+};
+
 const isPhotoScreeningEnabled = () =>
-  asBool(process.env.PHOTO_SCREENING_ENABLED, asBool(process.env.CREDENTIAL_SCREENING_ENABLED, true));
+  asBool(process.env.PHOTO_SCREENING_ENABLED, asBool(process.env.CREDENTIAL_SCREENING_ENABLED, DEFAULTS.screeningEnabled));
 
 const isPhotoVisionEnabled = () =>
   isPhotoScreeningEnabled()
-  && asBool(process.env.PHOTO_AI_VISION_ENABLED, asBool(process.env.CREDENTIAL_AI_VISION_ENABLED, true));
+  && asBool(process.env.PHOTO_AI_VISION_ENABLED, asBool(process.env.CREDENTIAL_AI_VISION_ENABLED, DEFAULTS.visionEnabled));
 
-const photoFlagThreshold = () => asInt(process.env.PHOTO_FLAG_THRESHOLD, 60);
-const photoHighThreshold = () => asInt(process.env.PHOTO_HIGH_THRESHOLD, 80);
+const photoFlagThreshold = () => asInt(process.env.PHOTO_FLAG_THRESHOLD, DEFAULTS.flagThreshold);
+const photoHighThreshold = () => asInt(process.env.PHOTO_HIGH_THRESHOLD, DEFAULTS.highThreshold);
 const photoAiThreshold = () => {
   const parsed = Number.parseFloat(process.env.PHOTO_AI_THRESHOLD);
-  return Number.isFinite(parsed) ? parsed : 0.6;
+  return Number.isFinite(parsed) ? parsed : DEFAULTS.aiThreshold;
 };
 
 const PHOTO_FLAGS = {
@@ -55,7 +64,9 @@ const FLAG_NOTES = {
 
 const VISION_SYSTEM = `You inspect customer-submitted photos of broken home appliances for a Philippine repair platform.
 Decide whether the photo is a genuine camera photo of a real appliance, or fake (AI-generated, stock image, or a screenshot).
-Return STRICT JSON only, no prose. Be conservative: when unsure, prefer the less accusatory value.`;
+Modern generators (ChatGPT image models, DALL-E, Gemini/Imagen class) render photorealistic appliances, so a real-looking overall scene proves nothing. Judge the fine details instead: warped or gibberish text and digits on keypads and displays, waxy or plastic textures on metal and food debris, over-perfect surfaces next to selective grime, inconsistent shadows and reflections, repeating patterns, and noise or compression that does not match across regions.
+Score what the details show. When fine details look generated, report aiGeneratedLikelihood 0.6 or higher even if the overall scene looks real. Reserve low scores for photos whose fine details all read genuine.
+Return STRICT JSON only: output exactly the JSON object, no markdown fences, no prose before or after it.`;
 
 const VISION_INSTRUCTION = `Return a JSON object with exactly these keys:
 {

@@ -9,6 +9,7 @@ import { splitJobDescription } from '../../../utils/jobDescription';
 import { PhotoThumb } from '../../../components/RequestPhoto';
 import {
   formatJobSchedule,
+  hasPhotoWarning,
   hasSafetyWarning,
   safetyWarningText,
   type JobItem,
@@ -106,6 +107,16 @@ export const QueueJobCard = ({
         <PhotoThumb photoUrl={job.photoUrl} onPress={() => onPreviewPhoto(job.photoUrl ?? null)} />
       </View>
     )}
+
+    {/* UAT #6: AI / fake photo warning before accepting. */}
+    {hasPhotoWarning(job) ? (
+      <View style={styles.safetyWarnRow}>
+        <Ionicons name="warning-outline" size={13} color={colors.warningText} />
+        <Text style={styles.safetyWarnText}>
+          {job.photoNotes || 'This device photo may be fake or AI-generated. Verify it before travelling.'}
+        </Text>
+      </View>
+    ) : null}
 
     {/* UAT #5: warn before accepting, not only after travelling. */}
     {hasSafetyWarning(job) ? (

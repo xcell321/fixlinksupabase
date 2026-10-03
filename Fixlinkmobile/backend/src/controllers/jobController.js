@@ -160,6 +160,14 @@ const reportScam = handleRequest(
   })
 );
 
+const listCustomerReviews = handleRequest(
+  { logLabel: 'Error loading customer reviews:', serverMessage: 'Unable to load customer reviews.' },
+  (req) => jobService.listCustomerReviews({
+    customerUid: req.params.uid,
+    authUid: req.authUser.uid,
+  })
+);
+
 module.exports = {
   submitRequest,
   listAvailableJobs,
@@ -178,5 +186,6 @@ module.exports = {
   reportNoShow,
   submitReview,
   rateCustomer,
+  listCustomerReviews,
   reportScam,
 };

@@ -11,8 +11,8 @@
 
 const jobRepository = require('../../repositories/jobRepository');
 const reviewRepository = require('../../repositories/reviewRepository');
-const userRepository = require('../../repositories/userRepository');
 const { HttpError } = require('../../domain/httpError');
+const { suspendAccount } = require('./accountSuspension');
 const {
   isValidRating,
   ratingRangeLabel,
@@ -85,8 +85,7 @@ const rateCustomer = async ({ jobId, authUid, technicianUid, rating, comment }) 
       const history = await reviewRepository.findTechnicianReviewsForCustomer(job.customer_uid);
       const negatives = history.filter((row) => isNegativeRating(row.rating)).length;
       if (shouldSuspendForNegativeRatings(negatives)) {
-        const { error: suspendError } = await userRepository.updateStatus(job.customer_uid, 'suspended');
-        if (!suspendError) customerSuspended = true;
+        customerSuspended = await suspendAccount(job.customer_uid, { reason: 'negative ratings' });
       }
     } catch (suspendError) {
       console.warn('Could not apply the negative-rating policy:', suspendError.message);
@@ -104,4 +103,31 @@ const rateCustomer = async ({ jobId, authUid, technicianUid, rating, comment }) 
   };
 };
 
-module.exports = { rateCustomer };
+// GET /api/requests/customer/:uid/reviews
+//
+// UAT #11 — what another technician reads to identify a legit customer before
+// accepting: technician-authored stars + comments, newest first, capped. The
+// reporter identity is never exposed, so no review invites retaliation.
+const MAX_VISIBLE_REVIEWS = 20;
+
+const listCustomerReviews = async ({ customerUid }) => {
+  const uid = String(customerUid || '').trim();
+  if (!uid) {
+    throw new HttpError(400, { error: 'Customer identity is required.' });
+  }
+  const history = await reviewRepository.findTechnicianReviewsForCustomer(uid);
+  const sorted = [...(history || [])].sort((a, b) =>
+    String(b.created_at || '').localeCompare(String(a.created_at || ''))
+  );
+  const reviews = sorted.slice(0, MAX_VISIBLE_REVIEWS).map((row) => ({
+    rating: Number(row.rating),
+    comment: String(row.comment || '').trim(),
+    createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
+  }));
+  return {
+    status: 200,
+    body: { reviews, totalReviews: (history || []).length },
+  };
+};
+
+module.exports = { rateCustomer, listCustomerReviews };

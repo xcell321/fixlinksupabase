@@ -7,8 +7,11 @@ const {
   TECHNICIAN_SETTABLE_STATUSES,
   isCustomerCancellable,
   isTechnicianEnRoute,
+  isTechnicianArrived,
   stageOf,
 } = require('../../domain/jobWorkflow');
+const { shouldSuspendForLateCancel } = require('../../domain/autoSuspendPolicy');
+const { suspendAccount } = require('./accountSuspension');
 const { HttpError } = require('../../domain/httpError');
 const { assertTechnicianOwner } = require('../../middleware/identityGuards');
 const { getTechnicianActiveJobCount, getWorkloadStatus, isAtJobLimit, getMaxActiveJobs } = require('../workloadService');
@@ -92,6 +95,11 @@ const declineJob = async ({ jobId, authUid, technicianUid }) => {
 };
 
 // PUT /api/requests/:id/cancel — the customer cancels their own request.
+//
+// UAT #2: once the technician has physically arrived, cancelling stops being a
+// scheduling change. The cancellation still goes through — the technician
+// should not be left waiting — but it is logged at stage `after_travel` and the
+// customer is auto-suspended at CUSTOMER_LATE_CANCEL_LIMIT such cancellations.
 const cancelJob = async ({ jobId, authUid, cancellationReason }) => {
   const existing = await jobRepository.findCancellationContext(jobId);
   if (!existing) throw new HttpError(404, { error: 'Repair request not found.' });
@@ -102,7 +110,9 @@ const cancelJob = async ({ jobId, authUid, cancellationReason }) => {
     throw new HttpError(409, { error: 'This request can no longer be cancelled.' });
   }
 
-  const stage = stageOf(existing.status);
+  const arrived = isTechnicianArrived(existing);
+  // `after_travel` is the stage that means "the technician was already there".
+  const stage = arrived ? 'after_travel' : stageOf(existing.status);
   const reason = String(cancellationReason || '').trim() || null;
   await jobRepository.updateById(existing.id, {
     status: 'Cancelled',
@@ -113,30 +123,56 @@ const cancelJob = async ({ jobId, authUid, cancellationReason }) => {
     cancellation_reason: reason,
   });
 
-  // Log an incident only when the customer cancels after having already
-  // confirmed that someone would be at the service location.
-  if (stage === 'after_ready' || stage === 'after_confirmation') {
+  // Log an incident when the customer cancels after having already confirmed
+  // that someone would be at the service location, or after the technician
+  // arrived. The row is also the counter the UAT #2 rule reads back.
+  if (arrived || stage === 'after_ready' || stage === 'after_confirmation') {
     await jobRepository.insertIncident({
       job_id: existing.id,
       customer_uid: existing.customer_uid,
       technician_uid: existing.technician_uid,
       type: 'cancellation',
       stage,
-      reason: reason || 'Customer cancelled after confirmation',
+      reason: reason || (arrived
+        ? 'Customer cancelled after the technician arrived'
+        : 'Customer cancelled after confirmation'),
       status: 'logged',
       created_at: new Date().toISOString(),
     });
   }
 
+  // UAT #2: enough late cancellations suspend the customer.
+  let customerSuspended = false;
+  if (arrived && existing.customer_uid) {
+    const lateCancellations = await jobRepository.countLateCancellations(existing.customer_uid);
+    if (shouldSuspendForLateCancel(lateCancellations)) {
+      customerSuspended = await suspendAccount(existing.customer_uid, {
+        reason: 'cancelled after the technician arrived',
+      });
+    }
+  }
+
   if (existing.technician_uid) {
     await notify(existing.technician_uid, {
-      text: `Customer cancelled the request${stage !== 'before_accept' ? ` (stage: ${stage.replace('after_', '')})` : ''}.`,
+      text: arrived
+        ? 'Customer cancelled the request after you had already arrived at the service location.'
+        : `Customer cancelled the request${stage !== 'before_accept' ? ` (stage: ${stage.replace('after_', '')})` : ''}.`,
       jobId: existing.id,
       senderName: 'Customer',
     });
   }
 
-  return { body: { message: 'Repair request cancelled.' } };
+  return {
+    body: {
+      message: customerSuspended
+        ? 'Repair request cancelled. Your account was suspended for cancelling after the technician had already arrived.'
+        : 'Repair request cancelled.',
+      cancelledBy: 'customer',
+      cancellationStage: stage,
+      lateCancellation: arrived,
+      customerSuspended,
+    },
+  };
 };
 
 // POST /api/requests/:id/confirm-repair

@@ -161,6 +161,9 @@ export default function AppNavigator() {
   const seenNotifIdsRef = useRef<Set<string>>(new Set());
   const bootstrappedRef = useRef(false);
   const bannerQueueRef = useRef<NotificationItem[]>([]);
+  // Fingerprint of the last applied inbox. The 10s poll refetches constantly,
+  // but an identical payload must not re-render the whole navigation tree.
+  const lastNotifFingerprintRef = useRef<string>('');
 
   useEffect(() => {
     const handleRecoveryUrl = (url: string | null | undefined) => {
@@ -211,6 +214,11 @@ export default function AppNavigator() {
         const list: NotificationItem[] = Array.isArray(notifications) ? notifications : [];
         // Sort newest first by timestamp
         list.sort((a, b) => String(b.timestamp || '').localeCompare(String(a.timestamp || '')));
+        // Identical inbox as last tick: skip every setter so the app sits still.
+        // New arrivals always change the payload, so no banner is ever lost.
+        const fingerprint = JSON.stringify(list);
+        if (fingerprint === lastNotifFingerprintRef.current) return;
+        lastNotifFingerprintRef.current = fingerprint;
         setChatNotifications(list);
 
         // Banner queue: only for unread, deduped
@@ -245,6 +253,7 @@ export default function AppNavigator() {
     bannerQueueRef.current.length = 0;
     bannerRef.current = null;
     setBanner(null);
+    lastNotifFingerprintRef.current = '';
     bootstrappedRef.current = false;
     loadNotifications();
     const intervalId = setInterval(loadNotifications, 10000);

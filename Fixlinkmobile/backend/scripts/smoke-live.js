@@ -1,5 +1,5 @@
 /**
- * FixLink — read-only live smoke test for UAT #6-#11.
+ * FixLink — read-only live smoke test for UAT #2-#11.
  *
  * Runs ONLY SELECTs / presence checks against the live Supabase project. It
  * never inserts, updates or deletes anything, so it is safe to run anytime.
@@ -29,6 +29,10 @@ const selectOne = (table, columns) => async () => {
 const run = async () => {
   console.log('\n=== FixLink live smoke (read-only) ===\n');
 
+  // #2 auto-suspend after a wasted technician trip
+  await check('#2 jobs.technician_arrival_timestamp', selectOne('jobs', 'technician_arrival_timestamp'));
+  await check('#2 users.no_show_count', selectOne('users', 'no_show_count'));
+  await check('#2 service_incidents.cancellation/no_show', selectOne('service_incidents', 'type, stage, status'));
   // #6 daily request cap inputs
   await check('#6 jobs.customer_uid/created_at/status', selectOne('jobs', 'customer_uid, created_at, status'));
   // #6 fake / AI device-photo screening
