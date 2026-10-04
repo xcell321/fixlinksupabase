@@ -294,18 +294,9 @@ const updateJobStatus = async ({ jobId, authUid, status, technicianUid, cancella
       });
     }
   }
-  if (status === 'Cancelled') {
-    updates.cancelled_at = new Date().toISOString();
-    updates.cancelled_by = 'technician';
-    updates.cancellation_stage = stageOf(job.status) || 'after_accept';
-    updates.cancellation_reason = String(cancellationReason || '').trim() || null;
-    await notify(job.customer_uid, {
-      text: `Your technician cancelled this request. ${updates.cancellation_reason ? `Reason: ${updates.cancellation_reason}` : ''}`.trim(),
-      jobId: job.id,
-      senderUid: technicianUid,
-      senderName: job.technician_name || 'Technician',
-    });
-  }
+  // No 'Cancelled' branch: the allowlist above rejects it, so a technician
+  // can never cancel after accepting. Historical rows that already carry
+  // cancelled_by 'technician' are untouched — this is the write path only.
 
   await jobRepository.updateById(job.id, updates);
   return { body: { message: `Job marked ${status}.`, status } };

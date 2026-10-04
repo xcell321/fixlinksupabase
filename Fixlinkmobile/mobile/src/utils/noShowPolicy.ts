@@ -3,8 +3,7 @@
 // The server stays the authority: it refuses a customer no-show report until
 // the technician has recorded an arrival AND waited the window, and it suspends
 // the customer once the report lands. This module only mirrors those numbers so
-// the technician sees a countdown instead of a rejected request, and so the
-// customer is warned before cancelling on someone who is already outside.
+// the technician sees a countdown instead of a rejected request.
 //
 // Every value is an EXPO_PUBLIC_* variable (Expo inlines these at build time)
 // and the defaults match the backend's documented fallbacks.
@@ -12,17 +11,11 @@
 const DEFAULT_WAIT_MINUTES = 60;
 const MIN_WAIT_MINUTES = 30;
 const MAX_WAIT_MINUTES = 60;
-const DEFAULT_LATE_CANCEL_SUSPENDS = true;
 const MS_PER_MINUTE = 60 * 1000;
 
 const asInt = (value: string | undefined, fallback: number): number => {
   const parsed = Number.parseInt(String(value ?? ''), 10);
   return Number.isFinite(parsed) ? parsed : fallback;
-};
-
-const asBool = (value: string | undefined, fallback: boolean): boolean => {
-  if (value === undefined || value === '') return fallback;
-  return String(value).toLowerCase() !== 'false';
 };
 
 /**
@@ -34,10 +27,6 @@ export const noShowWaitMinutes = (): number => {
   const raw = asInt(process.env.EXPO_PUBLIC_CUSTOMER_NOSHOW_WAIT_MINUTES, DEFAULT_WAIT_MINUTES);
   return Math.min(Math.max(raw, MIN_WAIT_MINUTES), MAX_WAIT_MINUTES);
 };
-
-/** Whether cancelling after the technician arrived is still a suspendable act. */
-export const lateCancelSuspends = (): boolean =>
-  asBool(process.env.EXPO_PUBLIC_CUSTOMER_LATE_CANCEL_SUSPENDS, DEFAULT_LATE_CANCEL_SUSPENDS);
 
 export interface NoShowWaitState {
   /** The technician has recorded an arrival, so the clock is running. */
@@ -86,10 +75,3 @@ export const noShowBlockedText = (state: NoShowWaitState): string =>
 export const noShowConfirmMessage = (waitedMinutes: number): string =>
   `You have waited ${minutesText(waitedMinutes)} and nobody is at the service location. `
   + 'Reporting this no-show suspends the customer\'s account. Only report it if you really are there.';
-
-/** The customer's cancellation warning once the technician has arrived. */
-export const lateCancelWarning = (): string => (
-  lateCancelSuspends()
-    ? 'The technician is already at your location. Cancelling now will suspend your account.'
-    : 'The technician is already at your location. Cancel only if you really cannot continue.'
-);

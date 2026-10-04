@@ -1,10 +1,10 @@
 // UAT #4 — booking regulations the customer must accept before the location
 // step, and therefore before any GPS is acquired.
 //
-// Every number and every sentence the office may want to retune comes from the
+// Every sentence the office may want to retune comes from the
 // environment (EXPO_PUBLIC_*), so the regulation can be reworded without
 // touching this file. The literals below are only fallbacks for a local run
-// with an empty .env.
+// with an empty .env. Each fallback describes what the system actually does.
 //
 // IMPORTANT: every read below is a STATIC `process.env.EXPO_PUBLIC_X` member
 // expression. Expo/Metro inlines those at build time and cannot resolve a
@@ -26,11 +26,6 @@ const asText = (value: string | undefined, fallback: string): string => {
   return String(value).trim();
 };
 
-const asInt = (value: string | undefined, fallback: number): number => {
-  const parsed = Number.parseInt(asText(value, String(fallback)), 10);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
-};
-
 const asBool = (value: string | undefined, fallback: boolean): boolean => {
   if (value === undefined || value === null || String(value).trim() === '') return fallback;
   return String(value).trim().toLowerCase() === 'true';
@@ -41,8 +36,6 @@ const asBool = (value: string | undefined, fallback: boolean): boolean => {
 // the point of use, which is what the "nothing is hardcoded" rule means here.
 const FALLBACKS = {
   required: true,
-  minLeadDays: 1,
-  cancelWindowHours: 5,
   version: '2026-10-01',
   title: 'Booking regulations',
   intro: 'FixLink only dispatches a technician when these rules are followed. Read them before you continue - the location step and the map are unlocked once you agree.',
@@ -50,22 +43,17 @@ const FALLBACKS = {
   continueLabel: 'Agree and continue',
   declineLabel: 'I do not agree',
   declineNotice: 'You must accept the booking regulations to continue. Your request was not submitted and no technician was called.',
-  leadLabel: '-day rule',
-  cancelLabel: '-hour rule',
-  sameDayLabel: 'Same-day charge',
-  leadRule: (lead: number) => `A repair request must be scheduled at least ${lead} day${lead === 1 ? '' : 's'} ahead. A same-day request is only accepted with the same-day charge and depends on a technician still being available.`,
-  cancelRule: (hours: number) => `You may cancel or reschedule at no charge up to ${hours} hours before the appointment. Cancelling inside the ${hours}-hour window, or after the technician has already travelled, may still be charged.`,
-  sameDayRule: 'A same-day visit carries an extra same-day charge on top of the agreed repair price. Your technician confirms the final amount before any work starts.',
+  tickHint: 'Tick the box to enable continuing.',
+  scheduleLabel: 'Scheduling rule',
+  cancelLabel: 'Cancellation rule',
+  acceptanceLabel: 'Technician acceptance',
+  scheduleRule: 'Choose today or a future date and a time window. Past dates are not accepted.',
+  cancelRule: 'Once a technician accepts your request, it can no longer be cancelled. Cancelling is only possible while the request is still pending.',
+  acceptanceRule: 'Your request is posted to nearby available technicians. A technician may only decline before accepting. Once accepted, both sides are committed and you are notified right away.',
 };
 
 export const termsRequired = (): boolean =>
   asBool(process.env.EXPO_PUBLIC_SUBMIT_TERMS_REQUIRED, FALLBACKS.required);
-
-export const minLeadDays = (): number =>
-  asInt(process.env.EXPO_PUBLIC_TERMS_MIN_LEAD_DAYS, FALLBACKS.minLeadDays);
-
-export const cancelWindowHours = (): number =>
-  asInt(process.env.EXPO_PUBLIC_TERMS_CANCEL_WINDOW_HOURS, FALLBACKS.cancelWindowHours);
 
 export const termsVersion = (): string =>
   asText(process.env.EXPO_PUBLIC_TERMS_VERSION, FALLBACKS.version);
@@ -94,36 +82,39 @@ export const termsDeclineNotice = (): string => asText(
   FALLBACKS.declineNotice
 );
 
-// The three regulations the UAT sheet names: the 1-day rule, the 5-hour rule
-// and the same-day charge. The numbers inside the copy come from the variables
-// above, so changing a window changes the sentence too.
-export const submitTermRules = (): SubmitTermRule[] => {
-  const lead = minLeadDays();
-  const hours = cancelWindowHours();
+export const termsTickHint = (): string => asText(
+  process.env.EXPO_PUBLIC_TERMS_TICK_HINT,
+  FALLBACKS.tickHint
+);
 
+// The three booking regulations, each describing what the system actually
+// does: the schedule picker only takes today or a future date, cancelling is
+// only possible while pending, and a booking is confirmed on technician
+// accept. Every sentence stays overridable through the environment.
+export const submitTermRules = (): SubmitTermRule[] => {
   return [
     {
-      id: 'lead-time',
-      label: asText(process.env.EXPO_PUBLIC_TERMS_LEAD_LABEL, `${lead}${FALLBACKS.leadLabel}`),
+      id: 'scheduling',
+      label: asText(process.env.EXPO_PUBLIC_TERMS_SCHEDULE_LABEL, FALLBACKS.scheduleLabel),
       body: asText(
-        process.env.EXPO_PUBLIC_TERMS_LEAD_RULE,
-        FALLBACKS.leadRule(lead)
+        process.env.EXPO_PUBLIC_TERMS_SCHEDULE_RULE,
+        FALLBACKS.scheduleRule
       ),
     },
     {
-      id: 'cancellation-window',
-      label: asText(process.env.EXPO_PUBLIC_TERMS_CANCEL_LABEL, `${hours}${FALLBACKS.cancelLabel}`),
+      id: 'cancellation',
+      label: asText(process.env.EXPO_PUBLIC_TERMS_CANCEL_LABEL, FALLBACKS.cancelLabel),
       body: asText(
         process.env.EXPO_PUBLIC_TERMS_CANCEL_RULE,
-        FALLBACKS.cancelRule(hours)
+        FALLBACKS.cancelRule
       ),
     },
     {
-      id: 'same-day-charge',
-      label: asText(process.env.EXPO_PUBLIC_TERMS_SAME_DAY_LABEL, FALLBACKS.sameDayLabel),
+      id: 'technician-acceptance',
+      label: asText(process.env.EXPO_PUBLIC_TERMS_ACCEPTANCE_LABEL, FALLBACKS.acceptanceLabel),
       body: asText(
-        process.env.EXPO_PUBLIC_TERMS_SAME_DAY_RULE,
-        FALLBACKS.sameDayRule
+        process.env.EXPO_PUBLIC_TERMS_ACCEPTANCE_RULE,
+        FALLBACKS.acceptanceRule
       ),
     },
   ];

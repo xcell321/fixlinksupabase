@@ -1,6 +1,8 @@
 // Red-Green: UAT #2 — automatic suspension of a customer who wastes a
-// technician's trip, either by cancelling after the technician already arrived
-// or by not being there when the technician shows up.
+// technician's trip by not being there when the technician shows up, plus the
+// cancellation policy: a customer may only cancel while the request is still
+// pending. Cancelling after accept answers 409, so the late-cancel suspension
+// path is dormant (kept for historical rows).
 //
 // Both rules are env-driven, so every timing-sensitive case pins the variables
 // it depends on instead of trusting whatever the developer's .env holds.
@@ -299,38 +301,36 @@ test('the same report only warns while the limit is not reached', async () => {
   });
 });
 
-test('cancelling after the technician arrived suspends the customer', async () => {
+// Policy: a customer may only cancel while the request is still pending. Once
+// a technician has accepted (accepted and beyond), the cancel endpoint answers
+// 409. The late-cancel suspension path below is therefore dormant, kept for
+// the historical rows that still carry those stages.
+test('a customer cannot cancel once the technician has arrived', async () => {
   const response = await cancel(ARRIVED_CANCEL_JOB, 'cancel-token');
-  assert.equal(response.status, 200);
+  assert.equal(response.status, 409);
   const body = await response.json();
-  assert.equal(body.lateCancellation, true);
-  assert.equal(body.customerSuspended, true);
-  assert.equal(body.cancellationStage, 'after_travel');
+  assert.equal(body.error, 'This request can no longer be cancelled.');
 
   const customer = stub.tables.users.find((user) => user.id === CUSTOMER_CANCEL);
-  assert.equal(customer.status, 'suspended');
+  assert.equal(customer.status, 'active');
 });
 
-test('cancelling before the technician arrives is not punishable', async () => {
+test('a customer cannot cancel an accepted request even before arrival', async () => {
   const response = await cancel(EARLY_CANCEL_JOB, 'early-cancel-token');
-  assert.equal(response.status, 200);
+  assert.equal(response.status, 409);
   const body = await response.json();
-  assert.equal(body.lateCancellation, false);
-  assert.equal(body.customerSuspended, false);
-  assert.equal(body.cancellationStage, 'after_ready');
+  assert.equal(body.error, 'This request can no longer be cancelled.');
 
   const customer = stub.tables.users.find((user) => user.id === CUSTOMER_CANCEL_EARLY);
   assert.equal(customer.status, 'active');
 });
 
-test('the late-cancellation rule can be switched off', async () => {
+test('a non-pending cancel is rejected even when late-cancel suspension is off', async () => {
   const response = await withEnv({ CUSTOMER_LATE_CANCEL_AUTO_SUSPEND: 'false' }, () =>
     cancel(RULE_OFF_JOB, 'rule-off-token'));
-  // The cancellation still succeeds; only the suspension is suppressed.
-  assert.equal(response.status, 200);
+  assert.equal(response.status, 409);
   const body = await response.json();
-  assert.equal(body.lateCancellation, true);
-  assert.equal(body.customerSuspended, false);
+  assert.equal(body.error, 'This request can no longer be cancelled.');
 
   const customer = stub.tables.users.find((user) => user.id === CUSTOMER_RULE_OFF);
   assert.equal(customer.status, 'active');
@@ -339,4 +339,35 @@ test('the late-cancellation rule can be switched off', async () => {
 test('a stranger cannot cancel someone else\'s request', async () => {
   const response = await cancel(PENDING_JOB, 'technician-token');
   assert.equal(response.status, 403);
+});
+
+test('a customer can still cancel a pending request', async () => {
+  const response = await cancel(PENDING_JOB, 'customer-token');
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.cancelledBy, 'customer');
+  assert.equal(body.cancellationStage, 'before_accept');
+  assert.equal(body.lateCancellation, false);
+  assert.equal(body.customerSuspended, false);
+
+  const job = stub.tables.jobs.find((row) => row.id === PENDING_JOB);
+  assert.equal(job.status, 'Cancelled');
+});
+
+// Policy: once a technician accepts, they are committed. The status shortcut
+// rejects 'Cancelled', so post-accept tech cancellation is impossible even
+// through a direct API call. Declining before accept stays available.
+test('a technician cannot cancel after accepting', async () => {
+  // Earlier no-show tests move this job around, so pin it to Accepted first.
+  const job = stub.tables.jobs.find((row) => row.id === WAITING_JOB);
+  job.status = 'Accepted';
+  const response = await fetch(`${baseUrl}/api/requests/accepted/${WAITING_JOB}/status`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json', authorization: 'Bearer technician-token' },
+    body: JSON.stringify({ status: 'Cancelled', technicianUid: TECH_UID }),
+  });
+  assert.equal(response.status, 400);
+  const body = await response.json();
+  assert.equal(body.error, 'Invalid job status.');
+  assert.equal(job.status, 'Accepted');
 });

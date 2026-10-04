@@ -27,6 +27,7 @@ import { colors, fonts, shadows, themedStyles } from '../theme';
 import type { IconName } from '../utils/applianceIcons';
 import MessageBanner from '../components/MessageBanner';
 import AssistantSheet from '../components/AssistantSheet';
+import { FadeInView } from '../components/animations';
 import type { AssistantContext } from '../components/AssistantSheet';
 
 type NavTab = { key: string; label: string; icon: IconName };
@@ -558,7 +559,16 @@ export default function AppNavigator() {
       
       <MessageBanner banner={banner} onDismiss={dismissBanner} onPress={() => banner && openBannerNotification(banner)} />
 
-      <View style={styles.screenContainer}>{screen}</View>
+      <View style={styles.screenContainer}>
+        <FadeInView
+          key={isCustomer ? `customer-${customerTab}` : `tech-${technicianTab}`}
+          slideUp={8}
+          duration={200}
+          style={styles.screenFade}
+        >
+          {screen}
+        </FadeInView>
+      </View>
 
       <Modal visible={notificationsOpen} animationType="slide" onRequestClose={handleCloseNotifications}>
         <View style={styles.modalBackdrop}>
@@ -640,7 +650,7 @@ export default function AppNavigator() {
 }
 
 const styles = themedStyles({
-  container: { flex: 1, backgroundColor: colors.canvas }, authContainer: { flex: 1, backgroundColor: colors.canvas }, screenContainer: { flex: 1, width: '100%' as const, alignSelf: 'center' as const },
+  container: { flex: 1, backgroundColor: colors.canvas }, authContainer: { flex: 1, backgroundColor: colors.canvas }, screenContainer: { flex: 1, width: '100%' as const, alignSelf: 'center' as const }, screenFade: { flex: 1 },
   modalBackdrop: { flex: 1, backgroundColor: colors.white },
   backdropPress: { flex: 1 },
   notificationPanel: { flex: 1, width: '100%', backgroundColor: colors.white, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 24 },

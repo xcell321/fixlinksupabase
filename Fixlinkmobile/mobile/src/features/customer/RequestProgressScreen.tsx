@@ -7,7 +7,6 @@ import { cancelRepairRequest, confirmRepairRequest, fetchCompletedJobs, fetchCus
 import { alpha, colors, fonts, shadows, themedStyles } from '../../theme';
 import { getApplianceIcon, getStatusColor, getStatusGuidance, getStatusIcon } from '../../utils/applianceIcons';
 import { splitJobDescription } from '../../utils/jobDescription';
-import { lateCancelWarning } from '../../utils/noShowPolicy';
 import type { ScheduleAvailability, TechnicianScheduleItem } from '../../types/schedule';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -80,7 +79,9 @@ interface RequestProgressScreenProps {
 
 const ACTIVE_STATUSES = ['accepted', 'confirmed', 'customer ready', 'in progress'];
 // Statuses the backend still lets the customer cancel (domain/jobWorkflow.js).
-const CANCELLABLE_STATUSES = ['pending', 'accepted', 'confirmed', 'customer ready'];
+// Policy: only pending requests can be cancelled. Once a technician accepts,
+// the Cancel button disappears and the backend answers 409.
+const CANCELLABLE_STATUSES = ['pending'];
 const PROGRESS_STEPS = ['Accepted', 'Confirmed', 'Ready', 'In Progress'];
 
 const progressIndexOf = (status: string | undefined): number => {
@@ -231,23 +232,6 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
   // Prototype shows Active / History only — no AI recommendation feed.
   const pendingIds = pendingRequests.map((r) => r.id).join(',');
 
-  const handleCancelRequest = (requestId: string): void => {
-    setActionError(null);
-    setPendingAction({
-      title: 'Cancel request?',
-      message: 'This can only be done before a technician accepts the request.',
-      confirmLabel: 'Cancel request',
-      cancelLabel: 'Keep request',
-      danger: true,
-      run: async () => {
-        // Reason intentionally empty: backend stores null, identical to the previous call.
-        await cancelRepairRequest(requestId, '');
-        fetchAll();
-        setTrackedRequests((current) => current.map((request) => request.id === requestId ? { ...request, status: 'Cancelled' } : request));
-      },
-    });
-  };
-
   const handleReviewSubmit = async (jobId: string): Promise<void> => {
     if (!reviewRatings[jobId]) {
       Alert.alert('Error', 'Please select a rating before submitting.');
@@ -353,16 +337,11 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
     });
   };
 
-  // UAT #2: cancelling after the technician has arrived is no longer a free
-  // action — the account is suspended for it — so the confirmation has to warn
-  // instead of reading like an ordinary queue exit.
+  // Only pending requests reach this dialog (accepted and beyond have no
+  // Cancel button), so the message only covers the queue-exit case.
   const cancelMessageFor = (req: ServiceRequest): string => {
-    if (req.technicianArrivalAt) return lateCancelWarning();
-    const status = String(req.status || '').toLowerCase();
-    if (status === 'pending') {
-      return 'No technician has accepted this request yet. Cancelling removes it from the queue.';
-    }
-    return 'The technician is on the way. Cancelling now will notify them.';
+    void req;
+    return 'No technician has accepted this request yet. Cancelling removes it from the queue.';
   };
 
   const cancelWithMessage = (req: ServiceRequest, message: string): void => {

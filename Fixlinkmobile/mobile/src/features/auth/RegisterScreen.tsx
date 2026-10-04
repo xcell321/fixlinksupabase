@@ -84,6 +84,23 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
     return null;
   };
 
+  // Government ID numbers vary by ID type, so only the over-limit case is
+  // rejected. Spaces and dashes are ignored when counting. A digit-only entry
+  // is a National ID: PSN is 12 digits and PCN is 16, so anything longer is a
+  // typo. Other IDs (license, passport) mix letters and digits and are capped
+  // at 20 significant characters.
+  const validateGovernmentId = (raw?: string | null): string | null => {
+    const value = String(raw ?? '').trim();
+    if (!value) return 'Government ID is required';
+    const compact = value.replace(/[\s-]/g, '');
+    if (/^\d+$/.test(compact)) {
+      if (compact.length > 16) return 'ID number is too long. National ID is 12 digits (PSN) or 16 digits (PCN).';
+      return null;
+    }
+    if (compact.length > 20) return 'ID number is too long. Enter the number printed on your ID.';
+    return null;
+  };
+
   const toggleSkill = (categoryName: string) => {
     const skillList = skills.split(',').map((s) => s.trim()).filter((s) => s !== '');
     if (skillList.includes(categoryName)) {
@@ -111,9 +128,10 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
       if (!serviceArea.trim()) nextErrors.serviceArea = 'Service area is required';
       if (!skills.trim()) nextErrors.skills = 'Select at least one expertise';
       if (!yearsExperience.trim()) nextErrors.yearsExperience = 'Years of experience is required';
-      if (!governmentIdNumber.trim()) nextErrors.governmentIdNumber = 'Government ID is required';
+      const governmentIdError = validateGovernmentId(governmentIdNumber);
+      if (governmentIdError) nextErrors.governmentIdNumber = governmentIdError;
       if (!governmentIdFile) nextErrors.governmentIdFile = 'Government ID file is required';
-      if (!certificateFile) nextErrors.certificateFile = 'Certificate is required';
+      if (!certificateFile) nextErrors.certificateFile = 'Certificate or proof of experience is required';
       if (!facePhotoFile) nextErrors.facePhotoFile = 'Face photo is required';
     } else {
       if (!governmentIdFile) nextErrors.governmentIdFile = 'Government ID file is required';
@@ -404,7 +422,18 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
 
         {isTechRole && (
           <>
-            {renderField('Government ID Number', governmentIdNumber, setGovernmentIdNumber, 'governmentIdNumber', 'Enter valid government ID number')}
+            <View style={styles.field}>
+              <Text style={styles.label}>Government ID Number</Text>
+              <TextInput
+                style={[styles.input, fieldErrors.governmentIdNumber && styles.inputError]}
+                placeholder="Enter the number printed on your ID"
+                placeholderTextColor={colors.subtle}
+                value={governmentIdNumber}
+                onChangeText={(t) => { setGovernmentIdNumber(t); clearFieldError('governmentIdNumber'); }}
+                accessibilityLabel="Government ID Number"
+              />
+              {fieldErrors.governmentIdNumber ? <Text style={styles.errorText}>{fieldErrors.governmentIdNumber}</Text> : <Text style={[styles.helperText, { marginTop: 6 }]}>National ID: enter the 12-digit PhilSys Number (PSN) or the 16-digit PhilSys Card Number (PCN). For other IDs, enter the number printed on the card.</Text>}
+            </View>
             <View style={styles.field}>
               <Text style={styles.label}>Government ID File</Text>
               <TouchableOpacity style={[styles.input, styles.docButton, fieldErrors.governmentIdFile && styles.inputError]} onPress={() => chooseCredential(setGovernmentIdFile, 'governmentIdFile', 'Government ID file')} accessibilityRole="button" accessibilityLabel="Choose Government ID file">
@@ -414,12 +443,12 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
               {fieldErrors.governmentIdFile ? <Text style={styles.errorText}>{fieldErrors.governmentIdFile}</Text> : null}
             </View>
             <View style={styles.field}>
-              <Text style={styles.label}>Certificate or Proof of Experience</Text>
-              <TouchableOpacity style={[styles.input, styles.docButton, fieldErrors.certificateFile && styles.inputError]} onPress={() => chooseCredential(setCertificateFile, 'certificateFile', 'Certificate file')} accessibilityRole="button" accessibilityLabel="Choose certificate file">
+              <Text style={styles.label}>TESDA Certificate, Training Certificate, or Proof of Freelance Experience</Text>
+              <TouchableOpacity style={[styles.input, styles.docButton, fieldErrors.certificateFile && styles.inputError]} onPress={() => chooseCredential(setCertificateFile, 'certificateFile', 'Certificate file')} accessibilityRole="button" accessibilityLabel="Choose certificate or proof of freelance experience">
                 <Ionicons name="cloud-upload-outline" size={18} color={accent} />
-                <Text style={styles.docButtonText} numberOfLines={1}>{certificateFile ? certificateFile.name : 'Choose certificate file'}</Text>
+                <Text style={styles.docButtonText} numberOfLines={1}>{certificateFile ? certificateFile.name : 'Choose certificate or proof of experience'}</Text>
               </TouchableOpacity>
-              {fieldErrors.certificateFile ? <Text style={styles.errorText}>{fieldErrors.certificateFile}</Text> : null}
+              {fieldErrors.certificateFile ? <Text style={styles.errorText}>{fieldErrors.certificateFile}</Text> : <Text style={[styles.helperText, { marginTop: 6 }]}>TESDA or training certificate, employment certificate, freelance job proof, or client recommendation.</Text>}
             </View>
             <View style={styles.field}>
               <Text style={styles.label}>Face Photo (front camera only)</Text>

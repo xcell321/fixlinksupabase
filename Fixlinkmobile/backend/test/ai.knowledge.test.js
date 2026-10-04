@@ -41,6 +41,11 @@ test('a booking question retrieves the customer booking section', () => {
   assert.match(result.text, /four steps/i);
 });
 
+test('a cancellation question retrieves the cancellation policy section', () => {
+  const result = retrieveKnowledge('can I cancel my request after the technician accepts');
+  assert.ok(result.sections.includes('cancellation-policy'), result.sections.join(','));
+});
+
 test('a code question retrieves the completion OTP section', () => {
   const result = retrieveKnowledge('what is the 4 digit OTP code for completing the job');
   assert.ok(result.sections.includes('completion-otp'), result.sections.join(','));

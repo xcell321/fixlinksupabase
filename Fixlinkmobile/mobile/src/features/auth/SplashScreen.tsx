@@ -4,6 +4,7 @@ import React from 'react';
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { alpha, colors, fonts, themedStyles } from '../../theme';
+import { FadeInView } from '../../components/animations';
 
 const ORANGE = colors.customer;
 const DARK = colors.dark;
@@ -19,19 +20,27 @@ export default function SplashScreen({ onGetStarted, onHaveAccount }: SplashScre
       <View style={styles.blobTop} />
       <View style={styles.blobBottom} />
       <View style={styles.center}>
-        <View style={styles.logo}>
-          <Ionicons name="construct" size={36} color={colors.onAccent} />
-        </View>
-        <Text style={styles.brand}>FIX<Text style={styles.brandAccent}>LINK</Text></Text>
-        <Text style={styles.tagline}>Fast, reliable device repair at your doorstep</Text>
-        <View style={styles.actions}>
-          <TouchableOpacity style={styles.primary} onPress={onGetStarted} activeOpacity={0.88} accessibilityRole="button" accessibilityLabel="Get started">
-            <Text style={styles.primaryText}>Get Started</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.outline} onPress={onHaveAccount} activeOpacity={0.88} accessibilityRole="button" accessibilityLabel="I already have an account">
-            <Text style={styles.outlineText}>I already have an account</Text>
-          </TouchableOpacity>
-        </View>
+        <FadeInView slideUp={10} duration={320}>
+          <View style={styles.logo}>
+            <Ionicons name="construct" size={36} color={colors.onAccent} />
+          </View>
+        </FadeInView>
+        <FadeInView slideUp={10} duration={320} delay={90}>
+          <Text style={styles.brand}>FIX<Text style={styles.brandAccent}>LINK</Text></Text>
+        </FadeInView>
+        <FadeInView slideUp={8} duration={300} delay={170}>
+          <Text style={styles.tagline}>Fast, reliable device repair at your doorstep</Text>
+        </FadeInView>
+        <FadeInView slideUp={8} duration={300} delay={240} style={styles.actionsWrap}>
+          <View style={styles.actions}>
+            <TouchableOpacity style={styles.primary} onPress={onGetStarted} activeOpacity={0.88} accessibilityRole="button" accessibilityLabel="Get started">
+              <Text style={styles.primaryText}>Get Started</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.outline} onPress={onHaveAccount} activeOpacity={0.88} accessibilityRole="button" accessibilityLabel="I already have an account">
+              <Text style={styles.outlineText}>I already have an account</Text>
+            </TouchableOpacity>
+          </View>
+        </FadeInView>
       </View>
       <Text style={styles.foot}>Customer & Technician App</Text>
     </View>
@@ -43,6 +52,7 @@ const styles = themedStyles({
   blobTop: { position: 'absolute', top: -80, right: -80, width: 288, height: 288, borderRadius: 144, backgroundColor: ORANGE, opacity: 0.10 },
   blobBottom: { position: 'absolute', bottom: 40, left: -64, width: 192, height: 192, borderRadius: 96, backgroundColor: ORANGE, opacity: 0.10 },
   center: { alignItems: 'center', paddingHorizontal: 32, width: '100%', maxWidth: 360 },
+  actionsWrap: { width: '100%', alignItems: 'stretch' },
   logo: { width: 80, height: 80, borderRadius: 20, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center', marginBottom: 24, boxShadow: `0 8px 24px ${alpha(colors.customer, 0.35)}` },
   brand: { color: colors.onAccent, fontSize: 40, fontFamily: fonts.extraBold, letterSpacing: -0.5 },
   brandAccent: { color: ORANGE, fontFamily: fonts.extraBold },

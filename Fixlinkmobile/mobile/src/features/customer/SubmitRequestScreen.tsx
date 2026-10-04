@@ -1343,20 +1343,6 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
 
         {/* Nav row */}
         <View style={styles.navRow}>
-          {currentStep > 1 ? (
-            <TouchableOpacity
-              style={styles.secondaryButton}
-              onPress={handleBack}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-              accessibilityLabel="Go back"
-              hitSlop={8}
-            >
-              <Ionicons name="chevron-back" size={16} color={colors.ink} />
-              <Text style={styles.secondaryButtonText}>Back</Text>
-            </TouchableOpacity>
-          ) : null}
-
           {currentStep < TOTAL_STEPS ? (
             <TouchableOpacity
               style={[styles.primaryButton, styles.primaryButtonFlex, !canContinueForStep(currentStep) && styles.primaryButtonMuted]}
@@ -1387,6 +1373,19 @@ export default function SubmitRequestScreen({ currentUser, customerName, onNavig
               )}
             </TouchableOpacity>
           )}
+
+          {currentStep > 1 ? (
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={handleBack}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+              hitSlop={8}
+            >
+              <Text style={styles.secondaryButtonText}>Back</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
 
         {currentStep < TOTAL_STEPS && !canContinueForStep(currentStep) && (
