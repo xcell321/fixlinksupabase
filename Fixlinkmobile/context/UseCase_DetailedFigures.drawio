@@ -1,0 +1,176 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Fig - Decline Request" id="fixlink-decline">
+    <mxGraphModel dx="400" dy="40" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageWidth="700" pageHeight="520" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" value="" style="shape=rectangle;fillColor=none;strokeColor=#000000;html=1;" vertex="1" parent="1">
+          <mxGeometry x="230" y="30" width="240" height="440" as="geometry" />
+        </mxCell>
+        <mxCell id="3" value="Decline Request" style="ellipse;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="255" y="120" width="190" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="4" value="Confirm Dismiss" style="ellipse;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="275" y="280" width="150" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="5" value="Technician" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;fillColor=#ffffff;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="60" y="220" width="40" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="6" style="endArrow=none;html=1;strokeWidth=2;" edge="1" parent="1" source="5" target="3" />
+        <mxCell id="7" value="&lt;&lt;Include&gt;&gt;" style="endArrow=block;html=1;strokeWidth=2;" edge="1" parent="1" source="3" target="4" />
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram name="Fig - Report Scam No-Show" id="fixlink-report">
+    <mxGraphModel dx="400" dy="40" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageWidth="700" pageHeight="520" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" value="" style="shape=rectangle;fillColor=none;strokeColor=#000000;html=1;" vertex="1" parent="1">
+          <mxGeometry x="230" y="30" width="240" height="440" as="geometry" />
+        </mxCell>
+        <mxCell id="3" value="Report Scam / No-Show" style="ellipse;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="255" y="120" width="190" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="4" value="Confirm Report" style="ellipse;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="275" y="280" width="150" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="5" value="Technician" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;fillColor=#ffffff;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="60" y="220" width="40" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="6" style="endArrow=none;html=1;strokeWidth=2;" edge="1" parent="1" source="5" target="3" />
+        <mxCell id="7" value="&lt;&lt;Include&gt;&gt;" style="endArrow=block;html=1;strokeWidth=2;" edge="1" parent="1" source="3" target="4" />
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram name="Fig - Verify Completion" id="fixlink-verify">
+    <mxGraphModel dx="400" dy="40" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageWidth="700" pageHeight="520" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" value="" style="shape=rectangle;fillColor=none;strokeColor=#000000;html=1;" vertex="1" parent="1">
+          <mxGeometry x="230" y="30" width="240" height="440" as="geometry" />
+        </mxCell>
+        <mxCell id="3" value="Verify Completion" style="ellipse;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="255" y="120" width="190" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="4" value="Validate OTP Code" style="ellipse;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="275" y="280" width="150" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="5" value="Customer" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;fillColor=#ffffff;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="60" y="220" width="40" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="6" value="Technician" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;fillColor=#ffffff;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="600" y="220" width="40" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="7" style="endArrow=none;html=1;strokeWidth=2;" edge="1" parent="1" source="5" target="3" />
+        <mxCell id="8" style="endArrow=none;html=1;strokeWidth=2;" edge="1" parent="1" source="6" target="3" />
+        <mxCell id="9" value="&lt;&lt;Include&gt;&gt;" style="endArrow=block;html=1;strokeWidth=2;" edge="1" parent="1" source="3" target="4" />
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram name="Fig - Chat Call" id="fixlink-chat">
+    <mxGraphModel dx="400" dy="40" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageWidth="700" pageHeight="520" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" value="" style="shape=rectangle;fillColor=none;strokeColor=#000000;html=1;" vertex="1" parent="1">
+          <mxGeometry x="230" y="30" width="240" height="440" as="geometry" />
+        </mxCell>
+        <mxCell id="3" value="Chat / Call" style="ellipse;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="255" y="120" width="190" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="4" value="Load Message Thread" style="ellipse;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="275" y="280" width="150" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="5" value="Customer" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;fillColor=#ffffff;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="60" y="220" width="40" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="6" value="Technician" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;fillColor=#ffffff;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="600" y="220" width="40" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="7" style="endArrow=none;html=1;strokeWidth=2;" edge="1" parent="1" source="5" target="3" />
+        <mxCell id="8" style="endArrow=none;html=1;strokeWidth=2;" edge="1" parent="1" source="6" target="3" />
+        <mxCell id="9" value="&lt;&lt;Include&gt;&gt;" style="endArrow=block;html=1;strokeWidth=2;" edge="1" parent="1" source="3" target="4" />
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram name="Fig - View Location Tracking" id="fixlink-track">
+    <mxGraphModel dx="400" dy="40" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageWidth="700" pageHeight="520" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" value="" style="shape=rectangle;fillColor=none;strokeColor=#000000;html=1;" vertex="1" parent="1">
+          <mxGeometry x="230" y="30" width="240" height="440" as="geometry" />
+        </mxCell>
+        <mxCell id="3" value="View Location &amp; Tracking" style="ellipse;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="255" y="120" width="190" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="4" value="Load Live Coordinates" style="ellipse;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="275" y="280" width="150" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="5" value="Customer" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;fillColor=#ffffff;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="60" y="220" width="40" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="6" value="Technician" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;fillColor=#ffffff;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="600" y="220" width="40" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="7" style="endArrow=none;html=1;strokeWidth=2;" edge="1" parent="1" source="5" target="3" />
+        <mxCell id="8" style="endArrow=none;html=1;strokeWidth=2;" edge="1" parent="1" source="6" target="3" />
+        <mxCell id="9" value="&lt;&lt;Include&gt;&gt;" style="endArrow=block;html=1;strokeWidth=2;" edge="1" parent="1" source="3" target="4" />
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram name="Fig - Upload Verification Documents" id="fixlink-uploaddocs">
+    <mxGraphModel dx="400" dy="40" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageWidth="700" pageHeight="520" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" value="" style="shape=rectangle;fillColor=none;strokeColor=#000000;html=1;" vertex="1" parent="1">
+          <mxGeometry x="230" y="30" width="240" height="440" as="geometry" />
+        </mxCell>
+        <mxCell id="3" value="Upload Verification Documents" style="ellipse;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="255" y="120" width="190" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="4" value="Screen Face &amp; ID" style="ellipse;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="275" y="280" width="150" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="5" value="Customer" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;fillColor=#ffffff;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="60" y="220" width="40" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="6" value="Technician" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;fillColor=#ffffff;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="600" y="220" width="40" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="7" style="endArrow=none;html=1;strokeWidth=2;" edge="1" parent="1" source="5" target="3" />
+        <mxCell id="8" style="endArrow=none;html=1;strokeWidth=2;" edge="1" parent="1" source="6" target="3" />
+        <mxCell id="9" value="&lt;&lt;Include&gt;&gt;" style="endArrow=block;html=1;strokeWidth=2;" edge="1" parent="1" source="3" target="4" />
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram name="Fig 6 - Register Account" id="fixlink-register">
+    <mxGraphModel dx="400" dy="40" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageWidth="700" pageHeight="520" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" value="" style="shape=rectangle;fillColor=none;strokeColor=#000000;html=1;" vertex="1" parent="1">
+          <mxGeometry x="220" y="60" width="260" height="400" as="geometry" />
+        </mxCell>
+        <mxCell id="3" value="Register Account" style="ellipse;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="255" y="140" width="190" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="4" value="Input valid data" style="ellipse;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="280" y="300" width="140" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="5" value="Customer" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;fillColor=#ffffff;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="50" y="230" width="40" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="6" value="Technician" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;fillColor=#ffffff;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="610" y="230" width="40" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="7" style="endArrow=none;html=1;strokeWidth=2;" edge="1" parent="1" source="5" target="3" />
+        <mxCell id="8" style="endArrow=none;html=1;strokeWidth=2;" edge="1" parent="1" source="6" target="3" />
+        <mxCell id="9" value="&lt;&lt;Include&gt;&gt;" style="endArrow=block;html=1;strokeWidth=2;" edge="1" parent="1" source="3" target="4" />
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -34,7 +34,9 @@ export {
   submitTechnicianReview,
   rateCustomer,
   reportScam,
+  fetchCustomerReviews,
 } from './api/requestsApi';
+export type { CustomerReviewItem } from './api/requestsApi';
 export {
   fetchJobMessages,
   sendJobMessage,

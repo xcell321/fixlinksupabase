@@ -6,6 +6,7 @@ import type { JobItem } from '../availableJobsHelpers';
 export interface CachedFeed {
   jobs: JobItem[];
   acceptedJobs: JobItem[];
+  completedJobs: JobItem[];
   lastSyncAt: Date | null;
   fetchError: boolean;
 }

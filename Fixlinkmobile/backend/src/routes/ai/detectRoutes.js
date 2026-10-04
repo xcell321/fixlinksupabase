@@ -6,7 +6,7 @@ const express = require('express');
 
 const router = express.Router();
 const { analyzeRepairDescription } = require('../../services/repairAnalyzer');
-const { isOmniRouteConfigured } = require('../../services/omniRoute');
+const { isAiConfigured } = require('../../services/aiClient');
 
 router.post('/detect-category', async (req, res) => {
   try {
@@ -14,7 +14,7 @@ router.post('/detect-category', async (req, res) => {
     if (!String(description || '').trim()) {
       return res.status(400).json({ error: 'A repair description is required.' });
     }
-    if (!isOmniRouteConfigured()) {
+    if (!isAiConfigured()) {
       return res.status(502).json({ error: 'AI service is not configured.', ai: 'degraded' });
     }
     const analysis = await analyzeRepairDescription({ description, applianceType, category });

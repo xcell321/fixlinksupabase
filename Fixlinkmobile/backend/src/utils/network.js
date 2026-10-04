@@ -1,5 +1,9 @@
 const os = require('os');
 
+// Fallback listen port when PORT is unset. Kept here so index.js and the URL
+// helpers below share one definition instead of repeating the literal.
+const DEFAULT_PORT = 5050;
+
 /**
  * Auto-detect the machine's LAN IP for PUBLIC_BASE_URL.
  * Priority: 192.168.x.x (WiFi/hotspot) > 10.x.x.x > 172.16-31.x.x > first non-internal IPv4.
@@ -45,7 +49,7 @@ function getPublicBaseUrl(requestHost, forwardedProto, forwardedHost) {
     const isLoopback = bare === 'localhost' || bare === '127.0.0.1' || bare === '[::1]' || bare === '::1';
     if (isLoopback) {
       if (envUrl) return envUrl.replace(/\/$/, '');
-      const port = process.env.PORT || 5050;
+      const port = process.env.PORT || DEFAULT_PORT;
       return `http://${getLocalIp()}:${port}`;
     }
     const proto = String(forwardedProto || '').trim().toLowerCase().split(',')[0].trim();
@@ -56,8 +60,8 @@ function getPublicBaseUrl(requestHost, forwardedProto, forwardedHost) {
     return `${scheme}://${host}`;
   }
   if (envUrl) return envUrl.replace(/\/$/, '');
-  const port = process.env.PORT || 5050;
+  const port = process.env.PORT || DEFAULT_PORT;
   return `http://${getLocalIp()}:${port}`;
 }
 
-module.exports = { getLocalIp, getPublicBaseUrl };
+module.exports = { DEFAULT_PORT, getLocalIp, getPublicBaseUrl };

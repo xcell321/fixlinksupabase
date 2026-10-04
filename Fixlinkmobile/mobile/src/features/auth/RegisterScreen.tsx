@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, ActivityIndicator, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import { fetchPlatformCategories, registerUser } from '../../services/api';
 import { colors, fonts, themedStyles } from '../../theme';
 
@@ -83,6 +84,23 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
     return null;
   };
 
+  // Government ID numbers vary by ID type, so only the over-limit case is
+  // rejected. Spaces and dashes are ignored when counting. A digit-only entry
+  // is a National ID: PSN is 12 digits and PCN is 16, so anything longer is a
+  // typo. Other IDs (license, passport) mix letters and digits and are capped
+  // at 20 significant characters.
+  const validateGovernmentId = (raw?: string | null): string | null => {
+    const value = String(raw ?? '').trim();
+    if (!value) return 'Government ID is required';
+    const compact = value.replace(/[\s-]/g, '');
+    if (/^\d+$/.test(compact)) {
+      if (compact.length > 16) return 'ID number is too long. National ID is 12 digits (PSN) or 16 digits (PCN).';
+      return null;
+    }
+    if (compact.length > 20) return 'ID number is too long. Enter the number printed on your ID.';
+    return null;
+  };
+
   const toggleSkill = (categoryName: string) => {
     const skillList = skills.split(',').map((s) => s.trim()).filter((s) => s !== '');
     if (skillList.includes(categoryName)) {
@@ -110,9 +128,10 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
       if (!serviceArea.trim()) nextErrors.serviceArea = 'Service area is required';
       if (!skills.trim()) nextErrors.skills = 'Select at least one expertise';
       if (!yearsExperience.trim()) nextErrors.yearsExperience = 'Years of experience is required';
-      if (!governmentIdNumber.trim()) nextErrors.governmentIdNumber = 'Government ID is required';
+      const governmentIdError = validateGovernmentId(governmentIdNumber);
+      if (governmentIdError) nextErrors.governmentIdNumber = governmentIdError;
       if (!governmentIdFile) nextErrors.governmentIdFile = 'Government ID file is required';
-      if (!certificateFile) nextErrors.certificateFile = 'Certificate is required';
+      if (!certificateFile) nextErrors.certificateFile = 'Certificate or proof of experience is required';
       if (!facePhotoFile) nextErrors.facePhotoFile = 'Face photo is required';
     } else {
       if (!governmentIdFile) nextErrors.governmentIdFile = 'Government ID file is required';
@@ -197,6 +216,39 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
     }
     clearFieldError(fieldKey);
     setter(asset);
+  };
+
+  // Face photos are live front-camera captures only, for every role. No
+  // gallery or file option exists, so a saved or AI-generated portrait cannot
+  // enter through signup. Government ID and certificate stay on the document
+  // picker since those are existing physical papers.
+  const takeFacePhoto = async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (permission.status !== 'granted') {
+      setFieldErrors((prev) => ({ ...prev, facePhotoFile: 'Allow camera access to take your face photo.' }));
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      cameraType: ImagePicker.CameraType.front,
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (result.canceled || !result.assets?.[0]?.uri) return;
+    const asset = result.assets[0];
+    const file: CredentialFile = {
+      uri: asset.uri,
+      name: asset.fileName || 'face-photo.jpg',
+      mimeType: asset.mimeType || 'image/jpeg',
+      size: asset.fileSize ?? undefined,
+      lastModified: Date.now(),
+    };
+    setFieldErrors((prev) => {
+      if (!prev.facePhotoFile) return prev;
+      const next = { ...prev };
+      delete next.facePhotoFile;
+      return next;
+    });
+    setFacePhotoFile(file);
   };
 
   // `prefix` renders a fixed, non-editable leading label inside the field box
@@ -370,7 +422,18 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
 
         {isTechRole && (
           <>
-            {renderField('Government ID Number', governmentIdNumber, setGovernmentIdNumber, 'governmentIdNumber', 'Enter valid government ID number')}
+            <View style={styles.field}>
+              <Text style={styles.label}>Government ID Number</Text>
+              <TextInput
+                style={[styles.input, fieldErrors.governmentIdNumber && styles.inputError]}
+                placeholder="Enter the number printed on your ID"
+                placeholderTextColor={colors.subtle}
+                value={governmentIdNumber}
+                onChangeText={(t) => { setGovernmentIdNumber(t); clearFieldError('governmentIdNumber'); }}
+                accessibilityLabel="Government ID Number"
+              />
+              {fieldErrors.governmentIdNumber ? <Text style={styles.errorText}>{fieldErrors.governmentIdNumber}</Text> : <Text style={[styles.helperText, { marginTop: 6 }]}>National ID: enter the 12-digit PhilSys Number (PSN) or the 16-digit PhilSys Card Number (PCN). For other IDs, enter the number printed on the card.</Text>}
+            </View>
             <View style={styles.field}>
               <Text style={styles.label}>Government ID File</Text>
               <TouchableOpacity style={[styles.input, styles.docButton, fieldErrors.governmentIdFile && styles.inputError]} onPress={() => chooseCredential(setGovernmentIdFile, 'governmentIdFile', 'Government ID file')} accessibilityRole="button" accessibilityLabel="Choose Government ID file">
@@ -380,18 +443,18 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
               {fieldErrors.governmentIdFile ? <Text style={styles.errorText}>{fieldErrors.governmentIdFile}</Text> : null}
             </View>
             <View style={styles.field}>
-              <Text style={styles.label}>Certificate or Proof of Experience</Text>
-              <TouchableOpacity style={[styles.input, styles.docButton, fieldErrors.certificateFile && styles.inputError]} onPress={() => chooseCredential(setCertificateFile, 'certificateFile', 'Certificate file')} accessibilityRole="button" accessibilityLabel="Choose certificate file">
+              <Text style={styles.label}>TESDA Certificate, Training Certificate, or Proof of Freelance Experience</Text>
+              <TouchableOpacity style={[styles.input, styles.docButton, fieldErrors.certificateFile && styles.inputError]} onPress={() => chooseCredential(setCertificateFile, 'certificateFile', 'Certificate file')} accessibilityRole="button" accessibilityLabel="Choose certificate or proof of freelance experience">
                 <Ionicons name="cloud-upload-outline" size={18} color={accent} />
-                <Text style={styles.docButtonText} numberOfLines={1}>{certificateFile ? certificateFile.name : 'Choose certificate file'}</Text>
+                <Text style={styles.docButtonText} numberOfLines={1}>{certificateFile ? certificateFile.name : 'Choose certificate or proof of experience'}</Text>
               </TouchableOpacity>
-              {fieldErrors.certificateFile ? <Text style={styles.errorText}>{fieldErrors.certificateFile}</Text> : null}
+              {fieldErrors.certificateFile ? <Text style={styles.errorText}>{fieldErrors.certificateFile}</Text> : <Text style={[styles.helperText, { marginTop: 6 }]}>TESDA or training certificate, employment certificate, freelance job proof, or client recommendation.</Text>}
             </View>
             <View style={styles.field}>
-              <Text style={styles.label}>Face Photo</Text>
-              <TouchableOpacity style={[styles.input, styles.docButton, fieldErrors.facePhotoFile && styles.inputError]} onPress={() => chooseCredential(setFacePhotoFile, 'facePhotoFile', 'Face photo')} accessibilityRole="button" accessibilityLabel="Choose face photo">
+              <Text style={styles.label}>Face Photo (front camera only)</Text>
+              <TouchableOpacity style={[styles.input, styles.docButton, fieldErrors.facePhotoFile && styles.inputError]} onPress={() => { void takeFacePhoto(); }} accessibilityRole="button" accessibilityLabel="Take face photo with front camera">
                 <Ionicons name="camera-outline" size={18} color={accent} />
-                <Text style={styles.docButtonText} numberOfLines={1}>{facePhotoFile ? facePhotoFile.name : 'Choose face photo'}</Text>
+                <Text style={styles.docButtonText} numberOfLines={1}>{facePhotoFile ? facePhotoFile.name : 'Take face photo'}</Text>
               </TouchableOpacity>
               {fieldErrors.facePhotoFile ? <Text style={styles.errorText}>{fieldErrors.facePhotoFile}</Text> : null}
             </View>
@@ -409,10 +472,10 @@ export default function RegisterScreen({ switchToLogin, initialRole = 'customer'
               {fieldErrors.governmentIdFile ? <Text style={styles.errorText}>{fieldErrors.governmentIdFile}</Text> : null}
             </View>
             <View style={styles.field}>
-              <Text style={styles.label}>Face Photo</Text>
-              <TouchableOpacity style={[styles.input, styles.docButton, fieldErrors.facePhotoFile && styles.inputError]} onPress={() => chooseCredential(setFacePhotoFile, 'facePhotoFile', 'Face photo')} accessibilityRole="button" accessibilityLabel="Choose face photo">
+              <Text style={styles.label}>Face Photo (front camera only)</Text>
+              <TouchableOpacity style={[styles.input, styles.docButton, fieldErrors.facePhotoFile && styles.inputError]} onPress={() => { void takeFacePhoto(); }} accessibilityRole="button" accessibilityLabel="Take face photo with front camera">
                 <Ionicons name="camera-outline" size={18} color={accent} />
-                <Text style={styles.docButtonText} numberOfLines={1}>{facePhotoFile ? facePhotoFile.name : 'Choose face photo'}</Text>
+                <Text style={styles.docButtonText} numberOfLines={1}>{facePhotoFile ? facePhotoFile.name : 'Take face photo'}</Text>
               </TouchableOpacity>
               {fieldErrors.facePhotoFile ? <Text style={styles.errorText}>{fieldErrors.facePhotoFile}</Text> : null}
             </View>

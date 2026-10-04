@@ -6,6 +6,13 @@
 // refactor looked fine. This script walks src/ and verifies that every relative
 // import/require actually resolves to a file on disk, regardless of @ts-nocheck.
 //
+// It also guards the EXPO_PUBLIC_* reads. Expo/Metro inlines a STATIC
+// `process.env.EXPO_PUBLIC_X` at build time and cannot resolve a dynamic read
+// such as `process.env[key]` — the dynamic form compiles, works in development
+// and then silently returns the fallback in a production bundle. So a dynamic
+// read is a hard failure here, and every statically read variable must be
+// documented in .env.example (skipped when that file is absent).
+//
 // Run with: npm run check:imports
 
 const fs = require('fs');
@@ -66,6 +73,80 @@ for (const file of files) {
   }
 }
 
+// --- EXPO_PUBLIC_* static-access guard ------------------------------------
+// `process.env.EXPO_PUBLIC_X` is fine; `process.env[X]` / `process.env?.[X]` is not.
+//
+// Comments are blanked out first (same length, so line numbers survive) — the
+// rule is explained in prose in the files it protects, and that prose must not
+// trip the check.
+const stripComments = (source) => source
+  .replace(/\/\*[\s\S]*?\*\//g, (match) => match.replace(/[^\n]/g, ' '))
+  .replace(/\/\/[^\n]*/g, (match) => ' '.repeat(match.length));
+
+const DYNAMIC_ENV_READ = /process\.env\s*\??\.?\s*\[/g;
+const STATIC_ENV_READ = /process\.env\??\.(EXPO_PUBLIC_[A-Z0-9_]+)/g;
+// An inline fallback such as `asBool(process.env.X, true)` puts a magic value
+// back in the code; defaults must be named. `''` is allowed — it means "unset".
+const LITERAL_ENV_FALLBACK =
+  /process\.env\??\.(EXPO_PUBLIC_[A-Z0-9_]+)\s*(,|\?\?|\|\|)\s*('[^']*'|"[^"]*"|true|false|-?\d[\d.]*)/g;
+
+const dynamicReads = [];
+const literalFallbacks = [];
+const staticVars = new Set();
+
+for (const file of files) {
+  const source = stripComments(fs.readFileSync(file, 'utf8'));
+  for (const match of source.matchAll(DYNAMIC_ENV_READ)) {
+    const line = source.slice(0, match.index).split('\n').length;
+    dynamicReads.push(`${path.relative(PROJECT_ROOT, file)}:${line}`);
+  }
+  for (const match of source.matchAll(STATIC_ENV_READ)) staticVars.add(match[1]);
+  for (const match of source.matchAll(LITERAL_ENV_FALLBACK)) {
+    const [full, , , literal] = match;
+    if (literal === "''" || literal === '""') continue;
+    const line = source.slice(0, match.index).split('\n').length;
+    literalFallbacks.push(`${path.relative(PROJECT_ROOT, file)}:${line}  ${full.trim()}`);
+  }
+}
+
+if (dynamicReads.length > 0) {
+  console.error(
+    `Mobile check failed: ${dynamicReads.length} dynamic process.env read(s). `
+    + 'Expo can only inline process.env.EXPO_PUBLIC_X (static member access):'
+  );
+  for (const entry of dynamicReads) console.error(`  ${entry}`);
+  process.exit(1);
+}
+
+if (literalFallbacks.length > 0) {
+  console.error(
+    `Mobile check failed: ${literalFallbacks.length} inline literal fallback(s). `
+    + 'Every default must be a named constant:'
+  );
+  for (const entry of literalFallbacks) console.error(`  ${entry}`);
+  process.exit(1);
+}
+
+// --- .env.example coverage ------------------------------------------------
+// Kept in sync so every knob the app reads is discoverable. The check is
+// skipped when the template is absent, because .env.example is gitignored.
+const EXAMPLE_PATH = path.join(PROJECT_ROOT, '.env.example');
+let documented = null;
+if (fs.existsSync(EXAMPLE_PATH)) {
+  const example = fs.readFileSync(EXAMPLE_PATH, 'utf8');
+  documented = new Set([...example.matchAll(/(EXPO_PUBLIC_[A-Z0-9_]+)/g)].map((match) => match[1]));
+}
+
+const undocumented = documented
+  ? [...staticVars].filter((name) => !documented.has(name)).sort()
+  : [];
+
+if (undocumented.length > 0) {
+  console.error(`Mobile check failed: ${undocumented.length} EXPO_PUBLIC_* read(s) missing from .env.example:`);
+  for (const name of undocumented) console.error(`  ${name}`);
+  process.exit(1);
+}
+
 if (broken.length > 0) {
   console.error(`Mobile check failed: ${broken.length} unresolved relative import(s):`);
   for (const entry of broken) console.error(`  ${entry}`);
@@ -73,5 +154,7 @@ if (broken.length > 0) {
 }
 
 console.log(
-  `Mobile check passed: ${files.length} file(s), ${resolvedCount} relative import(s) resolved.`
+  `Mobile check passed: ${files.length} file(s), ${resolvedCount} relative import(s) resolved, `
+  + `${staticVars.size} EXPO_PUBLIC_* read(s) static, 0 dynamic, 0 literal fallback`
+  + (documented ? `, ${documented.size} documented in .env.example.` : ' (.env.example not present, coverage skipped).')
 );

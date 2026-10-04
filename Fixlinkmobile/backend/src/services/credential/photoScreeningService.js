@@ -5,7 +5,7 @@
 // — it warns the technician, it never blocks a submission.
 
 const { analyzeDocument } = require('./documentForensics');
-const { visionComplete, isOmniRouteConfigured } = require('../omniRoute');
+const { visionComplete, isVisionConfigured } = require('../aiClient');
 const { config, mergeRisk, levelForScore } = require('../../domain/credentialScreening');
 const photo = require('../../domain/photoScreening');
 
@@ -35,7 +35,7 @@ const screenRepairPhoto = async (file) => {
   const flags = [...forensic.flags];
 
   let vision = null;
-  if (photo.isPhotoVisionEnabled() && isOmniRouteConfigured()) {
+  if (photo.isPhotoVisionEnabled() && isVisionConfigured()) {
     try {
       vision = await runVision(file);
     } catch (error) {

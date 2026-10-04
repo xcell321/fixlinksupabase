@@ -4,8 +4,10 @@
 
 const { supabase, supabaseAuth } = require('../../config/supabase');
 const { HttpError } = require('../../domain/httpError');
+const { requireLoginFace } = require('../../domain/loginFacePolicy');
+const { verifyLoginFace } = require('./faceLoginService');
 
-const login = async ({ email, password, expectedRole }) => {
+const login = async ({ email, password, expectedRole, faceFile }) => {
   if (!email || !password) {
     throw new HttpError(400, { error: 'Missing email or password' });
   }
@@ -91,8 +93,30 @@ const login = async ({ email, password, expectedRole }) => {
     });
   }
 
+  // Optional face gate: a live selfie is compared against the face photo
+  // stored at signup. Off by default so existing clients keep working. When on
+  // and vision is unreachable, sign-in falls back to the password result
+  // instead of locking the user out; only a positive mismatch blocks.
+  let faceVerified = 'skipped';
+  if (requireLoginFace()) {
+    if (!faceFile || !Buffer.isBuffer(faceFile.buffer) || faceFile.buffer.length === 0) {
+      throw new HttpError(400, { error: 'A live face photo is required to sign in. Take a selfie to continue.' });
+    }
+    const referenceUrl = userData.profile_image || userData.selfie_url;
+    if (!referenceUrl) {
+      console.warn(`Login face check skipped for ${userData.id}: no stored face photo.`);
+    } else {
+      const verdict = await verifyLoginFace({ referenceUrl, selfieFile: faceFile });
+      if (!verdict.unavailable && !verdict.match) {
+        throw new HttpError(401, { error: 'Face verification failed. The selfie does not match the face photo on this account.' });
+      }
+      if (!verdict.unavailable) faceVerified = true;
+    }
+  }
+
   return {
     message: 'Login successful',
+    faceVerified,
     uid: data.user.id,
     role: userData.role,
     name: userData.name,

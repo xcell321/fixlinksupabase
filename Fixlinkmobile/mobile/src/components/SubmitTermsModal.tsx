@@ -8,6 +8,7 @@ import {
   termsContinueLabel,
   termsDeclineLabel,
   termsIntro,
+  termsTickHint,
   termsTitle,
   termsVersion,
 } from '../utils/submitTerms';
@@ -88,15 +89,6 @@ export default function SubmitTermsModal({
           <View style={styles.actions}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={termsDeclineLabel()}
-              onPress={onDecline}
-              style={({ pressed }) => [styles.declineButton, pressed && styles.pressedSoft]}
-            >
-              <Text style={styles.declineText}>{termsDeclineLabel()}</Text>
-            </Pressable>
-
-            <Pressable
-              accessibilityRole="button"
               accessibilityLabel={termsContinueLabel()}
               accessibilityState={{ disabled: !accepted }}
               onPress={onAgree}
@@ -111,11 +103,20 @@ export default function SubmitTermsModal({
                 {termsContinueLabel()}
               </Text>
             </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={termsDeclineLabel()}
+              onPress={onDecline}
+              style={({ pressed }) => [styles.declineButton, pressed && styles.pressedSoft]}
+            >
+              <Text style={styles.declineText}>{termsDeclineLabel()}</Text>
+            </Pressable>
           </View>
 
           {!accepted && (
             <Text style={styles.hint} accessibilityLiveRegion="polite">
-              Tick the box to enable continuing.
+              {termsTickHint()}
             </Text>
           )}
         </View>

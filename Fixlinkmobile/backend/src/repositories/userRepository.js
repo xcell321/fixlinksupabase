@@ -22,6 +22,18 @@ const findContactsByIds = async (uids) => {
   return data || [];
 };
 
+// Technician cards for customer job lists: everything the feed shows about an
+// assigned technician in one batched query instead of one query per job.
+const findTechnicianCardsByIds = async (uids) => {
+  const list = [...new Set((uids || []).filter(Boolean))];
+  if (list.length === 0) return [];
+  const { data } = await supabase
+    .from(TABLE)
+    .select('id, name, phone, skills, rating, total_reviews')
+    .in('id', list);
+  return data || [];
+};
+
 // Non-sensitive profile cards used when a technician rates a customer
 // (UAT #11): the verified badge and portfolio need only these fields.
 const findPublicProfilesByIds = async (uids) => {
@@ -48,4 +60,4 @@ const findByNameLike = async (name, role) => {
   return data || [];
 };
 
-module.exports = { findById, findRoleById, findContactsByIds, findByNameLike, findPublicProfilesByIds, updateStatus };
+module.exports = { findById, findRoleById, findContactsByIds, findTechnicianCardsByIds, findByNameLike, findPublicProfilesByIds, updateStatus };

@@ -611,6 +611,9 @@ alignSelf: 'center' },
     textAlign: 'center'
   },
   utilityLabelDanger: { color: colors.danger },
+  utilityLabelMuted: { color: colors.subtle },
+  // UAT #2: the no-show tile while the wait window is still running.
+  utilityTileDisabled: { opacity: 0.55 },
 
   primaryBtn: {
     flex: 1,

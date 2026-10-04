@@ -2,7 +2,7 @@
 //
 // Two passes are merged into one 0-100 risk:
 //   Layer 1  documentForensics  local, offline, zero dependencies
-//   Layer 2  OmniRoute vision   AI read of the ID and the selfie
+//   Layer 2  AI vision         AI read of the ID and the selfie
 //
 // The result is ADVISORY. It never blocks registration and never accuses
 // anyone: when the AI gateway is unreachable the local score stands alone and
@@ -21,7 +21,7 @@ const {
   judgeFace,
 } = require('../../domain/credentialScreening');
 const { analyzeDocument } = require('./documentForensics');
-const { visionComplete, isOmniRouteConfigured } = require('../omniRoute');
+const { visionComplete, isVisionConfigured } = require('../aiClient');
 
 const VISION_SYSTEM = `You are a document-integrity analyst for FixLink, a Philippine services platform.
 You receive a government ID image (and possibly a selfie) and must return STRICT JSON only, no prose.
@@ -120,7 +120,7 @@ const screenCredential = async ({ role, name, governmentIdNumber, governmentIdFi
   const flags = [...forensic.flags];
 
   let vision = null;
-  if (isVisionEnabled() && isOmniRouteConfigured()) {
+  if (isVisionEnabled() && isVisionConfigured()) {
     try {
       vision = await runVision({ role, governmentIdFile, selfieFile, governmentIdNumber, name });
     } catch (error) {

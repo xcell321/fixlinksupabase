@@ -1,7 +1,8 @@
-const { chatComplete, isOmniRouteConfigured } = require('./omniRoute');
+const { chatComplete, isAiConfigured } = require('./aiClient');
 
 // Requirement 1: the AI genuinely analyzes the customer's natural-language
-// repair description via OmniRoute and extracts the device, category, problem,
+// repair description via the configured AI provider and extracts the device,
+// category, problem,
 // and the required technician skills. Output is validated and normalized so
 // downstream matching only consumes clean, typed data.
 const analyzeRepairDescription = async ({ description, applianceType, category }) => {
@@ -44,4 +45,4 @@ const analyzeRepairDescription = async ({ description, applianceType, category }
   };
 };
 
-module.exports = { analyzeRepairDescription, isOmniRouteConfigured };
+module.exports = { analyzeRepairDescription, isAiConfigured };

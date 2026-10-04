@@ -1,9 +1,10 @@
 // Prototype TechJobDetail: pay card, customer card, live mini map, action rows.
 import React, { useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { rateCustomer, reportScam } from '../../services/api';
+import { rateCustomer, reportScam, fetchCustomerReviews, type CustomerReviewItem } from '../../services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { PhotoThumb } from '../../components/RequestPhoto';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import TechnicianLocationMap from '../../components/TechnicianLocationMap';
 import { colors, fonts, shadows, themedStyles } from '../../theme';
 import { getApplianceIcon } from '../../utils/applianceIcons';
@@ -12,6 +13,7 @@ import {
   formatJobSchedule,
   canMarkArrival,
   canStartRepair,
+  noShowState,
   hasPhotoWarning,
   hasSafetyWarning,
   safetyWarningText,
@@ -47,6 +49,10 @@ export default function TechJobDetailScreen({
   const customerInitial = String(job.customerName || 'C').trim().charAt(0).toUpperCase() || 'C';
   const arrivalEligible = canMarkArrival(job);
   const startEligible = canStartRepair(job);
+  // UAT #2: a customer no-show is only reportable once an arrival is recorded
+  // and the wait window has passed, so the button reflects that instead of
+  // letting the server reject the tap.
+  const noShow = noShowState(job);
   const isInProgress = job.status === 'In Progress';
   const busy = actionLoadingId === job.id || acceptingJobId === job.id;
   const isCompleted = String(job.status || '').toLowerCase() === 'completed';
@@ -62,6 +68,45 @@ export default function TechJobDetailScreen({
   const [scamBusy, setScamBusy] = useState(false);
   const [scamSent, setScamSent] = useState(false);
   const [scamError, setScamError] = useState<string | null>(null);
+  const [scamConfirmVisible, setScamConfirmVisible] = useState(false);
+  // The report form lives only while the job is still unfinished. A completed
+  // job never shows it, rated or not, because the work is done.
+  const showScamForm = isInProgress && !isQueue && !scamSent;
+  // UAT #11: reviews other technicians wrote about this customer.
+  const [custReviewsOpen, setCustReviewsOpen] = useState(false);
+  const [custReviewsLoading, setCustReviewsLoading] = useState(false);
+  const [custReviewsError, setCustReviewsError] = useState<string | null>(null);
+  const [custReviews, setCustReviews] = useState<CustomerReviewItem[] | null>(null);
+  const toggleCustomerReviews = (): void => {
+    const next = !custReviewsOpen;
+    setCustReviewsOpen(next);
+    if (next && custReviews === null && !custReviewsLoading) {
+      const uid = job.customerProfile?.uid;
+      if (!uid) {
+        setCustReviewsError('Reviews are unavailable for this customer.');
+        return;
+      }
+      setCustReviewsLoading(true);
+      setCustReviewsError(null);
+      fetchCustomerReviews(String(uid)).then(
+        (rows) => { setCustReviews(rows); setCustReviewsLoading(false); },
+        (error: unknown) => {
+          const err = error as { error?: string; message?: string };
+          setCustReviewsError(err?.error || err?.message || 'Could not load reviews.');
+          setCustReviewsLoading(false);
+        },
+      );
+    }
+  };
+  const openScamConfirm = (): void => {
+    if (scamBusy) return;
+    if (!scamReason.trim()) {
+      setScamError('Please state what happened before filing the report.');
+      return;
+    }
+    setScamError(null);
+    setScamConfirmVisible(true);
+  };
   const submitCustomerRating = async (): Promise<void> => {
     if (!custStars || custRatingBusy || !job.technicianUid) return;
     setCustRatingBusy(true);
@@ -168,6 +213,47 @@ export default function TechJobDetailScreen({
             <Ionicons name="time-outline" size={14} color={colors.subtle} />
             <Text style={styles.infoText} numberOfLines={1}>{formatJobSchedule(job)}</Text>
           </View>
+          {(job.customerProfile?.totalReviews ?? 0) > 0 ? (
+            <Pressable
+              onPress={toggleCustomerReviews}
+              style={styles.custRevToggle}
+              accessibilityRole="button"
+              accessibilityLabel={custReviewsOpen ? 'Hide customer reviews' : 'Read customer reviews'}
+            >
+              <Ionicons name="star" size={13} color={colors.gold} />
+              <Text style={styles.custRevToggleText} numberOfLines={1}>
+                {job.customerProfile?.rating != null
+                  ? `${Number(job.customerProfile.rating).toFixed(1)} ★ · ${job.customerProfile.totalReviews ?? 0} reviews · tap to read`
+                  : `${job.customerProfile?.totalReviews ?? 0} reviews · tap to read`}
+              </Text>
+              <Ionicons name={custReviewsOpen ? 'chevron-up' : 'chevron-down'} size={14} color={colors.subtle} />
+            </Pressable>
+          ) : null}
+          {custReviewsOpen ? (
+            <View style={styles.custRevList}>
+              {custReviewsLoading ? <ActivityIndicator color={colors.tech} size="small" /> : null}
+              {custReviewsError ? <Text style={styles.rateError}>{custReviewsError}</Text> : null}
+              {(custReviews ?? []).map((review, index) => (
+                <View key={`${review.createdAt ?? 'norev'}-${index}`} style={styles.custRevItem}>
+                  <Text style={styles.custRevStars}>
+                    {'★'.repeat(Math.max(0, Math.min(5, Math.round(Number(review.rating) || 0))))}
+                    <Text style={styles.custRevStarsDim}>{'★'.repeat(5 - Math.max(0, Math.min(5, Math.round(Number(review.rating) || 0))))}</Text>
+                  </Text>
+                  {review.comment ? (
+                    <Text style={styles.custRevComment} numberOfLines={3}>{review.comment}</Text>
+                  ) : (
+                    <Text style={styles.custRevCommentDim}>No written comment.</Text>
+                  )}
+                  {review.createdAt ? (
+                    <Text style={styles.custRevDate}>{String(review.createdAt).slice(0, 10)}</Text>
+                  ) : null}
+                </View>
+              ))}
+              {custReviews !== null && custReviews.length === 0 && !custReviewsLoading && !custReviewsError ? (
+                <Text style={styles.custRevCommentDim}>No written reviews yet.</Text>
+              ) : null}
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.card}>
@@ -202,14 +288,32 @@ export default function TechJobDetailScreen({
 
         {!isQueue ? (
           <View style={{ gap: 8 }}>
-            {arrivalEligible ? (
+            {arrivalEligible || noShow.hasArrived ? (
               <View style={styles.btnRow}>
-                <Pressable onPress={() => onArrival(job)} disabled={busy} style={({ pressed }) => [styles.primaryBlue, pressed && { opacity: 0.88 }]} accessibilityRole="button" accessibilityLabel="Mark arrival">
-                  {busy ? <ActivityIndicator color={colors.onAccent} size="small" /> : (<><Ionicons name="location" size={15} color={colors.onAccent} /><Text style={styles.primaryBlueText}>Mark Arrival</Text></>)}
-                </Pressable>
-                <Pressable onPress={() => onNoShow(job)} disabled={busy} style={({ pressed }) => [styles.declineBtn, pressed && { opacity: 0.85 }]} accessibilityRole="button" accessibilityLabel="Report no-show">
-                  <Text style={styles.declineText}>No-Show</Text>
-                </Pressable>
+                {arrivalEligible ? (
+                  <Pressable onPress={() => onArrival(job)} disabled={busy} style={({ pressed }) => [styles.primaryBlue, pressed && { opacity: 0.88 }]} accessibilityRole="button" accessibilityLabel="Mark arrival">
+                    {busy ? <ActivityIndicator color={colors.onAccent} size="small" /> : (<><Ionicons name="location" size={15} color={colors.onAccent} /><Text style={styles.primaryBlueText}>Mark Arrival</Text></>)}
+                  </Pressable>
+                ) : null}
+                {/* No-show reporting ends once the repair starts or the job
+                    completes: a finished job, or one already being repaired,
+                    has nobody left to miss the meetup. */}
+                {noShow.hasArrived && !isCompleted && !isInProgress ? (
+                  <Pressable
+                    onPress={() => onNoShow(job)}
+                    disabled={busy || !noShow.ready}
+                    style={({ pressed }) => [styles.declineBtn, pressed && { opacity: 0.85 }, !noShow.ready && styles.noShowWaiting]}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: !noShow.ready }}
+                    accessibilityLabel={noShow.ready
+                      ? 'Report no-show'
+                      : `Report no-show available in ${noShow.remainingMinutes} minutes`}
+                  >
+                    <Text style={styles.declineText}>
+                      {noShow.ready ? 'No-Show' : `No-Show in ${noShow.remainingMinutes}m`}
+                    </Text>
+                  </Pressable>
+                ) : null}
               </View>
             ) : null}
             <View style={styles.btnRow}>
@@ -309,7 +413,11 @@ export default function TechJobDetailScreen({
                 <Text style={styles.rateDoneText}>Customer rated. Thank you.</Text>
               </View>
             )}
-            {(isCompleted || isInProgress) && !isQueue && !scamSent && (
+            {/* Report-as-scammer stays available while the job can still go wrong
+                (In Progress) or while the customer is still unjudged. Once the
+                technician rates the customer, the job counts as closed
+                successfully and the report form leaves with it. */}
+            {showScamForm && (
               <View style={styles.rateCard}>
                 <Text style={styles.rateTitle}>Report as scammer</Text>
                 <TextInput
@@ -322,7 +430,7 @@ export default function TechJobDetailScreen({
                 />
                 {scamError ? <Text style={styles.rateError}>{scamError}</Text> : null}
                 <Pressable
-                  onPress={() => { void submitScamReport(); }}
+                  onPress={openScamConfirm}
                   disabled={scamBusy}
                   style={({ pressed }) => [styles.reportBtn, scamBusy && styles.rateBtnDisabled, pressed && { opacity: 0.88 }]}
                   accessibilityRole="button"
@@ -343,6 +451,16 @@ export default function TechJobDetailScreen({
           </View>
         ) : null}
       </ScrollView>
+      <ConfirmDialog
+        visible={scamConfirmVisible}
+        title="Report this customer?"
+        message="Are you sure? Filing a false report harms a real customer and is logged on your account."
+        confirmLabel="Yes, File Report"
+        danger
+        busy={scamBusy}
+        onCancel={() => { if (!scamBusy) setScamConfirmVisible(false); }}
+        onConfirm={() => { setScamConfirmVisible(false); void submitScamReport(); }}
+      />
     </View>
   );
 }
@@ -372,6 +490,15 @@ const styles = themedStyles({
   customerMeta: { color: colors.muted, fontSize: 12, fontFamily: fonts.regular, marginTop: 2 },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
   infoText: { flex: 1, color: colors.muted, fontSize: 12, fontFamily: fonts.regular },
+  custRevToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 10, backgroundColor: colors.appBg },
+  custRevToggleText: { flex: 1, color: colors.ink, fontSize: 12, fontFamily: fonts.medium },
+  custRevList: { marginTop: 8, gap: 8 },
+  custRevItem: { borderRadius: 10, backgroundColor: colors.appBg, paddingHorizontal: 10, paddingVertical: 8, gap: 2 },
+  custRevStars: { color: colors.gold, fontSize: 13, fontFamily: fonts.bold },
+  custRevStarsDim: { color: colors.line, fontSize: 13 },
+  custRevComment: { color: colors.ink, fontSize: 12, fontFamily: fonts.regular, lineHeight: 17 },
+  custRevCommentDim: { color: colors.muted, fontSize: 12, fontFamily: fonts.regular },
+  custRevDate: { color: colors.subtle, fontSize: 10, fontFamily: fonts.regular },
   mapPlaceholder: { backgroundColor: colors.surfaceSunken, borderRadius: 12, height: 112, alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: colors.lineSoft },
   mapPlaceholderText: { color: colors.muted, fontSize: 12, fontFamily: fonts.medium },
   mapAddressBar: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.techSoft, borderWidth: 1, borderColor: colors.hudBorder, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginTop: 10 },
@@ -383,6 +510,8 @@ const styles = themedStyles({
   btnRow: { flexDirection: 'row', gap: 8 },
   declineBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: colors.danger + '40', borderRadius: 14, minHeight: 48, backgroundColor: colors.white },
   declineText: { color: colors.danger, fontSize: 14, fontFamily: fonts.bold },
+  // UAT #2: the no-show action while the wait window is still running.
+  noShowWaiting: { opacity: 0.55 },
   acceptBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.tech, borderRadius: 14, minHeight: 48, ...shadows.card },
   acceptText: { color: colors.onAccent, fontSize: 14, fontFamily: fonts.bold },
   messageBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 14, minHeight: 48 },

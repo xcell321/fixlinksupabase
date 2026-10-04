@@ -12,7 +12,8 @@ import {
   updateJobStatus,
   verifyCompletionCode,
 } from '../../../services/api';
-import { validateOtpCode, type JobItem } from '../availableJobsHelpers';
+import { validateOtpCode, noShowState, type JobItem } from '../availableJobsHelpers';
+import { noShowBlockedText } from '../../../utils/noShowPolicy';
 import type { TechnicianRef } from './types';
 
 interface UseJobActionsArgs {
@@ -23,7 +24,7 @@ interface UseJobActionsArgs {
   loadJobs: (opts?: { background?: boolean }) => Promise<void>;
   setSelectedJobForDetails: React.Dispatch<React.SetStateAction<JobItem | null>>;
   selectedJobForDetails: JobItem | null;
-  setFeedTab: React.Dispatch<React.SetStateAction<'queue' | 'active'>>;
+  setFeedTab: React.Dispatch<React.SetStateAction<'queue' | 'active' | 'completed'>>;
 }
 
 export const useJobActions = ({
@@ -53,9 +54,10 @@ export const useJobActions = ({
   const [noShowJob, setNoShowJob] = useState<JobItem | null>(null);
 
   // Floating success modals. Alert dialogs do not fire reliably on web,
-  // so accept/start confirmations render in-app instead.
+  // so accept/start/complete confirmations render in-app instead.
   const [acceptedNotice, setAcceptedNotice] = useState<boolean>(false);
   const [startedNotice, setStartedNotice] = useState<boolean>(false);
+  const [completedNotice, setCompletedNotice] = useState<boolean>(false);
 
   const handleAcceptJob = (job: JobItem): void => {
     if (!technician?.uid) {
@@ -107,13 +109,16 @@ export const useJobActions = ({
       loadJobs({ background: true });
     } catch (error) {
       const err = error as { code?: string; message?: string; error?: string };
-      if (err?.code === 'TECHNICIAN_AT_CAPACITY') {
-        setAcceptError(err?.message || 'Complete an active job to accept new work.');
-      } else {
-        setAcceptError(
-          err?.error || err?.message || 'This job may already have been claimed by another technician.'
-        );
-      }
+      // Raw transport codes never reach the technician: anything shaped like
+      // "status code 409" becomes the friendly capacity sentence instead.
+      const rawMessage = err?.code === 'TECHNICIAN_AT_CAPACITY'
+        ? err?.message || 'Complete an active job to accept new work.'
+        : err?.error || err?.message || 'This job may already have been claimed by another technician.';
+      setAcceptError(
+        /status code \d{3}/i.test(rawMessage)
+          ? 'You cannot accept this job right now. Finish your accepted jobs first, then try again.'
+          : rawMessage
+      );
     } finally {
       setAcceptingJobId(null);
     }
@@ -205,8 +210,25 @@ export const useJobActions = ({
     }
   };
 
+  // UAT #2: the no-show report is only accepted once the technician has
+  // recorded an arrival and waited the window, so the action reports the
+  // countdown instead of opening a dialog the server would reject.
+  const noShowGateMessage = (job: JobItem): string | null => {
+    const wait = noShowState(job);
+    if (!wait.hasArrived) {
+      return 'Record your arrival at the service location before reporting a no-show.';
+    }
+    if (!wait.ready) return noShowBlockedText(wait);
+    return null;
+  };
+
   const handleNoShow = (job: JobItem): void => {
     if (!technician?.uid) return;
+    const blocked = noShowGateMessage(job);
+    if (blocked) {
+      Alert.alert('Keep waiting', blocked);
+      return;
+    }
     setAcceptError(null);
     setNoShowJob(job);
   };
@@ -214,6 +236,13 @@ export const useJobActions = ({
   const doNoShow = async (): Promise<void> => {
     const job = noShowJob;
     if (!job || !technician?.uid || actionLoadingId) return;
+    // Re-checked here because the card that opened the dialog may be stale.
+    const blocked = noShowGateMessage(job);
+    if (blocked) {
+      setNoShowJob(null);
+      Alert.alert('Keep waiting', blocked);
+      return;
+    }
     setNoShowJob(null);
     setActionLoadingId(job.id);
     try {
@@ -268,16 +297,20 @@ export const useJobActions = ({
       await verifyCompletionCode(selectedJobForOtp.id, cleanCode);
       setOtpModalVisible(false);
       setAcceptedJobs((currentJobs) => currentJobs.filter((j) => j.id !== selectedJobForOtp.id));
-      Alert.alert('Job Completed', 'Repair verified and finalized successfully.');
+      setCompletedNotice(true);
       loadJobs();
     } catch (error) {
       const err = error as { error?: string; message?: string };
       // Inline instead of an alert: the sheet stays open so the code can be
       // retyped, and the field is cleared so all 4 digits can go in again.
+      // Raw transport codes never reach the technician: anything shaped like
+      // "status code 404" becomes the friendly retry message instead.
+      const rawMessage = err?.error || err?.message || '';
       setOtpError(
-        err?.error ||
-          err?.message ||
-          'That code did not match. Ask the customer to read their 4-digit code again.'
+        /status code \d{3}/i.test(rawMessage)
+          ? 'That code did not match. Ask the customer to read their 4-digit code again.'
+          : rawMessage ||
+            'That code did not match. Ask the customer to read their 4-digit code again.'
       );
       setOtpCode('');
     } finally {
@@ -300,6 +333,8 @@ export const useJobActions = ({
     setAcceptedNotice,
     startedNotice,
     setStartedNotice,
+    completedNotice,
+    setCompletedNotice,
     otpModalVisible,
     setOtpModalVisible,
     otpCode,

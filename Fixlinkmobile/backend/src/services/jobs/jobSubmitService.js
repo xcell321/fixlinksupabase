@@ -9,7 +9,7 @@ const { maxDailyRequests, overDailyLimit } = require('../../domain/dailyRequestL
 const { termsVersion, verifyTerms } = require('../../domain/submitTerms');
 const { HttpError } = require('../../domain/httpError');
 const { resolveJobCoordinates } = require('../locationService');
-const { analyzeRepairDescription, isOmniRouteConfigured } = require('../repairAnalyzer');
+const { analyzeRepairDescription, isAiConfigured } = require('../repairAnalyzer');
 const { screenRepairPhoto } = require('../credential/photoScreeningService');
 const { assessRequest, isInvalidAddress } = require('./requestSafetyService');
 
@@ -212,7 +212,7 @@ const submitRequest = async ({ authUid, body, file }) => {
   // the AI triage the description into a category so technician matching keeps
   // working. Never blocks the response — a failure leaves the job as-is.
   const resolvedCategory = String(category || '').trim();
-  if (!resolvedCategory && isOmniRouteConfigured()) {
+  if (!resolvedCategory && isAiConfigured()) {
     analyzeRepairDescription({ description, applianceType, category })
       .then((analysis) => {
         const detectedCategory = analysis?.category;

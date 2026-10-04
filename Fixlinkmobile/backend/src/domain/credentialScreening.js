@@ -50,27 +50,49 @@ const LEVELS = {
   HIGH: 'high',
 };
 
+// Fallbacks for an empty .env. Every value is still read from the environment
+// on each call — these constants exist so no threshold or weight is a literal
+// at the point of use, which is what the "nothing is hardcoded" rule means here.
+const DEFAULTS = {
+  enabled: true,
+  aiVisionEnabled: true,
+  flagThreshold: 60,
+  highThreshold: 80,
+  minDimension: 300,
+  minFileBytes: 20480,
+  forensicWeight: 0.4,
+  visionWeight: 0.6,
+  visionAiThreshold: 0.6,
+  visionTamperThreshold: 0.6,
+  visionMaxBytes: 2097152,
+  visionTimeoutMs: 20000,
+  faceCheckEnabled: true,
+  selfieRequired: true,
+  faceMatchThreshold: 0.5,
+  livenessRiskThreshold: 0.6,
+};
+
 const config = () => ({
-  enabled: asBool(process.env.CREDENTIAL_SCREENING_ENABLED, true),
-  aiVisionEnabled: asBool(process.env.CREDENTIAL_AI_VISION_ENABLED, true),
-  flagThreshold: asInt(process.env.CREDENTIAL_FLAG_THRESHOLD, 60),
-  highThreshold: asInt(process.env.CREDENTIAL_HIGH_THRESHOLD, 80),
-  minDimension: asInt(process.env.CREDENTIAL_MIN_DIMENSION, 300),
-  minFileBytes: asInt(process.env.CREDENTIAL_MIN_FILE_BYTES, 20480),
-  forensicWeight: asFloat(process.env.CREDENTIAL_FORENSIC_WEIGHT, 0.4),
-  visionWeight: asFloat(process.env.CREDENTIAL_VISION_WEIGHT, 0.6),
-  visionAiThreshold: asFloat(process.env.CREDENTIAL_VISION_AI_THRESHOLD, 0.6),
-  visionTamperThreshold: asFloat(process.env.CREDENTIAL_VISION_TAMPER_THRESHOLD, 0.6),
-  visionMaxBytes: asInt(process.env.CREDENTIAL_VISION_MAX_BYTES, 2097152),
-  visionTimeoutMs: asInt(process.env.CREDENTIAL_VISION_TIMEOUT_MS, 20000),
+  enabled: asBool(process.env.CREDENTIAL_SCREENING_ENABLED, DEFAULTS.enabled),
+  aiVisionEnabled: asBool(process.env.CREDENTIAL_AI_VISION_ENABLED, DEFAULTS.aiVisionEnabled),
+  flagThreshold: asInt(process.env.CREDENTIAL_FLAG_THRESHOLD, DEFAULTS.flagThreshold),
+  highThreshold: asInt(process.env.CREDENTIAL_HIGH_THRESHOLD, DEFAULTS.highThreshold),
+  minDimension: asInt(process.env.CREDENTIAL_MIN_DIMENSION, DEFAULTS.minDimension),
+  minFileBytes: asInt(process.env.CREDENTIAL_MIN_FILE_BYTES, DEFAULTS.minFileBytes),
+  forensicWeight: asFloat(process.env.CREDENTIAL_FORENSIC_WEIGHT, DEFAULTS.forensicWeight),
+  visionWeight: asFloat(process.env.CREDENTIAL_VISION_WEIGHT, DEFAULTS.visionWeight),
+  visionAiThreshold: asFloat(process.env.CREDENTIAL_VISION_AI_THRESHOLD, DEFAULTS.visionAiThreshold),
+  visionTamperThreshold: asFloat(process.env.CREDENTIAL_VISION_TAMPER_THRESHOLD, DEFAULTS.visionTamperThreshold),
+  visionMaxBytes: asInt(process.env.CREDENTIAL_VISION_MAX_BYTES, DEFAULTS.visionMaxBytes),
+  visionTimeoutMs: asInt(process.env.CREDENTIAL_VISION_TIMEOUT_MS, DEFAULTS.visionTimeoutMs),
 });
 
 // --- Facial verification (#10) -------------------------------------------
 const faceConfig = () => ({
-  enabled: asBool(process.env.CREDENTIAL_FACE_CHECK_ENABLED, true),
-  selfieRequired: asBool(process.env.CREDENTIAL_SELFIE_REQUIRED, true),
-  matchThreshold: asFloat(process.env.CREDENTIAL_FACE_MATCH_THRESHOLD, 0.5),
-  livenessThreshold: asFloat(process.env.CREDENTIAL_LIVENESS_RISK_THRESHOLD, 0.6),
+  enabled: asBool(process.env.CREDENTIAL_FACE_CHECK_ENABLED, DEFAULTS.faceCheckEnabled),
+  selfieRequired: asBool(process.env.CREDENTIAL_SELFIE_REQUIRED, DEFAULTS.selfieRequired),
+  matchThreshold: asFloat(process.env.CREDENTIAL_FACE_MATCH_THRESHOLD, DEFAULTS.faceMatchThreshold),
+  livenessThreshold: asFloat(process.env.CREDENTIAL_LIVENESS_RISK_THRESHOLD, DEFAULTS.livenessRiskThreshold),
 });
 
 const isScreeningEnabled = () => config().enabled;

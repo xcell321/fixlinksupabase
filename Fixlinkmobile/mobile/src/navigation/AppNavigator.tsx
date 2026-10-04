@@ -27,6 +27,7 @@ import { colors, fonts, shadows, themedStyles } from '../theme';
 import type { IconName } from '../utils/applianceIcons';
 import MessageBanner from '../components/MessageBanner';
 import AssistantSheet from '../components/AssistantSheet';
+import { FadeInView } from '../components/animations';
 import type { AssistantContext } from '../components/AssistantSheet';
 
 type NavTab = { key: string; label: string; icon: IconName };
@@ -161,6 +162,9 @@ export default function AppNavigator() {
   const seenNotifIdsRef = useRef<Set<string>>(new Set());
   const bootstrappedRef = useRef(false);
   const bannerQueueRef = useRef<NotificationItem[]>([]);
+  // Fingerprint of the last applied inbox. The 10s poll refetches constantly,
+  // but an identical payload must not re-render the whole navigation tree.
+  const lastNotifFingerprintRef = useRef<string>('');
 
   useEffect(() => {
     const handleRecoveryUrl = (url: string | null | undefined) => {
@@ -211,6 +215,11 @@ export default function AppNavigator() {
         const list: NotificationItem[] = Array.isArray(notifications) ? notifications : [];
         // Sort newest first by timestamp
         list.sort((a, b) => String(b.timestamp || '').localeCompare(String(a.timestamp || '')));
+        // Identical inbox as last tick: skip every setter so the app sits still.
+        // New arrivals always change the payload, so no banner is ever lost.
+        const fingerprint = JSON.stringify(list);
+        if (fingerprint === lastNotifFingerprintRef.current) return;
+        lastNotifFingerprintRef.current = fingerprint;
         setChatNotifications(list);
 
         // Banner queue: only for unread, deduped
@@ -245,6 +254,7 @@ export default function AppNavigator() {
     bannerQueueRef.current.length = 0;
     bannerRef.current = null;
     setBanner(null);
+    lastNotifFingerprintRef.current = '';
     bootstrappedRef.current = false;
     loadNotifications();
     const intervalId = setInterval(loadNotifications, 10000);
@@ -549,7 +559,16 @@ export default function AppNavigator() {
       
       <MessageBanner banner={banner} onDismiss={dismissBanner} onPress={() => banner && openBannerNotification(banner)} />
 
-      <View style={styles.screenContainer}>{screen}</View>
+      <View style={styles.screenContainer}>
+        <FadeInView
+          key={isCustomer ? `customer-${customerTab}` : `tech-${technicianTab}`}
+          slideUp={8}
+          duration={200}
+          style={styles.screenFade}
+        >
+          {screen}
+        </FadeInView>
+      </View>
 
       <Modal visible={notificationsOpen} animationType="slide" onRequestClose={handleCloseNotifications}>
         <View style={styles.modalBackdrop}>
@@ -631,7 +650,7 @@ export default function AppNavigator() {
 }
 
 const styles = themedStyles({
-  container: { flex: 1, backgroundColor: colors.canvas }, authContainer: { flex: 1, backgroundColor: colors.canvas }, screenContainer: { flex: 1, width: '100%' as const, alignSelf: 'center' as const },
+  container: { flex: 1, backgroundColor: colors.canvas }, authContainer: { flex: 1, backgroundColor: colors.canvas }, screenContainer: { flex: 1, width: '100%' as const, alignSelf: 'center' as const }, screenFade: { flex: 1 },
   modalBackdrop: { flex: 1, backgroundColor: colors.white },
   backdropPress: { flex: 1 },
   notificationPanel: { flex: 1, width: '100%', backgroundColor: colors.white, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 24 },

@@ -45,6 +45,13 @@ const KNOWLEDGE_SECTIONS = [
     content: `A repair request moves through these statuses: Pending (waiting for a technician), then Accepted, Confirmed, Customer Ready, In Progress, and finally Completed. It can also end as Cancelled or No-Show. Only Accepted, Confirmed, Customer Ready, and In Progress count as active work for the technician. Customers follow the progress under Repairs, and technicians move the status forward as the work advances.`,
   },
   {
+    id: 'cancellation-policy',
+    title: 'Cancelling a repair request',
+    roles: 'all',
+    tags: ['cancel', 'cancellation', 'cancel request', 'cannot cancel', 'decline after accept', 'mo-cancel', 'kanselahon'],
+    content: `A customer may cancel a repair request only while it is still Pending. Once a technician accepts, the request can no longer be cancelled by the customer, and the Cancel button disappears from the app. A technician may only decline a job before accepting it, which returns the request to the queue; after accepting, the technician is committed and cannot cancel. There is no rescheduling flow: the schedule chosen at booking goes to the technician as-is, so double-check the date and time window before submitting.`,
+  },
+  {
     id: 'technician-jobs-feed',
     title: 'How technicians find and accept jobs',
     roles: ['technician'],

@@ -168,6 +168,22 @@ function installSupabaseStub({ users = [], tokens = {}, tables: extraTables = {}
         job.technician_name = params.p_technician_name;
         return Promise.resolve({ data: job.id, error: null });
       }
+      if (name === 'record_no_show') {
+        const customer = (tables.users || []).find((u) => String(u.id) === String(params.p_customer_uid));
+        const count = (Number(customer?.no_show_count) || 0) + 1;
+        if (customer) customer.no_show_count = count;
+        const incidents = tables.service_incidents || (tables.service_incidents = []);
+        incidents.push({
+          id: `incident-${incidents.length + 1}`,
+          type: 'no_show',
+          stage: params.p_stage,
+          customer_uid: params.p_customer_uid,
+          technician_uid: params.p_technician_uid,
+          reason: params.p_reason,
+          status: 'logged',
+        });
+        return Promise.resolve({ data: count, error: null });
+      }
       if (name === 'record_scam_incident') {
         const reported = (tables.users || []).find((u) => String(u.id) === String(params.p_reported_uid));
         const count = (Number(reported?.scam_count) || 0) + 1;

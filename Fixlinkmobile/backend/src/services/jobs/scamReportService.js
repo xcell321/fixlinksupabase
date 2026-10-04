@@ -7,10 +7,10 @@
 // auto-suspended.
 
 const jobRepository = require('../../repositories/jobRepository');
-const userRepository = require('../../repositories/userRepository');
 const { HttpError } = require('../../domain/httpError');
 const { isScamReportable } = require('../../domain/jobWorkflow');
 const { shouldAutoSuspend, customerScamLimit } = require('../../domain/scamPolicy');
+const { suspendAccount } = require('./accountSuspension');
 
 const incidentCount = (data) => {
   if (typeof data === 'number') return data;
@@ -60,12 +60,7 @@ const reportScam = async ({ jobId, authUid, reason }) => {
   // requirement; a reported technician is left for admin review.
   let suspended = false;
   if (reportedRole === 'customer' && shouldAutoSuspend(count)) {
-    try {
-      const { error: suspendError } = await userRepository.updateStatus(reportedUid, 'suspended');
-      if (!suspendError) suspended = true;
-    } catch (suspendError) {
-      console.warn('Could not auto-suspend reported customer:', suspendError.message);
-    }
+    suspended = await suspendAccount(reportedUid, { reason: 'repeat scam reports' });
   }
 
   return {

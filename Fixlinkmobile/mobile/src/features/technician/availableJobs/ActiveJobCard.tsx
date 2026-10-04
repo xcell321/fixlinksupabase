@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../../theme';
 import { getApplianceIcon, getStatusColor, getStatusIcon } from '../../../utils/applianceIcons';
 import { splitJobDescription } from '../../../utils/jobDescription';
-import { canMarkArrival, canStartRepair, formatJobSchedule, type JobItem } from '../availableJobsHelpers';
+import { canMarkArrival, canStartRepair, formatJobSchedule, noShowState, type JobItem } from '../availableJobsHelpers';
 import { styles } from './availableJobsStyles';
 import type { IconName } from './types';
 
@@ -46,6 +46,9 @@ export const ActiveJobCard = ({
   const isInProgress = job.status === 'In Progress';
   const hasArrived = Boolean(job.technicianArrivalAt);
   const isArrivalEligible = canMarkArrival(job);
+  // UAT #2: the no-show tile only becomes active once the technician has been
+  // on site for the wait window; until then it shows the countdown.
+  const noShow = noShowState(job);
   // "[Brand] words" -> show the words, and the brand only when it is all there is.
   const { brand: jobBrand, text: problemText } = splitJobDescription(job.description);
   const problemPreview = problemText || jobBrand || '';
@@ -327,24 +330,38 @@ export const ActiveJobCard = ({
               </Pressable>
             )}
 
-            {/* No-show: destructive, kept last so it is never a mis-tap next to the primary action */}
-            {isArrivalEligible && (
+            {/* No-show: destructive, kept last so it is never a mis-tap next to the primary action.
+                UAT #2 gates it on the arrival stamp plus the wait window, so the
+                technician is told to keep waiting rather than getting a rejection.
+                Once the repair itself starts, the customer is necessarily present,
+                so the tile leaves together with the wait state. */}
+            {noShow.hasArrived && String(job.status ?? '').toLowerCase() !== 'in progress' && (
               <Pressable
                 style={({ pressed }) => [styles.utilityAction, pressed && styles.utilityActionPressed]}
                 onPress={() => onNoShow(job)}
-                disabled={actionLoadingId === job.id}
+                disabled={!noShow.ready || actionLoadingId === job.id}
                 accessibilityRole="button"
-                accessibilityLabel="Report customer no-show"
+                accessibilityState={{ disabled: !noShow.ready }}
+                accessibilityLabel={noShow.ready
+                  ? 'Report customer no-show'
+                  : `Report no-show available in ${noShow.remainingMinutes} minutes`}
               >
-                <View style={[styles.utilityTile, styles.utilityTileDanger]}>
+                <View style={[styles.utilityTile, styles.utilityTileDanger, !noShow.ready && styles.utilityTileDisabled]}>
                   {actionLoadingId === job.id ? (
                     <ActivityIndicator color={colors.danger} size="small" />
                   ) : (
-                    <Ionicons name="person-remove-outline" size={19} color={colors.danger} />
+                    <Ionicons
+                      name="person-remove-outline"
+                      size={19}
+                      color={noShow.ready ? colors.danger : colors.subtle}
+                    />
                   )}
                 </View>
-                <Text style={[styles.utilityLabel, styles.utilityLabelDanger]} numberOfLines={1}>
-                  No-Show
+                <Text
+                  style={[styles.utilityLabel, noShow.ready ? styles.utilityLabelDanger : styles.utilityLabelMuted]}
+                  numberOfLines={1}
+                >
+                  {noShow.ready ? 'No-Show' : `Wait ${noShow.remainingMinutes}m`}
                 </Text>
               </Pressable>
             )}

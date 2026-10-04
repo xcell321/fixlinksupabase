@@ -1,8 +1,8 @@
 // Request-path test for POST /api/ai/assistant after the knowledge base + RAG
 // wiring. It boots the real Express app (and the real route, retriever, and
 // prompt builder) but swaps two boundaries for deterministic fakes:
-//   - src/config/supabase   -> in-memory stub so requireAuth accepts a token
-//   - src/services/omniRoute -> captures the prompt instead of calling the LLM
+//   - src/config/supabase  -> in-memory stub so requireAuth accepts a token
+//   - src/services/aiClient -> captures the prompt instead of calling the LLM
 //
 // The point is to assert that the knowledge base actually reaches the model
 // prompt and that the role filter and outside-world instruction are present.
@@ -18,21 +18,25 @@ const CUSTOMER_UID = '55555555-5555-5555-5555-555555555555';
 
 // Capture every prompt the assistant builds.
 const captured = [];
-const omniRoutePath = require.resolve('../src/services/omniRoute');
-require.cache[omniRoutePath] = {
-  id: omniRoutePath,
-  filename: omniRoutePath,
+const aiClientPath = require.resolve('../src/services/aiClient');
+require.cache[aiClientPath] = {
+  id: aiClientPath,
+  filename: aiClientPath,
   loaded: true,
   children: [],
   paths: [],
   exports: {
-    isOmniRouteConfigured: () => true,
-    getBaseUrl: () => 'http://stub.local/v1',
-    getModel: () => 'stub-model',
+    isAiConfigured: () => true,
+    isVisionConfigured: () => true,
     chatComplete: async ({ system, user }) => {
       captured.push({ system, user });
-      return { content: 'stubbed reply', raw: {} };
+      // The assistant route reads `content` (plain text); ranking/analyzer read
+      // `parsed`. The stub returns both, like the real client does.
+      return { content: 'stubbed reply', parsed: { reply: 'stubbed reply' }, raw: {} };
     },
+    // Present so a module that destructures it at load time still sees a
+    // function; this test never reaches the vision path.
+    visionComplete: async () => { throw new Error('visionComplete is not stubbed in this test.'); },
   },
 };
 

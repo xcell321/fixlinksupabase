@@ -12,6 +12,7 @@ import type { Coords, TechnicianRef } from './types';
 interface UseTechnicianJobsResult {
   jobs: JobItem[];
   acceptedJobs: JobItem[];
+  completedJobs: JobItem[];
   loading: boolean;
   refreshing: boolean;
   fetchError: boolean;
@@ -28,11 +29,17 @@ export const useTechnicianJobs = (technician: TechnicianRef): UseTechnicianJobsR
   const cached = technician?.uid ? jobsCache.get(technician.uid) : undefined;
   const [jobs, setJobs] = useState<JobItem[]>(cached?.jobs ?? []);
   const [acceptedJobs, setAcceptedJobs] = useState<JobItem[]>(cached?.acceptedJobs ?? []);
+  const [completedJobs, setCompletedJobs] = useState<JobItem[]>(cached?.completedJobs ?? []);
   const [loading, setLoading] = useState<boolean>(cached ? false : true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [fetchError, setFetchError] = useState<boolean>(cached?.fetchError ?? false);
   const [lastSyncAt, setLastSyncAt] = useState<Date | null>(cached?.lastSyncAt ?? null);
   const loadJobsRef = useRef<boolean>(false);
+  // Fingerprint of the last applied feed. The 8s poll refetches constantly,
+  // but re-setting identical arrays re-renders every card and re-resolves
+  // every image for no visible change, which reads as lag on web and
+  // low-end phones. Identical payloads skip every setter below.
+  const lastFingerprintRef = useRef<string>('');
 
   // Coords state
   const [techCoords, setTechCoords] = useState<Coords | null>(
@@ -47,7 +54,15 @@ export const useTechnicianJobs = (technician: TechnicianRef): UseTechnicianJobsR
       if (status === 'granted') {
         const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
         const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
-        setTechCoords(coords);
+        // Same spot as last tick: keep the old object so downstream effects
+        // and renders that depend on coords stay quiet.
+        setTechCoords((prev) => (
+          prev
+          && Math.abs(prev.latitude - coords.latitude) < 0.000001
+          && Math.abs(prev.longitude - coords.longitude) < 0.000001
+            ? prev
+            : coords
+        ));
         if (technician?.uid) {
           updateTechnicianLocation(technician.uid, coords).catch(() => {});
         }
@@ -76,23 +91,35 @@ export const useTechnicianJobs = (technician: TechnicianRef): UseTechnicianJobsR
         fetchTechnicianJobs(technician?.uid)
       ]);
       const newJobs = Array.isArray(result) ? (result as JobItem[]) : [];
-      const newAccepted = Array.isArray(assigned)
-        ? (assigned as JobItem[]).filter((job) =>
-            ['Accepted', 'Confirmed', 'Customer Ready', 'In Progress'].includes(job.status ?? '')
-          )
-        : [];
-      setJobs(newJobs);
-      setAcceptedJobs(newAccepted);
+      const assignedJobs = Array.isArray(assigned) ? (assigned as JobItem[]) : [];
+      const newAccepted = assignedJobs.filter((job) =>
+        ['Accepted', 'Confirmed', 'Customer Ready', 'In Progress'].includes(job.status ?? '')
+      );
+      // Finished work leaves the active list but stays browsable under History
+      // so the technician can still rate the customer afterwards.
+      const newCompleted = assignedJobs.filter(
+        (job) => String(job.status ?? '').toLowerCase() === 'completed'
+      );
       setFetchError(false);
       const now = new Date();
-      setLastSyncAt(now);
-      if (technician?.uid) {
-        jobsCache.set(technician.uid, {
-          jobs: newJobs,
-          acceptedJobs: newAccepted,
-          lastSyncAt: now,
-          fetchError: false
-        });
+      // Same payload as last tick: leave every list untouched so cards,
+      // images, and scroll position sit perfectly still.
+      const fingerprint = `${technician?.uid ?? ''}:${JSON.stringify([newJobs, newAccepted, newCompleted])}`;
+      if (fingerprint !== lastFingerprintRef.current) {
+        lastFingerprintRef.current = fingerprint;
+        setJobs(newJobs);
+        setAcceptedJobs(newAccepted);
+        setCompletedJobs(newCompleted);
+        setLastSyncAt(now);
+        if (technician?.uid) {
+          jobsCache.set(technician.uid, {
+            jobs: newJobs,
+            acceptedJobs: newAccepted,
+            completedJobs: newCompleted,
+            lastSyncAt: now,
+            fetchError: false
+          });
+        }
       }
     } catch (error) {
       console.warn('Failed to load technician jobs from backend:', error);
@@ -121,6 +148,7 @@ export const useTechnicianJobs = (technician: TechnicianRef): UseTechnicianJobsR
   return {
     jobs,
     acceptedJobs,
+    completedJobs,
     loading,
     refreshing,
     fetchError,

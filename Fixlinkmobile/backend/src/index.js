@@ -16,9 +16,10 @@ const recoveryRoutes = require('./routes/recovery');
 const aiRoutes = require('./routes/ai');
 const mapsRoutes = require('./routes/maps');
 const { createRateLimiter } = require('./middleware/rateLimit');
+const { DEFAULT_PORT } = require('./utils/network');
 
 const app = express();
-const PORT = process.env.PORT || 5050;
+const PORT = process.env.PORT || DEFAULT_PORT;
 
 // Trust Cloudflare Tunnel and other proxies so req.protocol and req.ip reflect
 // the real client instead of 127.0.0.1. This keeps rate limiting fair and lets

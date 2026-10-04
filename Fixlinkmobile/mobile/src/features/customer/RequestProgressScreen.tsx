@@ -26,6 +26,8 @@ interface ServiceRequest {
   preferredTime?: string;
   scheduledDate?: string;
   photoUrl?: string | null;
+  /** UAT #2: set once the technician records an arrival on site. */
+  technicianArrivalAt?: string | null;
 }
 
 interface CompletedJob {
@@ -76,6 +78,10 @@ interface RequestProgressScreenProps {
 }
 
 const ACTIVE_STATUSES = ['accepted', 'confirmed', 'customer ready', 'in progress'];
+// Statuses the backend still lets the customer cancel (domain/jobWorkflow.js).
+// Policy: only pending requests can be cancelled. Once a technician accepts,
+// the Cancel button disappears and the backend answers 409.
+const CANCELLABLE_STATUSES = ['pending'];
 const PROGRESS_STEPS = ['Accepted', 'Confirmed', 'Ready', 'In Progress'];
 
 const progressIndexOf = (status: string | undefined): number => {
@@ -226,23 +232,6 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
   // Prototype shows Active / History only — no AI recommendation feed.
   const pendingIds = pendingRequests.map((r) => r.id).join(',');
 
-  const handleCancelRequest = (requestId: string): void => {
-    setActionError(null);
-    setPendingAction({
-      title: 'Cancel request?',
-      message: 'This can only be done before a technician accepts the request.',
-      confirmLabel: 'Cancel request',
-      cancelLabel: 'Keep request',
-      danger: true,
-      run: async () => {
-        // Reason intentionally empty: backend stores null, identical to the previous call.
-        await cancelRepairRequest(requestId, '');
-        fetchAll();
-        setTrackedRequests((current) => current.map((request) => request.id === requestId ? { ...request, status: 'Cancelled' } : request));
-      },
-    });
-  };
-
   const handleReviewSubmit = async (jobId: string): Promise<void> => {
     if (!reviewRatings[jobId]) {
       Alert.alert('Error', 'Please select a rating before submitting.');
@@ -348,6 +337,13 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
     });
   };
 
+  // Only pending requests reach this dialog (accepted and beyond have no
+  // Cancel button), so the message only covers the queue-exit case.
+  const cancelMessageFor = (req: ServiceRequest): string => {
+    void req;
+    return 'No technician has accepted this request yet. Cancelling removes it from the queue.';
+  };
+
   const cancelWithMessage = (req: ServiceRequest, message: string): void => {
     setActionError(null);
     setPendingAction({
@@ -381,7 +377,6 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
     // alone) so the raw brackets never reach the screen.
     const { brand, text: issueText } = splitJobDescription(req.description);
     const statusKey = String(req.status || '').toLowerCase();
-    const isPending = statusKey === 'pending';
     const progress = STATUS_PROGRESS[statusKey] ?? 15;
     const isFocused = focusedJobId && String(focusedJobId) === String(req.id);
     return (
@@ -418,11 +413,11 @@ export default function RequestProgressScreen({ customerName, customerUid, accep
             <Text style={styles.refFooterText} numberOfLines={1}>ETA: {etaLabel(req)}</Text>
           </View>
         </View>
-        {isPending && (
+        {CANCELLABLE_STATUSES.includes(statusKey) && (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Cancel request for ${req.applianceType ?? 'this request'}`}
-            onPress={() => cancelWithMessage(req, 'This can only be done before a technician accepts the request.')}
+            onPress={() => cancelWithMessage(req, cancelMessageFor(req))}
             style={({ pressed }) => [styles.refCancelBtn, pressed && { opacity: 0.8 }]}
           >
             <Text style={styles.refCancelText}>Cancel request</Text>

@@ -5,8 +5,10 @@
 // could drift apart. Grouping them here keeps them consistent.
 
 // Statuses in which a customer may still cancel their own request.
-// ("Customer Ready" is included: the technician has not started work yet.)
-const CUSTOMER_CANCELLABLE_STATUSES = ['pending', 'accepted', 'confirmed', 'customer ready'];
+// Policy: cancelling is only possible while the request is still pending.
+// Once a technician accepts (accepted and beyond), the customer can no longer
+// cancel — the cancel endpoint answers 409 for those statuses.
+const CUSTOMER_CANCELLABLE_STATUSES = ['pending'];
 
 // Statuses where the technician is assigned and travelling / ready to work.
 const TECHNICIAN_EN_ROUTE_STATUSES = ['accepted', 'confirmed', 'customer ready'];
@@ -30,7 +32,11 @@ const scamReportableStatuses = () => {
 const LIVE_TRACKING_STATUSES = ['Accepted', 'Confirmed', 'Customer Ready', 'In Progress'];
 
 // Statuses a technician may set through the status shortcut endpoint.
-const TECHNICIAN_SETTABLE_STATUSES = ['In Progress', 'Completed', 'Cancelled'];
+// Policy: once a technician accepts, they are committed. There is no
+// technician cancel after accept — a technician may only decline before
+// accepting (declineJob returns the request to the Pending queue), so
+// 'Cancelled' is deliberately not settable here.
+const TECHNICIAN_SETTABLE_STATUSES = ['In Progress', 'Completed'];
 
 const normalizeStatus = (status) => String(status || '').toLowerCase();
 
@@ -39,6 +45,11 @@ const isCustomerCancellable = (status) => CUSTOMER_CANCELLABLE_STATUSES.includes
 const isTechnicianEnRoute = (status) => TECHNICIAN_EN_ROUTE_STATUSES.includes(normalizeStatus(status));
 
 const isNoShowReportable = (status) => NO_SHOW_REPORTABLE_STATUSES.includes(normalizeStatus(status));
+
+// UAT #2: the technician's arrival stamp is the fact that makes a later
+// customer cancellation — or a reported no-show — the customer's
+// responsibility rather than a scheduling change.
+const isTechnicianArrived = (job) => Boolean(job && job.technician_arrival_timestamp);
 
 const isScamReportable = (status) => scamReportableStatuses().includes(normalizeStatus(status));
 
@@ -68,6 +79,7 @@ module.exports = {
   isCustomerCancellable,
   isTechnicianEnRoute,
   isNoShowReportable,
+  isTechnicianArrived,
   isScamReportable,
   isLiveTrackable,
   stageOf,

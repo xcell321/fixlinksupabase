@@ -26,6 +26,7 @@ const EXPECTED_ROUTES = [
   'GET /job/:id',
   'PUT /accepted/:id/messages/read',
   'GET /customer/:customerName',
+  'GET /customer/:uid/reviews',
   'GET /technician/:technicianUid/workload',
   'GET /technician/:technicianUid',
   'GET /accepted/:id/messages',

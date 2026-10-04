@@ -66,6 +66,8 @@ router.put('/accepted/:id/messages/read', chatController.markMessagesRead);
 
 // --- Customer's own jobs ---------------------------------------------------
 router.get('/customer/:customerName', jobController.listCustomerJobs);
+// UAT #11: reviews technicians wrote about a customer (legit check).
+router.get('/customer/:uid/reviews', jobController.listCustomerReviews);
 
 // --- Technician workload + job list ----------------------------------------
 router.get('/technician/:technicianUid/workload', jobController.getTechnicianWorkload);

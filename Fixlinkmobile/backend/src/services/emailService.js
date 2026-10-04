@@ -26,21 +26,27 @@ function withTimeout(promise, ms, message) {
   ]).finally(() => clearTimeout(timer));
 }
 
+// Fallbacks for an unset SMTP config, so no host or port is a literal in use.
+const DEFAULT_EMAIL_HOST = 'smtp.gmail.com';
+const DEFAULT_EMAIL_PORT = 587;
+const DEFAULT_EMAIL_FROM = '"FixLink Support" <noreply@fixlink.com>';
+const EMAIL_PORT_SSL = 465;
+
 async function createTransporter() {
-  let host = process.env.EMAIL_HOST || 'smtp.gmail.com';
-  const port = Number(process.env.EMAIL_PORT) || 587;
+  let host = process.env.EMAIL_HOST || DEFAULT_EMAIL_HOST;
+  const port = Number(process.env.EMAIL_PORT) || DEFAULT_EMAIL_PORT;
   const tls = {};
   try {
     const { address } = await lookup(host);
     host = address;
-    tls.servername = process.env.EMAIL_HOST || 'smtp.gmail.com';
+    tls.servername = process.env.EMAIL_HOST || DEFAULT_EMAIL_HOST;
   } catch (_) {
     /* keep using the hostname as-is */
   }
   return nodemailer.createTransport({
     host,
     port,
-    secure: port === 465,
+    secure: port === EMAIL_PORT_SSL,
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
@@ -89,7 +95,7 @@ const sendPasswordResetEmail = async (to, link, requestHost, forwardedProto, for
   // Minimal copy: heading, one-time/24h note, the button, a paste fallback, and
   // a short ignore line. Colors come from EMAIL_COLORS below.
   const mailOptions = {
-    from: process.env.EMAIL_FROM || '"FixLink Support" <noreply@fixlink.com>',
+    from: process.env.EMAIL_FROM || DEFAULT_EMAIL_FROM,
     to,
     subject: 'Reset your FixLink password',
     html: `
@@ -133,7 +139,7 @@ const sendTechnicianApprovedEmail = async (to, name) => {
   const registeredEmail = escapeHtml(to);
 
   const mailOptions = {
-    from: process.env.EMAIL_FROM || '"FixLink Support" <noreply@fixlink.com>',
+    from: process.env.EMAIL_FROM || DEFAULT_EMAIL_FROM,
     to,
     subject: 'Your FixLink technician account is approved',
     html: `

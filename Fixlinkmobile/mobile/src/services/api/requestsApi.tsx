@@ -41,8 +41,13 @@ export const fetchRepairRequests = async (technicianUid?: string, coords?: Coord
   }
 };
 
-export const acceptRepairRequest = async (jobId: string, technicianUid: string, technicianName: string): Promise<unknown> =>
-  (await api.put(`/requests/${encodeURIComponent(jobId)}/accept`, { technicianUid, technicianName })).data;
+export const acceptRepairRequest = async (jobId: string, technicianUid: string, technicianName: string): Promise<unknown> => {
+  try {
+    return (await api.put(`/requests/${encodeURIComponent(jobId)}/accept`, { technicianUid, technicianName })).data;
+  } catch (error: unknown) {
+    throw unwrapError(error);
+  }
+};
 
 export const declineRepairRequest = async (jobId: string, technicianUid: string): Promise<unknown> =>
   (await api.put(`/requests/${jobId}/decline`, { technicianUid })).data;
@@ -106,6 +111,20 @@ export const reportScam = async (jobId: string, reason: string): Promise<unknown
   }
 };
 
+export interface CustomerReviewItem {
+  rating: number;
+  comment: string;
+  createdAt: string | null;
+}
+
+// UAT #11: reviews technicians wrote about a customer, newest first.
+export const fetchCustomerReviews = async (customerUid: string): Promise<CustomerReviewItem[]> => {
+  const data = (await api.get(`/requests/customer/${encodeURIComponent(customerUid)}/reviews`)).data as {
+    reviews?: CustomerReviewItem[];
+  };
+  return Array.isArray(data?.reviews) ? data.reviews : [];
+};
+
 export const markCustomerReady = async (jobId: string): Promise<unknown> => {
   try {
     return (await api.post(`/requests/${encodeURIComponent(jobId)}/customer-ready`)).data;
@@ -133,8 +152,14 @@ export const reportNoShow = async (jobId: string, technicianUid: string, reason:
   }
 };
 
-export const verifyCompletionCode = async (jobId: string, code: string): Promise<unknown> =>
-  (await api.post(`/requests/${jobId}/verify-completion`, { code })).data;
+export const verifyCompletionCode = async (jobId: string, code: string): Promise<unknown> => {
+  try {
+    return (await api.post(`/requests/${jobId}/verify-completion`, { code })).data;
+  } catch (error: unknown) {
+    const err = error as { response?: { data?: unknown } };
+    throw err.response ? err.response.data : error;
+  }
+};
 
 export const submitTechnicianReview = async (jobId: string, review: unknown): Promise<unknown> =>
   (await api.post(`/requests/${jobId}/review`, review)).data;

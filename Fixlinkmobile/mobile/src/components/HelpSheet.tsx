@@ -30,7 +30,7 @@ const CUSTOMER_ITEMS: HelpItem[] = [
   {
     icon: 'calendar-outline',
     title: 'Scheduling',
-    body: 'Choose today or a future date and a time window. You can reschedule after a technician is matched.',
+    body: 'Choose today or a future date and a time window. Double-check it before submitting, since the schedule goes to the technician as-is.',
   },
   {
     icon: 'map-outline',
