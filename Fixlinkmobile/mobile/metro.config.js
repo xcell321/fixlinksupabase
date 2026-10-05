@@ -8,6 +8,7 @@
 //
 const { getDefaultConfig } = require('expo/metro-config');
 const { createProxyMiddleware } = require('http-proxy-middleware');
+const { withInspector } = require('react-native-dev-inspector/metro');
 
 module.exports = (async () => {
   const config = await getDefaultConfig(__dirname);
@@ -65,5 +66,7 @@ module.exports = (async () => {
     };
   };
 
-  return config;
+  return withInspector(config, {
+    editor: 'code',
+  });
 })();
