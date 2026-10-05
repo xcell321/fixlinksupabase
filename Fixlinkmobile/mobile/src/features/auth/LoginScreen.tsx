@@ -291,7 +291,7 @@ export default function LoginScreen({ onLoginSuccess, switchToRegister, switchTo
            ><Ionicons name={showPassword ? 'eye-outline' : 'eye-off-outline'} size={18} color={colors.muted} /></TouchableOpacity>) : null}</View>{fieldErrors.password ? <Text style={styles.fieldError}>{fieldErrors.password}</Text> : null}
       <TouchableOpacity style={styles.forgotWrap} onPress={() => switchToForgotPassword(role)}><Text style={[styles.forgot, { color: accent }]}>Forgot password?</Text></TouchableOpacity>
       {loginError ? <Text style={styles.errorText}>{loginError}</Text>
-       : null}<TouchableOpacity style={[styles.button, { backgroundColor: accent }]} onPress={handleLogin} disabled={loading} activeOpacity={0.88}>{loading ?
+       : null}<TouchableOpacity style={[styles.button, { backgroundColor: accent  }]} onPress={handleLogin} disabled={loading} activeOpacity={0.88}>{loading ?
         <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.buttonText}>Sign In</Text>}</TouchableOpacity>
       <View style={styles.registerRow}><Text style={styles.registerText}>{role === 'technician' ? 'New technician? ' : "Don't have an account? "}</Text><TouchableOpacity onPress={() => switchToRegister(role)}><Text style={[styles.registerLink, { color: accent }]}>{role === 'technician' ? 'Apply Now' : 'Register'}</Text></TouchableOpacity></View>
       <View style={styles.techLoginRow}>

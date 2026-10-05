@@ -31,6 +31,7 @@ stub.supabaseAuth.auth.signInWithPassword = async ({ email }) => {
 
 // Controllable vision verdict for the face comparison.
 let verdict = { matchConfidence: 0.9, livenessRisk: 0.1 };
+let verdictModel = 'stub-full-judge';
 let visionBroken = false;
 const aiClientPath = require.resolve('../src/services/aiClient');
 require.cache[aiClientPath] = {
@@ -48,12 +49,13 @@ require.cache[aiClientPath] = {
       return {
         parsed: {
           facePresent: true,
-          selfieFacePresent: true,
+          selfieFacePresent: verdict.selfieFacePresent ?? true,
           idFacePresent: true,
+          faceCovered: verdict.faceCovered ?? false,
           livenessRisk: verdict.livenessRisk,
           matchConfidence: verdict.matchConfidence,
         },
-        model: 'stub',
+        model: verdictModel,
       };
     },
   },
@@ -161,6 +163,71 @@ test('flag on: mismatched face is blocked with a friendly message', async () => 
     const payload = await response.json();
     assert.match(payload.error, /face verification failed/i);
     assert.doesNotMatch(payload.error, /status code/i);
+  });
+});
+
+test('flag on: fallback lite judge at 0.85 is blocked by the higher lite bar', async () => {
+  verdict = { matchConfidence: 0.85, livenessRisk: 0.1 };
+  verdictModel = 'gemini-3.5-flash-lite';
+  visionBroken = false;
+  await withEnv({ REQUIRE_LOGIN_FACE: 'true' }, async () => {
+    const response = await loginFace();
+    assert.equal(response.status, 401);
+    const payload = await response.json();
+    assert.match(payload.error, /face verification failed/i);
+  });
+  verdict = { matchConfidence: 0.9, livenessRisk: 0.1 };
+  verdictModel = 'stub-full-judge';
+});
+
+test('flag on: selfie with no person is rejected as no-person, not a generic mismatch', async () => {
+  verdict = { matchConfidence: 0.9, livenessRisk: 0.1, selfieFacePresent: false };
+  visionBroken = false;
+  await withEnv({ REQUIRE_LOGIN_FACE: 'true' }, async () => {
+    const response = await loginFace();
+    assert.equal(response.status, 422);
+    const payload = await response.json();
+    assert.match(payload.error, /no person detected/i);
+  });
+  verdict = { matchConfidence: 0.9, livenessRisk: 0.1 };
+});
+
+test('flag on: covered face is rejected and told to uncover', async () => {
+  verdict = { matchConfidence: 0.9, livenessRisk: 0.1, faceCovered: true };
+  visionBroken = false;
+  await withEnv({ REQUIRE_LOGIN_FACE: 'true' }, async () => {
+    const response = await loginFace();
+    assert.equal(response.status, 422);
+    const payload = await response.json();
+    assert.match(payload.error, /face is covered/i);
+  });
+  verdict = { matchConfidence: 0.9, livenessRisk: 0.1 };
+});
+
+test('flag on: screen replay is rejected as a spoof attempt', async () => {
+  verdict = { matchConfidence: 0.9, livenessRisk: 0.95 };
+  visionBroken = false;
+  await withEnv({ REQUIRE_LOGIN_FACE: 'true' }, async () => {
+    const response = await loginFace();
+    assert.equal(response.status, 401);
+    const payload = await response.json();
+    assert.match(payload.error, /spoof/i);
+  });
+  verdict = { matchConfidence: 0.9, livenessRisk: 0.1 };
+});
+
+test('flag on: non-image face upload is rejected', async () => {
+  visionBroken = false;
+  await withEnv({ REQUIRE_LOGIN_FACE: 'true' }, async () => {
+    const form = new FormData();
+    form.set('email', 'face@fixlink.test');
+    form.set('password', 'password123');
+    form.set('expectedRole', 'technician');
+    form.set('face', new Blob([Buffer.alloc(128, 9)], { type: 'text/plain' }), 'selfie.txt');
+    const response = await fetch(`${baseUrl}/api/auth/login`, { method: 'POST', body: form });
+    assert.equal(response.status, 400);
+    const payload = await response.json();
+    assert.match(payload.error, /face photo/i);
   });
 });
 

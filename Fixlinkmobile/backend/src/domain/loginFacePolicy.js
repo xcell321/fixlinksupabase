@@ -7,7 +7,11 @@
 
 const DEFAULTS = {
   requireLoginFace: false,
-  matchThreshold: 0.5,
+  // Full-judge bar, set from the measured live split (same 0.98, other 0.25).
+  matchThreshold: 0.7,
+  // Fallback-judge bar: the lite model scores generously (a wrong face once
+  // read 0.85 while true faces read 0.98+), so its verdicts face a higher bar.
+  liteMatchThreshold: 0.95,
 };
 
 const asBool = (value, fallback) => {
@@ -25,8 +29,16 @@ const loginFaceMatchThreshold = () => {
   return Number.isFinite(parsed) ? parsed : DEFAULTS.matchThreshold;
 };
 
+// Higher bar applied only when the verdict came from the fallback lite
+// judge, whose scores run hot on strangers.
+const loginFaceLiteThreshold = () => {
+  const parsed = Number.parseFloat(process.env.LOGIN_FACE_LITE_THRESHOLD);
+  return Number.isFinite(parsed) ? parsed : DEFAULTS.liteMatchThreshold;
+};
+
 module.exports = {
   DEFAULTS,
   requireLoginFace,
   loginFaceMatchThreshold,
+  loginFaceLiteThreshold,
 };

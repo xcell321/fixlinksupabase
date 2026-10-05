@@ -5,6 +5,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Platform } from 'react-native';
 import { appFonts } from './theme';
 import AppNavigator from './navigation/AppNavigator';
+import { Inspector } from 'react-native-dev-inspector';
+import './setupLocator';
 
 // Web only: hide the browser's default focus outline/rectangle on inputs so
 // tapping a field shows only the blinking text caret, no border highlight.
@@ -29,8 +31,10 @@ export default function App(): React.JSX.Element | null {
   if (!fontsLoaded) return null;
 
   return (
-    <SafeAreaProvider>
-      <AppNavigator />
-    </SafeAreaProvider>
+    <Inspector disabled={!__DEV__ || Platform.OS === 'web'} editor="code">
+      <SafeAreaProvider>
+        <AppNavigator />
+      </SafeAreaProvider>
+    </Inspector>
   );
 }

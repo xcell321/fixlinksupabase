@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "check:imports": "node scripts/checkImports.js",
     "verify": "npm run typecheck && npm run check:imports",
+    "postinstall": "patch-package",
     "audit:responsive": "node scripts/responsiveAudit.js"
   },
   "dependencies": {
@@ -38,8 +39,12 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.0",
+    "@locator/babel-jsx": "^0.5.1",
+    "@locator/runtime": "^0.5.1",
     "@types/react": "~19.2.4",
     "http-proxy-middleware": "^4.2.0",
+    "patch-package": "^8.0.1",
+    "react-native-dev-inspector": "^1.1.0",
     "typescript": "~6.0.3"
   },
   "private": true

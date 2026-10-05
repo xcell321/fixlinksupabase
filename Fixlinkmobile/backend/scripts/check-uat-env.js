@@ -77,7 +77,7 @@ const groups = {
     'CREDENTIAL_FACE_MATCH_THRESHOLD', 'CREDENTIAL_LIVENESS_RISK_THRESHOLD',
     'CREDENTIAL_VISION_MAX_BYTES', 'CREDENTIAL_VISION_TIMEOUT_MS',
   ],
-  'Login face gate': ['REQUIRE_LOGIN_FACE', 'LOGIN_FACE_MATCH_THRESHOLD'],
+  'Login face gate': ['REQUIRE_LOGIN_FACE', 'LOGIN_FACE_MATCH_THRESHOLD', 'LOGIN_FACE_LITE_THRESHOLD'],
 };
 
 const ai = require('../src/domain/aiProvider');
@@ -142,6 +142,7 @@ console.log(`  aiReasoningEffort()         ${ai.aiReasoningEffort() || '(omitted
   console.log(`  isVisionConfigured()        ${ai.isVisionConfigured()}`);
   console.log(`  requireLoginFace()          ${loginFace.requireLoginFace()}`);
   console.log(`  loginFaceMatchThreshold()   ${loginFace.loginFaceMatchThreshold()}`);
+  console.log(`  loginFaceLiteThreshold()    ${loginFace.loginFaceLiteThreshold()}`);
 
 console.log(`\nSummary: ${present} set, ${missing} missing.`);
 console.log(missing === 0
