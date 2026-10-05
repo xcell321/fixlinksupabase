@@ -37,6 +37,7 @@ const FLAGS = {
   NAME_MISMATCH: 'name_mismatch',
   SELFIE_MISSING: 'selfie_missing',
   FACE_NOT_DETECTED: 'face_not_detected',
+  FACE_COVERED: 'face_covered',
   ID_PHOTO_NOT_FOUND: 'id_photo_not_found',
   FACE_MISMATCH: 'face_mismatch',
   SELFIE_LIVENESS_RISK: 'selfie_liveness_risk',
@@ -161,6 +162,7 @@ const judgeFace = ({ screening, declaredId, selfieProvided }) => {
 
   const { matchThreshold, livenessThreshold } = faceConfig();
   if (vision.facePresent === false || vision.selfieFacePresent === false) flags.push(FLAGS.FACE_NOT_DETECTED);
+  if (vision.faceCovered === true) flags.push(FLAGS.FACE_COVERED);
   if (vision.idFacePresent === false) flags.push(FLAGS.ID_PHOTO_NOT_FOUND);
   if (Number(vision.livenessRisk) >= livenessThreshold) flags.push(FLAGS.SELFIE_LIVENESS_RISK);
   const confidence = Number(vision.matchConfidence);

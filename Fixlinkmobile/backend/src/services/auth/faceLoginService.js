@@ -25,6 +25,7 @@ const VISION_INSTRUCTION = `Return a JSON object with exactly these keys:
   "facePresent": boolean (a human face is visible in the reference photo),
   "selfieFacePresent": boolean (a live human face is visible in the sign-in selfie),
   "idFacePresent": boolean (the reference photo contains a face),
+  "faceCovered": boolean (the selfie face is covered by a mask, sunglasses, hands, or cloth),
   "livenessRisk": number 0..1 (0 = almost certainly a live person, 1 = almost certainly a screen/print/photo-of-photo),
   "matchConfidence": number 0..1 (similarity between the reference face and the selfie),
   "notes": string (short English sentence)
@@ -44,17 +45,30 @@ const downloadReference = async (url) => {
   return buffer;
 };
 
-// Blocking verdicts: no face on either side, an explicit mismatch, spoof
-// signs, or similarity below the configured threshold.
-const isMismatch = (vision, threshold) => {
-  if (!vision || typeof vision !== 'object') return true;
+// Blocking verdicts with a machine-readable reason so the sign-in gate can
+// tell the user exactly what went wrong: nobody in frame (NO_FACE), a
+// covered face (COVERED), a screen or print replay (SPOOF), or simply the
+// wrong person (MISMATCH). Order matters: absence and covering are checked
+// before identity, because a covered or missing face must never read as a
+// plain mismatch.
+const REASONS = {
+  NO_FACE: 'NO_FACE',
+  COVERED: 'COVERED',
+  SPOOF: 'SPOOF',
+  MISMATCH: 'MISMATCH',
+};
+
+const judgeSelfie = (vision, threshold) => {
+  if (!vision || typeof vision !== 'object') return { ok: false, reason: REASONS.MISMATCH };
   const flags = judgeFace({ screening: { vision }, selfieProvided: true }).flags || [];
-  if (flags.includes(FLAGS.FACE_MISMATCH)) return true;
-  if (flags.includes(FLAGS.FACE_NOT_DETECTED)) return true;
-  if (flags.includes(FLAGS.ID_PHOTO_NOT_FOUND)) return true;
-  if (flags.includes(FLAGS.SELFIE_MISSING)) return true;
-  if (flags.includes(FLAGS.SELFIE_LIVENESS_RISK)) return true;
-  return Number(vision.matchConfidence) < threshold;
+  if (flags.includes(FLAGS.FACE_NOT_DETECTED)) return { ok: false, reason: REASONS.NO_FACE };
+  if (flags.includes(FLAGS.FACE_COVERED)) return { ok: false, reason: REASONS.COVERED };
+  if (flags.includes(FLAGS.SELFIE_LIVENESS_RISK)) return { ok: false, reason: REASONS.SPOOF };
+  if (flags.includes(FLAGS.FACE_MISMATCH)) return { ok: false, reason: REASONS.MISMATCH };
+  if (flags.includes(FLAGS.ID_PHOTO_NOT_FOUND)) return { ok: false, reason: REASONS.MISMATCH };
+  if (flags.includes(FLAGS.SELFIE_MISSING)) return { ok: false, reason: REASONS.MISMATCH };
+  if (Number(vision.matchConfidence) < threshold) return { ok: false, reason: REASONS.MISMATCH };
+  return { ok: true, reason: null };
 };
 
 const verifyLoginFace = async ({ referenceUrl, selfieFile }) => {
@@ -72,10 +86,11 @@ const verifyLoginFace = async ({ referenceUrl, selfieFile }) => {
       timeoutMs: visionTimeoutMs,
     });
     const threshold = loginFaceMatchThreshold();
-    const mismatch = isMismatch(parsed, threshold);
+    const { ok, reason } = judgeSelfie(parsed, threshold);
     return {
       unavailable: false,
-      match: !mismatch,
+      match: ok,
+      reason,
       matchConfidence: Number(parsed?.matchConfidence) || 0,
       livenessThreshold: faceConfig().livenessThreshold,
       model: model || null,
@@ -86,4 +101,4 @@ const verifyLoginFace = async ({ referenceUrl, selfieFile }) => {
   }
 };
 
-module.exports = { verifyLoginFace };
+module.exports = { verifyLoginFace, FACE_GATE_REASONS: REASONS };

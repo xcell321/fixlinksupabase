@@ -99,7 +99,11 @@ const login = async ({ email, password, expectedRole, faceFile }) => {
   // instead of locking the user out; only a positive mismatch blocks.
   let faceVerified = 'skipped';
   if (requireLoginFace()) {
-    if (!faceFile || !Buffer.isBuffer(faceFile.buffer) || faceFile.buffer.length === 0) {
+    // The gate photo must be a real image upload: an empty, missing, or
+    // non-image file can never satisfy the face check, so it is rejected
+    // before any verification runs and no caller can skip the selfie step.
+    const isImage = typeof faceFile?.mimetype === 'string' && faceFile.mimetype.startsWith('image/');
+    if (!faceFile || !Buffer.isBuffer(faceFile.buffer) || faceFile.buffer.length === 0 || !isImage) {
       throw new HttpError(400, { error: 'A live face photo is required to sign in. Take a selfie to continue.' });
     }
     const referenceUrl = userData.profile_image || userData.selfie_url;
@@ -108,6 +112,15 @@ const login = async ({ email, password, expectedRole, faceFile }) => {
     } else {
       const verdict = await verifyLoginFace({ referenceUrl, selfieFile: faceFile });
       if (!verdict.unavailable && !verdict.match) {
+        if (verdict.reason === 'NO_FACE') {
+          throw new HttpError(422, { error: 'No person detected in the selfie. Align your face in the frame and try again.' });
+        }
+        if (verdict.reason === 'COVERED') {
+          throw new HttpError(422, { error: 'Your face is covered. Remove masks, sunglasses, or anything covering your face and try again.' });
+        }
+        if (verdict.reason === 'SPOOF') {
+          throw new HttpError(401, { error: 'Spoof attempt detected. Use the live camera, not a screen or printed photo.' });
+        }
         throw new HttpError(401, { error: 'Face verification failed. The selfie does not match the face photo on this account.' });
       }
       if (!verdict.unavailable) faceVerified = true;
