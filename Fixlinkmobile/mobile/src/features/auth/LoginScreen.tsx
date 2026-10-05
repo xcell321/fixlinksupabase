@@ -193,14 +193,10 @@ export default function LoginScreen({ onLoginSuccess, switchToRegister, switchTo
          // The proxy or tunnel answered, but the API behind it is unreachable.
          setLoginError(errorMessage || 'Cannot reach the server. Check your connection and try again.');
        } else {
-          // 422 carries the face-gate verdicts (no person, covered face):
-          // they must reach the screen verbatim so the user knows what to
-          // fix, instead of collapsing into the generic fallback below.
           const messageByStatus: Record<number, string> = { 401: errorMessage || 'Incorrect email or password.',
-              403: errorMessage || 'Technician account pending approval.',
-              404: 'Profile not found.',
-              422: errorMessage || 'Face check failed. Adjust and try again.' };
-          setLoginError(messageByStatus[status] || errorMessage || 'Unable to log in.');
+             403: errorMessage || 'Technician account pending approval.',
+             404: 'Profile not found.' };
+         setLoginError(messageByStatus[status] || errorMessage || 'Unable to log in.');
        }
           } finally { setLoading(false); }
    };
@@ -212,8 +208,8 @@ export default function LoginScreen({ onLoginSuccess, switchToRegister, switchTo
          <TouchableOpacity onPress={() => { if (!loading) { setFaceStep(false); setLoginError(''); } }} disabled={loading} accessibilityRole="button" accessibilityLabel="Back to sign in" style={styles.scanBack} hitSlop={12}>
            <Ionicons name="chevron-back" size={22} color={colors.ink} />
          </TouchableOpacity>
-          <Text style={styles.scanTitle}>Face recognition</Text>
-           <Text style={styles.scanSubtitle}>Keep your face uncovered, look into the camera, and hold still</Text>
+         <Text style={styles.scanTitle}>Face recognition</Text>
+         <Text style={styles.scanSubtitle}>Please look into the camera and hold still</Text>
          <View style={styles.scanHeroFrame}>
           {cameraPermission?.granted ? (
             <CameraView ref={cameraRef} style={styles.scanCamera} facing="front" />
@@ -255,7 +251,7 @@ export default function LoginScreen({ onLoginSuccess, switchToRegister, switchTo
          {!loading && loginError ? (
            <>
              <Text style={styles.errorText}>{loginError}</Text>
-              <Text style={styles.scanGuide}>Stay in bright light with a clear, uncovered face at a straight angle. Remove masks, sunglasses, or hands covering your face. An empty frame or a photo of a screen will not sign you in.</Text>
+             <Text style={styles.scanGuide}>Please make sure you are in bright light with a clear face, facing the camera at a straight angle.</Text>
              <TouchableOpacity style={[styles.button, styles.scanButton, { backgroundColor: accent }]} onPress={() => { autoAttempted.current = true; void handleFaceSignIn(); }} activeOpacity={0.88} accessibilityRole="button" accessibilityLabel="Try face verification again">
                <Text style={styles.buttonText}>Try Again</Text>
              </TouchableOpacity>
@@ -295,7 +291,7 @@ export default function LoginScreen({ onLoginSuccess, switchToRegister, switchTo
            ><Ionicons name={showPassword ? 'eye-outline' : 'eye-off-outline'} size={18} color={colors.muted} /></TouchableOpacity>) : null}</View>{fieldErrors.password ? <Text style={styles.fieldError}>{fieldErrors.password}</Text> : null}
       <TouchableOpacity style={styles.forgotWrap} onPress={() => switchToForgotPassword(role)}><Text style={[styles.forgot, { color: accent }]}>Forgot password?</Text></TouchableOpacity>
       {loginError ? <Text style={styles.errorText}>{loginError}</Text>
-       : null}<TouchableOpacity style={[styles.button, { backgroundColor: accent }]} onPress={handleLogin} disabled={loading} activeOpacity={0.88}>{loading ?
+       : null}<TouchableOpacity style={[styles.button, { backgroundColor: accent  }]} onPress={handleLogin} disabled={loading} activeOpacity={0.88}>{loading ?
         <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.buttonText}>Sign In</Text>}</TouchableOpacity>
       <View style={styles.registerRow}><Text style={styles.registerText}>{role === 'technician' ? 'New technician? ' : "Don't have an account? "}</Text><TouchableOpacity onPress={() => switchToRegister(role)}><Text style={[styles.registerLink, { color: accent }]}>{role === 'technician' ? 'Apply Now' : 'Register'}</Text></TouchableOpacity></View>
       <View style={styles.techLoginRow}>

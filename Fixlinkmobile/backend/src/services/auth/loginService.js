@@ -106,11 +106,18 @@ const login = async ({ email, password, expectedRole, faceFile }) => {
     if (!faceFile || !Buffer.isBuffer(faceFile.buffer) || faceFile.buffer.length === 0 || !isImage) {
       throw new HttpError(400, { error: 'A live face photo is required to sign in. Take a selfie to continue.' });
     }
-    const referenceUrl = userData.profile_image || userData.selfie_url;
+    // The signup selfie is the immutable identity reference. The public
+    // avatar must never serve as the reference: it belongs to the user to
+    // change freely, and only the owner may ever be compared against it.
+    const referenceUrl = userData.selfie_url || userData.profile_image;
     if (!referenceUrl) {
       console.warn(`Login face check skipped for ${userData.id}: no stored face photo.`);
     } else {
       const verdict = await verifyLoginFace({ referenceUrl, selfieFile: faceFile });
+      // Audit trail: which path every gated sign-in took. Scores only, never images.
+      console.log(
+        `Face gate ${userData.id}: ${verdict.unavailable ? `unavailable (${verdict.reason || 'unknown'})` : `match=${verdict.match} confidence=${verdict.matchConfidence} model=${verdict.model || 'n/a'}`}`
+      );
       if (!verdict.unavailable && !verdict.match) {
         if (verdict.reason === 'NO_FACE') {
           throw new HttpError(422, { error: 'No person detected in the selfie. Align your face in the frame and try again.' });

@@ -77,6 +77,10 @@ function startServer() {
     return app.listen(PORT, '0.0.0.0', () => {
         console.log(`Server is running on port ${PORT}`);
         try {
+            const { requireLoginFace, loginFaceMatchThreshold } = require('./domain/loginFacePolicy');
+            console.log(`Face gate at sign-in: ${requireLoginFace() ? `ON (threshold ${loginFaceMatchThreshold()})` : 'OFF (password only)'}`);
+        } catch (_) {}
+        try {
             const { getLocalIp } = require('./utils/network');
             const autoIp = getLocalIp();
             const autoUrl = `http://${autoIp}:${PORT}`;

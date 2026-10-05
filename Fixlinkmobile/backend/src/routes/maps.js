@@ -92,6 +92,12 @@ router.get('/tiles/:z/:x/:y.png', async (req, res) => {
   }
 });
 
+// Everything below spends paid LocationIQ quota, so it requires a signed-in
+// user. Only the tile route above stays open: Leaflet <img> tags cannot carry
+// Authorization headers, and tiles are cached server-side.
+const { requireAuth } = require('../middleware/requireAuth');
+router.use(requireAuth);
+
 // GET /api/maps/search?q= — forward-query geocoding, Philippines-locked.
 // Optional structured params (street/city/postalcode) boost rooftop accuracy.
 router.get('/search', async (req, res) => {

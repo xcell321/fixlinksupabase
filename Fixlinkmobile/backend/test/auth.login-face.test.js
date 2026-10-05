@@ -31,6 +31,7 @@ stub.supabaseAuth.auth.signInWithPassword = async ({ email }) => {
 
 // Controllable vision verdict for the face comparison.
 let verdict = { matchConfidence: 0.9, livenessRisk: 0.1 };
+let verdictModel = 'stub-full-judge';
 let visionBroken = false;
 const aiClientPath = require.resolve('../src/services/aiClient');
 require.cache[aiClientPath] = {
@@ -54,7 +55,7 @@ require.cache[aiClientPath] = {
           livenessRisk: verdict.livenessRisk,
           matchConfidence: verdict.matchConfidence,
         },
-        model: 'stub',
+        model: verdictModel,
       };
     },
   },
@@ -163,6 +164,20 @@ test('flag on: mismatched face is blocked with a friendly message', async () => 
     assert.match(payload.error, /face verification failed/i);
     assert.doesNotMatch(payload.error, /status code/i);
   });
+});
+
+test('flag on: fallback lite judge at 0.85 is blocked by the higher lite bar', async () => {
+  verdict = { matchConfidence: 0.85, livenessRisk: 0.1 };
+  verdictModel = 'gemini-3.5-flash-lite';
+  visionBroken = false;
+  await withEnv({ REQUIRE_LOGIN_FACE: 'true' }, async () => {
+    const response = await loginFace();
+    assert.equal(response.status, 401);
+    const payload = await response.json();
+    assert.match(payload.error, /face verification failed/i);
+  });
+  verdict = { matchConfidence: 0.9, livenessRisk: 0.1 };
+  verdictModel = 'stub-full-judge';
 });
 
 test('flag on: selfie with no person is rejected as no-person, not a generic mismatch', async () => {

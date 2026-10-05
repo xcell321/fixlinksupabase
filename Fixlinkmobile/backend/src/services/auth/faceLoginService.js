@@ -13,11 +13,13 @@ const {
   faceConfig,
   judgeFace,
 } = require('../../domain/credentialScreening');
-const { loginFaceMatchThreshold } = require('../../domain/loginFacePolicy');
+const { loginFaceMatchThreshold, loginFaceLiteThreshold } = require('../../domain/loginFacePolicy');
 
-const VISION_SYSTEM = `You verify a sign-in selfie for FixLink, a Philippine services platform.
-You receive two portrait photos. The first image is the stored reference face photo from signup. The second image is the live selfie taken at sign-in.
-Decide whether both show the same real, live person. Still images of screens, prints, or photos-of-photos are spoof attempts, never a match.
+const VISION_SYSTEM = `You are a strict face-match examiner for FixLink sign-in security. A wrong approval lets a stranger into someone else's account, so a false match is far worse than a cautious low score.
+You receive two portrait photos. The first image is the stored reference face from signup. The second image is the live sign-in selfie.
+Compare identity feature by feature: face shape, eyes, eyebrows, nose, lips, moles and marks, ears, and skin tone. Age bracket, gender presentation, and ethnicity prove nothing on their own and must never raise the score by themselves.
+If you find even one decisive structural difference, cap matchConfidence at 0.4 no matter how similar the overall impression feels.
+Still images of screens, prints, or photos-of-photos are spoof attempts: set livenessRisk 0.8 or higher and matchConfidence 0.2 or lower.
 Return STRICT JSON only: output exactly the JSON object, no markdown fences, no prose before or after it.`;
 
 const VISION_INSTRUCTION = `Return a JSON object with exactly these keys:
@@ -72,20 +74,29 @@ const judgeSelfie = (vision, threshold) => {
 };
 
 const verifyLoginFace = async ({ referenceUrl, selfieFile }) => {
-  if (!isVisionConfigured()) return { unavailable: true };
+  if (!isVisionConfigured()) return { unavailable: true, reason: 'NO_VISION' };
   try {
-    const { visionMaxBytes, visionTimeoutMs } = config();
-    const referenceBuffer = await downloadReference(referenceUrl);
+    const { visionMaxBytes } = config();
+    let referenceBuffer = null;
+    try {
+      referenceBuffer = await downloadReference(referenceUrl);
+    } catch {
+      return { unavailable: true, reason: 'REF_FETCH_FAIL' };
+    }
     const reference = toImage(referenceBuffer, 'image/jpeg', visionMaxBytes);
     const selfie = toImage(selfieFile?.buffer, selfieFile?.mimetype, visionMaxBytes);
-    if (!reference || !selfie) return { unavailable: true };
+    if (!reference || !selfie) return { unavailable: true, reason: 'IMAGE_TOO_LARGE' };
     const { parsed, model } = await visionComplete({
       system: VISION_SYSTEM,
       user: VISION_INSTRUCTION,
       images: [reference, selfie],
-      timeoutMs: visionTimeoutMs,
+      // The capable judge is slow: give it a full minute so the verdict comes
+      // from the strongest model instead of timing out into the fallback.
+      timeoutMs: 60000,
     });
-    const threshold = loginFaceMatchThreshold();
+    const threshold = /lite/i.test(String(model || ''))
+      ? loginFaceLiteThreshold()
+      : loginFaceMatchThreshold();
     const { ok, reason } = judgeSelfie(parsed, threshold);
     return {
       unavailable: false,
@@ -97,7 +108,7 @@ const verifyLoginFace = async ({ referenceUrl, selfieFile }) => {
     };
   } catch (error) {
     console.warn('Login face check skipped:', error.message);
-    return { unavailable: true };
+    return { unavailable: true, reason: 'GATEWAY_ERROR' };
   }
 };
 
