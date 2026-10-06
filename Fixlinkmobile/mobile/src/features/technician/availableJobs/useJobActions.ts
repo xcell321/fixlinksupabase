@@ -2,7 +2,7 @@
 // Moved verbatim from AvailableJobsScreen.tsx: accept/decline with confirm
 // modals, arrival/start, no-show reporting, and the OTP verify handshake.
 // All Alert copy, optimistic updates and error mapping are unchanged.
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Alert } from 'react-native';
 import {
   acceptRepairRequest,
@@ -59,7 +59,9 @@ export const useJobActions = ({
   const [startedNotice, setStartedNotice] = useState<boolean>(false);
   const [completedNotice, setCompletedNotice] = useState<boolean>(false);
 
-  const handleAcceptJob = (job: JobItem): void => {
+  // Stable identity so the memoized job cards skip re-renders when
+  // unrelated screen state changes. Logic is unchanged.
+  const handleAcceptJob = useCallback((job: JobItem): void => {
     if (!technician?.uid) {
       setAcceptError('Please sign in with a verified technician account.');
       return;
@@ -75,7 +77,7 @@ export const useJobActions = ({
     // which left taps doing nothing with no message shown.
     setAcceptError(null);
     setConfirmJob(job);
-  };
+  }, [technician?.uid, acceptingJobId, workloadStatus]);
 
   const doAcceptJob = async (): Promise<void> => {
     const job = confirmJob;
@@ -124,11 +126,11 @@ export const useJobActions = ({
     }
   };
 
-  const handleDeclineJob = (job: JobItem): void => {
+  const handleDeclineJob = useCallback((job: JobItem): void => {
     if (!technician?.uid) return;
     setAcceptError(null);
     setDismissJob(job);
-  };
+  }, [technician?.uid]);
 
   const doDismissJob = async (): Promise<void> => {
     const job = dismissJob;
@@ -150,7 +152,7 @@ export const useJobActions = ({
     }
   };
 
-  const handleArrival = async (job: JobItem): Promise<void> => {
+  const handleArrival = useCallback(async (job: JobItem): Promise<void> => {
     if (!technician?.uid) return;
     setActionLoadingId(job.id);
     try {
@@ -180,9 +182,9 @@ export const useJobActions = ({
     } finally {
       setActionLoadingId(null);
     }
-  };
+  }, [technician?.uid, loadJobs]);
 
-  const handleStartJob = async (job: JobItem): Promise<void> => {
+  const handleStartJob = useCallback(async (job: JobItem): Promise<void> => {
     if (!technician?.uid) return;
     setActionLoadingId(job.id);
     try {
@@ -208,7 +210,7 @@ export const useJobActions = ({
     } finally {
       setActionLoadingId(null);
     }
-  };
+  }, [technician?.uid, loadJobs]);
 
   // UAT #2: the no-show report is only accepted once the technician has
   // recorded an arrival and waited the window, so the action reports the
@@ -222,7 +224,7 @@ export const useJobActions = ({
     return null;
   };
 
-  const handleNoShow = (job: JobItem): void => {
+  const handleNoShow = useCallback((job: JobItem): void => {
     if (!technician?.uid) return;
     const blocked = noShowGateMessage(job);
     if (blocked) {
@@ -231,7 +233,7 @@ export const useJobActions = ({
     }
     setAcceptError(null);
     setNoShowJob(job);
-  };
+  }, [technician?.uid]);
 
   const doNoShow = async (): Promise<void> => {
     const job = noShowJob;
@@ -268,12 +270,12 @@ export const useJobActions = ({
     }
   };
 
-  const openOtpModal = (job: JobItem): void => {
+  const openOtpModal = useCallback((job: JobItem): void => {
     setSelectedJobForOtp(job);
     setOtpCode('');
     setOtpError(null);
     setOtpModalVisible(true);
-  };
+  }, []);
 
   // Typing clears the last failure so the message never outlives the attempt.
   const handleOtpCodeChange = (code: string): void => {

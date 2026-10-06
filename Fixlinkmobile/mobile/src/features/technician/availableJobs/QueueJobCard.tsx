@@ -26,14 +26,16 @@ interface QueueJobCardProps {
   onPreviewPhoto: (url: string | null) => void;
 }
 
-export const QueueJobCard = ({
+// Memoized: props are the job plus stable callbacks, so a card re-renders
+// only when its own job changes. No visual or behavior change.
+export const QueueJobCard = React.memo(function QueueJobCard({
   job,
   acceptingJobId,
   onAccept,
   onDecline,
   onOpenDetails,
   onPreviewPhoto,
-}: QueueJobCardProps): React.JSX.Element => {
+}: QueueJobCardProps): React.JSX.Element {
   // "[Brand] words" -> show the words, and the brand only when it is all there is.
   const { brand, text } = splitJobDescription(job.description);
   const problemPreview = text || brand || '';
@@ -171,4 +173,4 @@ export const QueueJobCard = ({
     </View>
   </View>
   );
-};
+});

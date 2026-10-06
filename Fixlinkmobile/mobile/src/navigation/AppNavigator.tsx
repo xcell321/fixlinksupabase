@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Pressable, StatusBar, Modal, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
@@ -29,6 +29,7 @@ import MessageBanner from '../components/MessageBanner';
 import AssistantSheet from '../components/AssistantSheet';
 import { FadeInView } from '../components/animations';
 import type { AssistantContext } from '../components/AssistantSheet';
+import type { JobItem } from '../features/technician/availableJobsHelpers';
 
 type NavTab = { key: string; label: string; icon: IconName };
 
@@ -140,6 +141,11 @@ export default function AppNavigator() {
   const [technicianTab, setTechnicianTab] = useState('jobs');
   const [selectedJobForMap, setSelectedJobForMap] = useState<SelectedJob | null>(null);
   const [selectedChatTarget, setSelectedChatTarget] = useState<ChatTarget | null>(null);
+  // Stable technician job navigations: the jobs screen passes these down to
+  // memoized cards, so a new identity on every render would re-render them.
+  // Setters are stable, so empty deps are correct. Logic is unchanged.
+  const goTechJobsMap = useCallback((job: JobItem) => { setSelectedJobForMap(job); setTechnicianTab('map'); }, []);
+  const goTechJobsChat = useCallback((job: JobItem) => { setSelectedChatTarget(job); setTechnicianTab('chat'); }, []);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [chatNotifications, setChatNotifications] = useState<NotificationItem[]>([]);
   const [selectedNotification, setSelectedNotification] = useState<NotificationItem | null>(null);
@@ -547,7 +553,7 @@ export default function AppNavigator() {
     customerTab === 'profile' ? <CustomerProfileScreen user={user} onLogout={handleLogout} onUpdateProfile={handleCustomerProfileUpdate} onNavigateToProgress={() => { setAcceptedOnlyProgress(false); setCustomerTab('progress'); }} onOpenNotifications={() => setNotificationsOpen(true)} onOpenAssistant={() => openAssistant()} /> : 
     <ChatScreen currentUser={user} initialTarget={selectedChatTarget} onActiveConversationChange={setActiveChatJobId} />
   ) : (
-    technicianTab === 'jobs' ? <AvailableJobsScreen technician={user} notificationCount={unreadCount} highlightedJobId={technicianHighlightedJobId} onOpenNotifications={() => setNotificationsOpen(true)} onNavigateToMap={(job) => { setSelectedJobForMap(job); setTechnicianTab('map'); }} onNavigateToChat={(job) => { setSelectedChatTarget(job); setTechnicianTab('chat'); }} /> : 
+    technicianTab === 'jobs' ? <AvailableJobsScreen technician={user} notificationCount={unreadCount} highlightedJobId={technicianHighlightedJobId} onOpenNotifications={() => setNotificationsOpen(true)} onNavigateToMap={goTechJobsMap} onNavigateToChat={goTechJobsChat} /> : 
     technicianTab === 'map' ? (selectedJobForMap ? <TechnicianTrackerScreen currentUser={user} selectedJob={selectedJobForMap} onNavigateToJobs={() => setSelectedJobForMap(null)} /> : <TechMapScreen technician={user} onOpenJob={(job) => { setTechnicianHighlightedJobId(job.id); setTechnicianTab('jobs'); }} />) : 
     technicianTab === 'chat' ? <ChatScreen currentUser={user} initialTarget={selectedChatTarget} onActiveConversationChange={setActiveChatJobId} /> :
     <TechnicianProfileScreen technician={user as TechnicianScreenProp} onLogout={handleLogout} onProfileUpdate={handleTechnicianProfileUpdate} />
