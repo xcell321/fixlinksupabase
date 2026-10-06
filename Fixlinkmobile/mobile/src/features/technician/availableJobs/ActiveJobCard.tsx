@@ -31,7 +31,9 @@ const ticketRefOf = (id?: string): string => {
   return cleaned ? cleaned.slice(0, 6) : 'PENDING';
 };
 
-export const ActiveJobCard = ({
+// Memoized: props are the job plus stable callbacks, so a card re-renders
+// only when its own job changes. No visual or behavior change.
+export const ActiveJobCard = React.memo(function ActiveJobCard({
   job,
   actionLoadingId,
   onArrival,
@@ -42,7 +44,7 @@ export const ActiveJobCard = ({
   onNavigateToMap,
   onNavigateToChat,
   onPreviewPhoto,
-}: ActiveJobCardProps): React.JSX.Element => {
+}: ActiveJobCardProps): React.JSX.Element {
   const isInProgress = job.status === 'In Progress';
   const hasArrived = Boolean(job.technicianArrivalAt);
   const isArrivalEligible = canMarkArrival(job);
@@ -370,4 +372,4 @@ export const ActiveJobCard = ({
       </View>
     </View>
   );
-};
+});

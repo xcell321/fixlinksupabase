@@ -2,7 +2,7 @@
 // Moved verbatim from AvailableJobsScreen.tsx: feed state, GPS refresh,
 // loadJobs with overlap guard + per-technician cache, the silent 8s poll,
 // and pull-to-refresh. No behavior change.
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Location from 'expo-location';
 import { fetchRepairRequests, fetchTechnicianJobs, updateTechnicianLocation } from '../../../services/api';
 import type { JobItem } from '../availableJobsHelpers';
@@ -48,7 +48,9 @@ export const useTechnicianJobs = (technician: TechnicianRef): UseTechnicianJobsR
       : null
   );
 
-  const getUpdatedTechCoords = async (): Promise<Coords | null> => {
+  // Stable identity so consumers (memoized cards, pull-to-refresh) do not
+  // see a new function every render. Reads stay identical to before.
+  const getUpdatedTechCoords = useCallback(async (): Promise<Coords | null> => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status === 'granted') {
@@ -72,9 +74,9 @@ export const useTechnicianJobs = (technician: TechnicianRef): UseTechnicianJobsR
       console.warn('Could not update technician GPS:', e);
     }
     return techCoords;
-  };
+  }, [technician?.uid, techCoords]);
 
-  const loadJobs = async (opts: { background?: boolean } = {}): Promise<void> => {
+  const loadJobs = useCallback(async (opts: { background?: boolean } = {}): Promise<void> => {
     // Skip overlapping ticks. Slow tunnel responses must never stack sockets,
     // which also quiets MaxListeners warnings under many-user load.
     if (loadJobsRef.current) return;
@@ -129,7 +131,7 @@ export const useTechnicianJobs = (technician: TechnicianRef): UseTechnicianJobsR
       setRefreshing(false);
       loadJobsRef.current = false;
     }
-  };
+  }, [technician?.uid, techCoords]);
 
   useEffect(() => {
     loadJobs({ background: technician?.uid ? jobsCache.has(technician.uid) : false });
@@ -140,10 +142,10 @@ export const useTechnicianJobs = (technician: TechnicianRef): UseTechnicianJobsR
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [technician?.uid]);
 
-  const handleRefresh = (): void => {
+  const handleRefresh = useCallback((): void => {
     setRefreshing(true);
     loadJobs();
-  };
+  }, [loadJobs]);
 
   return {
     jobs,
