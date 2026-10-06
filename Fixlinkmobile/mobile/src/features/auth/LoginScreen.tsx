@@ -104,10 +104,48 @@ export default function LoginScreen({ onLoginSuccess, switchToRegister, switchTo
     if (!normalizedEmail) errors.email = 'Email is required.'; else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) errors.email = 'Enter a valid email.';
     if (!password) errors.password = 'Password is required.'; else if (password.length < 8) errors.password = 'Password must be at least 8 characters.';
     setFieldErrors(errors); setLoginError(''); if (Object.keys(errors).length) return;
-    // Credentials look fine: show the live face frame. Capture plus sign-in
-    // fire on their own once the preview reports ready.
-    autoAttempted.current = false;
-    setFaceStep(true);
+    // Step one: verify password first with a plain JSON sign-in (no selfie).
+    // The backend checks password before anything face-related, so a wrong
+    // password returns 401 here and we stay on this screen with "Incorrect".
+    // Only a correct password (200 when the face gate is off, or 400
+    // "face photo is required" when the gate is on) opens the face scanner.
+    // Face recognition itself is untouched: it still runs only inside
+    // handleFaceSignIn after this check passes.
+    setLoading(true);
+    try {
+      await api.post('/auth/login', { email: normalizedEmail, password, expectedRole: role });
+      autoAttempted.current = false;
+      setFaceStep(true);
+    } catch (error) {
+      const failure = error as RequestFailure;
+      const status = failure.response?.status;
+      const payload = failure.response?.data;
+      const errorMessage = payload && typeof payload === 'object' ? payload.error : undefined;
+      if (status == null) {
+        const timedOut = failure.code === 'ECONNABORTED' || failure.code === 'ETIMEDOUT';
+        setLoginError(timedOut
+          ? 'The server took too long to respond. Check your connection and try again.'
+          : 'Cannot reach the server. Check your connection and try again.');
+        return;
+      }
+      if (status === 502 || status === 503 || status === 504) {
+        setLoginError(errorMessage || 'Cannot reach the server. Check your connection and try again.');
+        return;
+      }
+      // Password is correct but the gate needs a selfie: this is the only
+      // error that proceeds to the face scanner. Every other error stays here.
+      if (status === 400 && /face photo is required/i.test(errorMessage || '')) {
+        autoAttempted.current = false;
+        setFaceStep(true);
+        return;
+      }
+      const messageByStatus: Record<number, string> = { 401: errorMessage || 'Incorrect email or password.',
+        403: errorMessage || 'Technician account pending approval.',
+        404: 'Profile not found.' };
+      setLoginError(messageByStatus[status] || errorMessage || 'Unable to log in.');
+    } finally {
+      setLoading(false);
+    }
    };
    // One automatic attempt per step visit: capture, then sign in with the
    // selfie attached. A match enters the system with no further taps.
